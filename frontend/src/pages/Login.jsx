@@ -1,19 +1,21 @@
 import { useState, useContext } from "react";
 import axios from "axios";
 import toast from "react-hot-toast";
+import AuthLayout from "../components/AuthLayout";
 import { AuthContext } from "../context/AuthContext";
 
 export default function Login() {
   const { login } = useContext(AuthContext);
-  const [email, setEmail] = useState("");
+  const [identifier, setIdentifier] = useState("");
   const [password, setPassword] = useState("");
 
   const handleLogin = async (e) => {
     e.preventDefault();
+
     try {
       const res = await axios.post("http://localhost:5000/api/auth/login", {
-        email,
-        password
+        identifier,
+        password,
       });
 
       login(res.data.user, res.data.token);
@@ -24,27 +26,49 @@ export default function Login() {
   };
 
   return (
-    <div className="container mt-5" style={{ maxWidth: 400 }}>
-      <h3 className="text-center">Login</h3>
+    <AuthLayout>
+      <h2 className="fw-bold mb-3 text-center">Welcome to TasteTrail</h2>
+      <p className="text-center text-muted mb-4">Discover recipes tailored for you</p>
+
       <form onSubmit={handleLogin}>
         <div className="mb-3">
-          <label>Email</label>
-          <input 
-            type="email" className="form-control"
-            value={email} onChange={(e) => setEmail(e.target.value)}
+          <label className="form-label fw-semibold">Email or Phone</label>
+          <input
+            type="text"
+            className="form-control p-2 rounded"
+            value={identifier}
+            onChange={(e) => setIdentifier(e.target.value)}
+            required
+            style={{ border: "1px solid #bbb" }}
           />
         </div>
 
         <div className="mb-3">
-          <label>Password</label>
-          <input 
-            type="password" className="form-control"
-            value={password} onChange={(e) => setPassword(e.target.value)}
+          <label className="form-label fw-semibold">Password</label>
+          <input
+            type="password"
+            className="form-control p-2 rounded"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            required
+            style={{ border: "1px solid #bbb" }}
           />
         </div>
 
-        <button className="btn btn-primary w-100">Login</button>
+        <button className="btn btn-warning w-100 mt-2 p-2 fw-semibold">
+          Login
+        </button>
+
+        <div className="text-center mt-3">
+          <a href="/forgot-password" className="text-decoration-none fw-semibold">Forgot Password?</a>
+        </div>
+
+        <div className="text-center mt-2">
+          <a href="/register" className="text-decoration-none fw-semibold">
+            Create Account
+          </a>
+        </div>
       </form>
-    </div>
+    </AuthLayout>
   );
 }
