@@ -2,6 +2,7 @@ import { useState } from "react";
 import axios from "axios";
 import toast from "react-hot-toast";
 import AuthLayout from "../components/AuthLayout";
+import "../styles/auth.css";
 
 export default function Register() {
   const [firstName, setFirst] = useState("");
@@ -27,7 +28,9 @@ export default function Register() {
         email,
         password,
       });
+
       toast.success("Account created!");
+      window.location.href = "/login";
     } catch (err) {
       toast.error(err.response?.data?.msg || "Something went wrong");
     }
@@ -35,45 +38,72 @@ export default function Register() {
 
   return (
     <AuthLayout>
-      <h2 className="fw-bold mb-3 text-center">Create Your Account</h2>
-      <p className="text-center text-muted mb-4">Join TasteTrail today!</p>
+      <h2 className="auth-title text-center">Create Your Account</h2>
+      <p className="auth-subtitle text-center">Join TasteTrail today!</p>
 
       <form onSubmit={handleRegister}>
         <div className="row">
           <div className="col-6 mb-3">
             <label className="form-label fw-semibold">First Name</label>
-            <input className="form-control p-2" required onChange={(e) => setFirst(e.target.value)} />
+            <input
+              className="form-control auth-input"
+              required
+              onChange={(e) => setFirst(e.target.value)}
+            />
           </div>
+
           <div className="col-6 mb-3">
             <label className="form-label fw-semibold">Last Name</label>
-            <input className="form-control p-2" required onChange={(e) => setLast(e.target.value)} />
+            <input
+              className="form-control auth-input"
+              required
+              onChange={(e) => setLast(e.target.value)}
+            />
           </div>
         </div>
 
         <div className="mb-3">
           <label className="form-label fw-semibold">Phone</label>
-          <input className="form-control p-2" required onChange={(e) => setPhone(e.target.value)} />
+          <input
+            className="form-control auth-input"
+            required
+            onChange={(e) => setPhone(e.target.value)}
+          />
         </div>
 
         <div className="mb-3">
           <label className="form-label fw-semibold">Email</label>
-          <input className="form-control p-2" required onChange={(e) => setEmail(e.target.value)} />
+          <input
+            className="form-control auth-input"
+            required
+            onChange={(e) => setEmail(e.target.value)}
+          />
         </div>
 
         <div className="mb-3">
           <label className="form-label fw-semibold">Password</label>
-          <input type="password" className="form-control p-2" required onChange={(e) => setPass(e.target.value)} />
+          <input
+            type="password"
+            className="form-control auth-input"
+            required
+            onChange={(e) => setPass(e.target.value)}
+          />
         </div>
 
         <div className="mb-3">
           <label className="form-label fw-semibold">Confirm Password</label>
-          <input type="password" className="form-control p-2" required onChange={(e) => setConfirm(e.target.value)} />
+          <input
+            type="password"
+            className="form-control auth-input"
+            required
+            onChange={(e) => setConfirm(e.target.value)}
+          />
         </div>
 
-        <button className="btn btn-warning w-100 p-2 fw-semibold">Register</button>
+        <button className="btn-gradient">Register</button>
 
         <div className="text-center mt-3">
-          <a href="/login" className="fw-semibold text-decoration-none">
+          <a href="/login" className="auth-link">
             Already Registered? Login
           </a>
         </div>
