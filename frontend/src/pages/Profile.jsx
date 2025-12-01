@@ -1,4 +1,4 @@
-import { useContext, useState } from "react";
+import { useContext, useState, useEffect } from "react";
 import { AuthContext } from "../context/AuthContext";
 import axios from "axios";
 import toast from "react-hot-toast";
@@ -14,28 +14,49 @@ export default function Profile() {
   const [password, setPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
 
-  const handleProfileUpdate = async (e) => {
-    e.preventDefault();
+  // ⭐⭐⭐ Sync UI whenever user updates ⭐⭐⭐
+  useEffect(() => {
+    setFirstName(user?.firstName || "");
+    setLastName(user?.lastName || "");
+    setPhone(user?.phone || "");
+  }, [user]);
 
-    try {
-     const res = await axios.put(
-  `http://localhost:5000/api/auth/update-profile/${user._id}`,
-  { firstName, lastName, phone },
-  {
-    headers: {
-      Authorization: `Bearer ${localStorage.getItem("token")}`,
-    },
-  }
-);
+const handleProfileUpdate = async (e) => {
+  e.preventDefault();
 
-      setUser(res.data.user);
-      localStorage.setItem("user", JSON.stringify(res.data.user));
+  try {
+    const token = localStorage.getItem("token");
 
-      toast.success("Profile updated successfully!");
-    } catch (err) {
-      toast.error("Update failed");
+    const res = await fetch(`http://localhost:5000/api/auth/update-profile/${user._id}`, {
+      method: "PUT",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`
+      },
+      body: JSON.stringify({
+        firstName,
+        lastName,
+        phone,
+      }),
+    });
+
+    const data = await res.json();
+
+    if (!res.ok) {
+      alert(data.message || "Failed to update");
+      return;
     }
-  };
+
+    // ⭐⭐⭐ UPDATE FRONTEND USER STATE ⭐⭐⭐
+    setUser(data.user);                       // <-- Update React state
+    localStorage.setItem("user", JSON.stringify(data.user));  // <-- Update localStorage
+
+    alert("Profile updated!");
+  } catch (err) {
+    console.log(err);
+    alert("Something went wrong");
+  }
+};
 
   const handlePasswordChange = async (e) => {
     e.preventDefault();
