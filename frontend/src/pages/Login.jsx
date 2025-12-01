@@ -22,7 +22,7 @@ export default function Login() {
       login(res.data.user, res.data.token);
 
       toast.success("Login successful!");
-      window.location.href = "/";
+      window.location.href = "/home";
     } catch (err) {
       toast.error(err.response?.data?.msg || "Login failed");
     }
