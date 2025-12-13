@@ -1,0 +1,41 @@
+.settings-header {
+  border-bottom: 3px solid #ffc107;
+  padding-bottom: 16px;
+}
+
+.settings-card {
+  background: white;
+  border: 1px solid #e0e0e0;
+}
+
+.info-card {
+  background: linear-gradient(135deg, #fff9e6 0%, #ffffff 100%);
+  border: 2px solid #ffc107;
+  position: sticky;
+  top: 20px;
+}
+
+.form-control, .form-select {
+  padding: 12px;
+  border: 2px solid #e0e0e0;
+  border-radius: 8px;
+  transition: all 0.3s ease;
+}
+
+.form-control:focus, .form-select:focus {
+  border-color: #ffc107;
+  box-shadow: 0 0 0 4px rgba(255, 193, 7, 0.1);
+}
+
+.notification-status {
+  padding: 16px;
+  background: #f8f9fa;
+  border-radius: 8px;
+}
+
+@media (max-width: 768px) {
+  .info-card {
+    position: static;
+    margin-top: 20px;
+  }
+}

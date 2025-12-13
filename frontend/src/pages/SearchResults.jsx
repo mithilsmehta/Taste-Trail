@@ -12,6 +12,8 @@ export default function SearchResults() {
   const [error, setError] = useState("");
   const [isSaved, setIsSaved] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [servings, setServings] = useState(2);
+  const [originalRecipe, setOriginalRecipe] = useState(null);
 
   const MODEL = "meta-llama/llama-3.1-70b-instruct";
 
@@ -23,6 +25,10 @@ export default function SearchResults() {
     setLoading(true);
     setError("");
     setRecipe(null);
+    setOriginalRecipe(null);
+
+    // Check if query contains "jain" (case insensitive)
+    const isJainRecipe = /jain/i.test(query);
 
     const systemPrompt = `
 STRICT RULES:
@@ -32,11 +38,23 @@ STRICT RULES:
 {
   "name": "",
   "ingredients": ["", ""],
-  "steps": ["", ""]
+  "steps": ["", ""],
+  "servings": 2
 }
+
+${isJainRecipe ? `
+JAIN DIETARY RESTRICTIONS:
+- NEVER use root vegetables: onion, garlic, potato, carrot, radish, beetroot, turnip, ginger
+- Use alternatives: raw banana (kachcha kela) for potato when appropriate, ginger powder instead of fresh ginger
+- Use asafoetida (hing) for flavor instead of onion/garlic
+- Only suggest raw banana when it makes sense for the dish (not in every recipe)
+- For Chinese/Indo-Chinese dishes, hakka noodles, use capsicum, cabbage, spring onion greens (only green part), mushrooms
+- For bhel/chaat, use puffed rice, sev, tomatoes, cucumber, raw mango, coriander
+- Be creative with Jain-friendly vegetables: cauliflower, peas, beans, capsicum, tomatoes, cucumber, cabbage, spinach, etc.
+` : ''}
 `;
 
-    const userPrompt = `Generate a detailed recipe for: ${query}`;
+    const userPrompt = `Generate a detailed recipe for ${servings} servings: ${query}`;
 
     try {
       const res = await fetch("https://openrouter.ai/api/v1/chat/completions", {
@@ -65,6 +83,9 @@ STRICT RULES:
       if (!match) throw new Error("AI returned invalid JSON");
 
       const parsed = JSON.parse(match[0]);
+      
+      // Store original recipe for scaling
+      setOriginalRecipe(parsed);
       setRecipe(parsed);
 
     } catch (err) {
@@ -74,6 +95,52 @@ STRICT RULES:
 
     setLoading(false);
   }
+
+  // Scale ingredients based on servings
+  const scaleIngredients = (newServings) => {
+    if (!originalRecipe) return;
+
+    const originalServings = originalRecipe.servings || 2;
+    const scaleFactor = newServings / originalServings;
+
+    const scaledIngredients = originalRecipe.ingredients.map(ingredient => {
+      // Extract numbers from ingredient string
+      const numberMatch = ingredient.match(/(\d+(?:\.\d+)?(?:\/\d+)?)/);
+      
+      if (numberMatch) {
+        const originalAmount = eval(numberMatch[1]); // Handle fractions like 1/2
+        const scaledAmount = originalAmount * scaleFactor;
+        
+        // Format the scaled amount nicely
+        let formattedAmount;
+        if (scaledAmount % 1 === 0) {
+          formattedAmount = scaledAmount.toString();
+        } else if (scaledAmount < 1) {
+          // Convert to fraction for small amounts
+          const fraction = scaledAmount.toFixed(2);
+          formattedAmount = fraction;
+        } else {
+          formattedAmount = scaledAmount.toFixed(1);
+        }
+        
+        return ingredient.replace(numberMatch[1], formattedAmount);
+      }
+      
+      return ingredient;
+    });
+
+    setRecipe({
+      ...originalRecipe,
+      ingredients: scaledIngredients,
+      servings: newServings
+    });
+  };
+
+  const handleServingsChange = (newServings) => {
+    if (newServings < 1 || newServings > 20) return;
+    setServings(newServings);
+    scaleIngredients(newServings);
+  };
 
   // ⭐ SAVE TO BACKEND DATABASE
   const saveRecipe = async () => {
@@ -156,14 +223,42 @@ STRICT RULES:
         {recipe && (
           <div className="recipe-container">
             <div className="recipe-header-card shadow-sm p-4 mb-4 rounded">
-              <h3 className="fw-bold mb-3">{recipe.name}</h3>
-              <button 
-                className={`btn ${isSaved ? 'btn-secondary' : 'btn-success'}`}
-                onClick={saveRecipe}
-                disabled={saving || isSaved}
-              >
-                {saving ? '⏳ Saving...' : isSaved ? '✅ Saved!' : '❤️ Save Recipe'}
-              </button>
+              <div className="d-flex justify-content-between align-items-start flex-wrap gap-3">
+                <div>
+                  <h3 className="fw-bold mb-3">{recipe.name}</h3>
+                  
+                  {/* Servings Selector */}
+                  <div className="servings-selector">
+                    <label className="fw-semibold me-3">👥 Servings:</label>
+                    <button 
+                      className="btn btn-outline-warning btn-sm"
+                      onClick={() => handleServingsChange(servings - 1)}
+                      disabled={servings <= 1}
+                    >
+                      −
+                    </button>
+                    <span className="mx-3 fw-bold fs-5">{servings}</span>
+                    <button 
+                      className="btn btn-outline-warning btn-sm"
+                      onClick={() => handleServingsChange(servings + 1)}
+                      disabled={servings >= 20}
+                    >
+                      +
+                    </button>
+                    <small className="text-muted ms-3">
+                      (Ingredients auto-scaled)
+                    </small>
+                  </div>
+                </div>
+
+                <button 
+                  className={`btn ${isSaved ? 'btn-secondary' : 'btn-success'}`}
+                  onClick={saveRecipe}
+                  disabled={saving || isSaved}
+                >
+                  {saving ? '⏳ Saving...' : isSaved ? '✅ Saved!' : '❤️ Save Recipe'}
+                </button>
+              </div>
             </div>
 
             <div className="row g-4">
@@ -235,6 +330,33 @@ STRICT RULES:
         .recipe-header-card {
           background: linear-gradient(135deg, #fff9e6 0%, #ffffff 100%);
           border: 2px solid #ffc107;
+        }
+
+        .servings-selector {
+          display: flex;
+          align-items: center;
+          padding: 12px 16px;
+          background: white;
+          border-radius: 10px;
+          border: 2px solid #ffc107;
+          margin-top: 8px;
+        }
+
+        .servings-selector button {
+          width: 35px;
+          height: 35px;
+          border-radius: 50%;
+          font-size: 1.2rem;
+          font-weight: bold;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          padding: 0;
+        }
+
+        .servings-selector button:disabled {
+          opacity: 0.4;
+          cursor: not-allowed;
         }
 
         .ingredients-card, .steps-card {

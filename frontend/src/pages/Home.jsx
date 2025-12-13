@@ -102,12 +102,12 @@ export default function Home() {
       <h3 className="fw-bold mt-5">Trending Recipes</h3>
       <div className="row mt-3 g-4">
         {[
-          "Butter Chicken",
+          "Butter Pav Bhaji",
           "Paneer Tikka",
           "Masala Dosa",
           "Veg Biryani",
           "Pasta Alfredo",
-          "Chicken Wrap",
+          "Veg Pizza",
         ].map((recipe) => (
           <div className="col-md-4" key={recipe}>
             <div className="recipe-card shadow p-3 rounded">

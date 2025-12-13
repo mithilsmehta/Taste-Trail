@@ -8,6 +8,9 @@ import ProtectedRoute from "./components/ProtectedRoute";
 import Profile from "./pages/Profile";
 import SearchResults from "./pages/SearchResults";
 import SavedRecipes from "./pages/SavedRecipes";
+import MealPlanner from "./pages/MealPlanner";
+import GroceryList from "./pages/GroceryList";
+import MealSettings from "./pages/MealSettings";
 
 export default function App() {
   return (
@@ -57,6 +60,34 @@ export default function App() {
           element={
             <ProtectedRoute>
               <SavedRecipes />
+            </ProtectedRoute>
+          }
+        />
+
+        {/* Meal Planning & Grocery */}
+        <Route
+          path="/meal-planner"
+          element={
+            <ProtectedRoute>
+              <MealPlanner />
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/grocery-list"
+          element={
+            <ProtectedRoute>
+              <GroceryList />
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/meal-settings"
+          element={
+            <ProtectedRoute>
+              <MealSettings />
             </ProtectedRoute>
           }
         />

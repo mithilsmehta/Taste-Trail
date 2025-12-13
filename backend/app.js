@@ -18,4 +18,13 @@ app.use("/api/auth", authRoutes);
 const recipeRoutes = require("./routes/recipeRoutes");
 app.use("/api/recipes", recipeRoutes);
 
+const mealPlanRoutes = require("./routes/mealPlanRoutes");
+app.use("/api/meal-plans", mealPlanRoutes);
+
+const groceryRoutes = require("./routes/groceryRoutes");
+app.use("/api/grocery", groceryRoutes);
+
+const settingsRoutes = require("./routes/settingsRoutes");
+app.use("/api/settings", settingsRoutes);
+
 app.listen(5000, () => console.log("Server running on 5000"));
