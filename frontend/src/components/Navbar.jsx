@@ -34,8 +34,12 @@ export default function Navbar() {
      <div className="collapse navbar-collapse justify-content-end" id="navbarNav">
   {user && (
     <>
+      <Link to="/saved" className="btn btn-outline-warning me-2">
+        ❤️ Saved Recipes
+      </Link>
+
       <Link to="/profile" className="btn btn-outline-dark me-2">
-        Profile
+        👤 Profile
       </Link>
 
       <button

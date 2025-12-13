@@ -15,4 +15,7 @@ connectDB();
 const authRoutes = require("./routes/authRoutes.js");
 app.use("/api/auth", authRoutes);
 
+const recipeRoutes = require("./routes/recipeRoutes");
+app.use("/api/recipes", recipeRoutes);
+
 app.listen(5000, () => console.log("Server running on 5000"));

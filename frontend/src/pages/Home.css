@@ -1,94 +1,125 @@
-.home-container {
-  width: 100%;
-  min-height: 100vh;
-  background: #fafafa;
-}
-
-/* Hero Section */
 .hero-section {
-  background: url("https://images.unsplash.com/photo-1504674900247-0877df9cc836")
-    center/cover no-repeat;
-  height: 45vh;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  text-align: center;
-  color: white;
-  padding: 20px;
+  margin-top: 40px;
 }
 
-.hero-text h1 {
-  font-size: 42px;
-  font-weight: 800;
+.title {
+  font-size: 2.6rem;
 }
 
-.hero-text p {
-  font-size: 18px;
-  margin-bottom: 20px;
+.subtitle {
+  font-size: 1.1rem;
+  color: #555;
 }
 
-/* Search box */
-.search-box {
-  display: flex;
-  gap: 10px;
-  justify-content: center;
+.hero-carousel {
+  border-radius: 16px;
+  overflow: hidden;
 }
 
-.search-box input {
-  width: 280px;
-  padding: 12px;
-  border-radius: 8px;
-  border: none;
-  outline: none;
-}
-
-.search-box button {
-  padding: 12px 18px;
-  background: #ff7f32;
-  border: none;
-  border-radius: 8px;
-  color: white;
-  font-weight: 700;
-}
-
-/* Categories Section */
-.categories {
-  padding: 30px;
-}
-
-.categories h2 {
-  font-weight: 700;
-  margin-bottom: 15px;
-}
-
-.category-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
-  gap: 15px;
+.hero-img {
+  height: 330px;
+  object-fit: cover;
+  border-radius: 14px;
 }
 
 .category-card {
   background: white;
-  padding: 20px;
-  border-radius: 12px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-  text-align: center;
-  font-size: 20px;
-  font-weight: 600;
+  padding: 18px;
+  border-radius: 14px;
   transition: 0.3s;
 }
 
 .category-card:hover {
-  transform: translateY(-5px);
-  background: #ffe6d3;
+  transform: translateY(-6px);
+  box-shadow: 0px 5px 15px rgba(0,0,0,0.15);
 }
 
-/* Mobile Responsive */
-@media (max-width: 480px) {
-  .hero-text h1 {
-    font-size: 28px;
+.category-card .emoji {
+  font-size: 2.2rem;
+}
+
+.recipe-card {
+  border-radius: 14px;
+  transition: 0.3s;
+}
+
+.recipe-card:hover {
+  transform: scale(1.03);
+}
+
+.upload-box {
+  background: #f8f8f8;
+}
+
+/* Search Modal Styles */
+.search-modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.7);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+  animation: fadeIn 0.2s ease-in;
+}
+
+.search-modal-content {
+  background: white;
+  border-radius: 20px;
+  width: 90%;
+  max-width: 600px;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
+  animation: slideUp 0.3s ease-out;
+}
+
+.search-modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 24px 28px;
+  border-bottom: 1px solid #e0e0e0;
+}
+
+.search-modal-body {
+  padding: 28px;
+}
+
+.search-input {
+  padding: 16px 20px;
+  font-size: 1.1rem;
+  border: 2px solid #e0e0e0;
+  border-radius: 12px;
+  transition: all 0.3s;
+}
+
+.search-input:focus {
+  border-color: #ffc107;
+  box-shadow: 0 0 0 4px rgba(255, 193, 7, 0.1);
+}
+
+.search-suggestions {
+  margin-top: 20px;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
   }
-  .search-box input {
-    width: 200px;
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes slideUp {
+  from {
+    transform: translateY(50px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
   }
 }
