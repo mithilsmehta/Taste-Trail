@@ -13,6 +13,7 @@ import SavedRecipes from "./pages/SavedRecipes";
 import MealPlanner from "./pages/MealPlanner";
 import GroceryList from "./pages/GroceryList";
 import MealSettings from "./pages/MealSettings";
+import DetectIngredients from "./pages/DetectIngredients";
 import notificationManager from "./services/NotificationManager";
 
 export default function App() {
@@ -101,6 +102,15 @@ export default function App() {
           element={
             <ProtectedRoute>
               <MealSettings />
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/detect"
+          element={
+            <ProtectedRoute>
+              <DetectIngredients />
             </ProtectedRoute>
           }
         />
