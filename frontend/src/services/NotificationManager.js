@@ -3,6 +3,7 @@
 class NotificationManager {
   constructor() {
     this.scheduledNotifications = [];
+    this.initializedForToken = "";
   }
 
   // Request notification permission from browser
@@ -54,24 +55,21 @@ class NotificationManager {
   }
 
   // Schedule a notification for a specific time
-  scheduleNotification(mealType, mealTime, offsetMinutes, ingredients = []) {
+  scheduleNotification(mealType, mealTime, offsetMinutes, ingredients = [], reminderTime = "") {
     if (!this.isPermitted()) {
       console.log("Notifications not permitted");
       return null;
     }
 
-    // Parse meal time (HH:MM format)
-    const [hours, minutes] = mealTime.split(":").map(Number);
-    
-    // Create date object for today's meal time
-    const mealDate = new Date();
-    mealDate.setHours(hours, minutes, 0, 0);
+    const [hours, minutes] = (reminderTime || mealTime).split(":").map(Number);
 
-    // Calculate notification time (offset minutes before meal)
-    const notificationTime = new Date(mealDate.getTime() - offsetMinutes * 60000);
+    const notificationTime = new Date();
+    notificationTime.setHours(hours, minutes, 0, 0);
+    if (!reminderTime) {
+      notificationTime.setMinutes(notificationTime.getMinutes() - offsetMinutes);
+    }
     const now = new Date();
 
-    // If notification time has passed today, schedule for tomorrow
     if (notificationTime <= now) {
       notificationTime.setDate(notificationTime.getDate() + 1);
     }
@@ -95,8 +93,7 @@ class NotificationManager {
         }
       );
 
-      // Reschedule for next day
-      this.scheduleNotification(mealType, mealTime, offsetMinutes, ingredients);
+      this.scheduleNotification(mealType, mealTime, offsetMinutes, ingredients, reminderTime);
     }, delay);
 
     // Store timeout ID for cancellation
@@ -127,6 +124,11 @@ class NotificationManager {
 
   // Schedule all meal notifications based on settings and meal plans
   async scheduleAllMealNotifications(settings, mealPlans) {
+    if (!settings.appNotificationsEnabled && !settings.notificationsEnabled) {
+      this.cancelAllNotifications();
+      return;
+    }
+
     if (!this.isPermitted()) {
       console.log("Notifications not permitted");
       return;
@@ -135,39 +137,98 @@ class NotificationManager {
     // Cancel existing notifications
     this.cancelAllNotifications();
 
-    const { mealTimes, notificationOffset } = settings;
+    const { mealTimes, notificationOffset, reminderMode, reminderTimes } = settings;
+    const firstPlannedMeal = (mealType) => {
+      const plans = mealPlans?.[mealType];
+      return Array.isArray(plans) ? plans.find(Boolean) : plans;
+    };
 
     // Schedule breakfast notification
-    if (mealPlans.breakfast) {
+    const breakfastPlan = firstPlannedMeal("breakfast");
+    if (breakfastPlan) {
       this.scheduleNotification(
         "breakfast",
         mealTimes.breakfast,
         notificationOffset,
-        mealPlans.breakfast.recipe.ingredients
+        breakfastPlan.recipe.ingredients,
+        reminderMode === "time" ? reminderTimes?.breakfast : ""
       );
     }
 
     // Schedule lunch notification
-    if (mealPlans.lunch) {
+    const lunchPlan = firstPlannedMeal("lunch");
+    if (lunchPlan) {
       this.scheduleNotification(
         "lunch",
         mealTimes.lunch,
         notificationOffset,
-        mealPlans.lunch.recipe.ingredients
+        lunchPlan.recipe.ingredients,
+        reminderMode === "time" ? reminderTimes?.lunch : ""
       );
     }
 
     // Schedule dinner notification
-    if (mealPlans.dinner) {
+    const dinnerPlan = firstPlannedMeal("dinner");
+    if (dinnerPlan) {
       this.scheduleNotification(
         "dinner",
         mealTimes.dinner,
         notificationOffset,
-        mealPlans.dinner.recipe.ingredients
+        dinnerPlan.recipe.ingredients,
+        reminderMode === "time" ? reminderTimes?.dinner : ""
       );
     }
 
     console.log("All meal notifications scheduled");
+  }
+
+  async initializeFromSavedSettings(token) {
+    if (!token || this.initializedForToken === token) return;
+    this.initializedForToken = token;
+
+    try {
+      // App notifications are temporarily disabled. Restore the block below when enabling them again.
+      this.cancelAllNotifications();
+      return;
+
+      /*
+      const settingsRes = await fetch("http://localhost:5000/api/settings/meal-times", {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      const settings = await settingsRes.json();
+
+      const appNotificationsEnabled = settings.appNotificationsEnabled ?? settings.notificationsEnabled;
+      if (!appNotificationsEnabled) {
+        this.cancelAllNotifications();
+        return;
+      }
+
+      if (!this.isPermitted()) return;
+
+      const mealPlansRes = await fetch("http://localhost:5000/api/meal-plans/my", {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      const mealPlans = await mealPlansRes.json();
+
+      await this.scheduleAllMealNotifications(
+        {
+          mealTimes: settings.mealTimes,
+          notificationOffset: settings.notificationOffset,
+          reminderMode: settings.reminderMode || "offset",
+          reminderTimes: settings.reminderTimes,
+          appNotificationsEnabled
+        },
+        mealPlans
+      );
+      */
+    } catch (err) {
+      console.error("Failed to initialize meal notifications:", err);
+    }
+  }
+
+  resetInitialization() {
+    this.initializedForToken = "";
+    this.cancelAllNotifications();
   }
 
   // Test notification (for debugging)

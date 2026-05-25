@@ -1,4 +1,6 @@
+import { useContext, useEffect } from "react";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import { AuthContext } from "./context/AuthContext";
 import Login from "./pages/Login";
 import Register from "./pages/Register";
 import ForgotPassword from "./pages/ForgotPassword";
@@ -11,8 +13,19 @@ import SavedRecipes from "./pages/SavedRecipes";
 import MealPlanner from "./pages/MealPlanner";
 import GroceryList from "./pages/GroceryList";
 import MealSettings from "./pages/MealSettings";
+import notificationManager from "./services/NotificationManager";
 
 export default function App() {
+  const { user, token } = useContext(AuthContext);
+
+  useEffect(() => {
+    if (user && token) {
+      notificationManager.initializeFromSavedSettings(token);
+    } else {
+      notificationManager.resetInitialization();
+    }
+  }, [user, token]);
+
   return (
     <BrowserRouter>
       <Routes>

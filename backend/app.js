@@ -5,6 +5,8 @@ const connectDB = require("./utils/db.js");
 
 dotenv.config();
 
+const { startMealReminderService } = require("./services/mealReminderService");
+
 const app = express();
 app.use(cors());
 app.use(express.json());
@@ -27,4 +29,7 @@ app.use("/api/grocery", groceryRoutes);
 const settingsRoutes = require("./routes/settingsRoutes");
 app.use("/api/settings", settingsRoutes);
 
-app.listen(5000, () => console.log("Server running on 5000"));
+app.listen(5000, () => {
+  console.log("Server running on 5000");
+  startMealReminderService();
+});

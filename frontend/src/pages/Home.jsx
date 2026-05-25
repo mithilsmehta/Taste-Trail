@@ -10,11 +10,129 @@ import img5 from "../assets/img5.jpg";
 import img6 from "../assets/img6.jpg";
 import Navbar from "../components/Navbar";
 
+const categories = [
+  {
+    name: "Indian",
+    icon: "🍛",
+    dishes: [
+      "Paneer Tikka",
+      "Masala Dosa",
+      "Veg Biryani",
+      "Chole Bhature",
+      "Pav Bhaji",
+      "Rajma Chawal",
+      "Palak Paneer",
+      "Aloo Paratha",
+      "Dhokla",
+      "Dal Tadka",
+      "Idli Sambar",
+      "Veg Pulao",
+    ],
+  },
+  {
+    name: "Italian",
+    icon: "🍝",
+    dishes: [
+      "Margherita Pizza",
+      "Pasta Alfredo",
+      "Arrabbiata Pasta",
+      "Pesto Pasta",
+      "Veg Lasagna",
+      "Mushroom Risotto",
+      "Bruschetta",
+      "Minestrone Soup",
+      "Caprese Salad",
+      "Garlic Bread",
+      "Focaccia",
+      "Four Cheese Pizza",
+    ],
+  },
+  {
+    name: "Chinese",
+    icon: "🥡",
+    dishes: [
+      "Veg Manchurian",
+      "Veg Hakka Noodles",
+      "Chilli Paneer",
+      "Veg Fried Rice",
+      "Spring Rolls",
+      "Schezwan Noodles",
+      "Hot and Sour Soup",
+      "Honey Chilli Potato",
+      "Veg Momos",
+      "Crispy Corn",
+      "Kung Pao Tofu",
+      "Chilli Garlic Noodles",
+    ],
+  },
+  {
+    name: "Desserts",
+    icon: "🍰",
+    dishes: [
+      "Gulab Jamun",
+      "Rasgulla",
+      "Kheer",
+      "Jalebi",
+      "Chocolate Brownie",
+      "Fruit Custard",
+      "Cheesecake",
+      "Tiramisu",
+      "Mango Mousse",
+      "Carrot Halwa",
+      "Ice Cream Sundae",
+      "Apple Pie",
+    ],
+  },
+  {
+    name: "Breakfast",
+    icon: "🥣",
+    dishes: [
+      "Poha",
+      "Upma",
+      "Masala Dosa",
+      "Idli Sambar",
+      "Aloo Paratha",
+      "Besan Chilla",
+      "Moong Dal Chilla",
+      "Oats Porridge",
+      "Vegetable Sandwich",
+      "Thepla",
+      "Avocado Toast",
+      "Smoothie Bowl",
+    ],
+  },
+  {
+    name: "Healthy",
+    icon: "🥗",
+    dishes: [
+      "Quinoa Salad",
+      "Sprouts Chaat",
+      "Vegetable Soup",
+      "Buddha Bowl",
+      "Millet Khichdi",
+      "Greek Salad",
+      "Paneer Salad",
+      "Lentil Soup",
+      "Grilled Vegetable Wrap",
+      "Hummus Bowl",
+      "Stuffed Bell Peppers",
+      "Fruit Smoothie",
+    ],
+  },
+];
+
 export default function Home() {
   const { user } = useContext(AuthContext);
   const navigate = useNavigate();
   const [showSearchModal, setShowSearchModal] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
+  const [selectedCategory, setSelectedCategory] = useState(null);
+
+  const openRecipe = (recipeName) => {
+    navigate(`/search?q=${encodeURIComponent(recipeName)}`);
+    setSelectedCategory(null);
+    setShowSearchModal(false);
+  };
 
   return (
     <>
@@ -25,7 +143,7 @@ export default function Home() {
       <div className="row align-items-center hero-section">
         {/* LEFT SIDE */}
         <div className="col-md-6 text-section">
-          <h1 className="fw-bold title">Welcome, {user?.firstName}! 👋</h1>
+          <h1 className="fw-bold title">Welcome, {user?.firstName} </h1>
           <p className="subtitle">
             Discover delicious recipes, detect ingredients from photos, and instantly generate meals with AI.
           </p>
@@ -74,20 +192,12 @@ export default function Home() {
       {/* ---------------- CATEGORIES ---------------- */}
       <h3 className="fw-bold mt-5">Categories</h3>
       <div className="row mt-3 g-4">
-        {[
-          { name: "Indian", icon: "🍛" },
-          { name: "Italian", icon: "🍝" },
-          { name: "Chinese", icon: "🥡" },
-          { name: "Desserts", icon: "🍰" },
-          { name: "Breakfast", icon: "🍳" },
-          { name: "Healthy", icon: "🥗" },
-        ].map((cat) => (
+        {categories.map((cat) => (
           <div className="col-6 col-md-4 col-lg-2" key={cat.name}>
             <div 
               className="category-card shadow-sm text-center"
               onClick={() => {
-                setSearchQuery(cat.name);
-                setShowSearchModal(true);
+                setSelectedCategory(cat);
               }}
               style={{ cursor: "pointer" }}
             >
@@ -117,7 +227,7 @@ export default function Home() {
               </p>
               <button 
                 className="btn btn-warning w-100"
-                onClick={() => navigate(`/search?q=${recipe}`)}
+                onClick={() => openRecipe(recipe)}
               >
                 View Recipe
               </button>
@@ -166,14 +276,11 @@ export default function Home() {
               <div className="search-suggestions mt-4">
                 <p className="text-muted mb-2">Popular Searches:</p>
                 <div className="d-flex flex-wrap gap-2">
-                  {["Butter Chicken", "Pasta Carbonara", "Biryani", "Pizza", "Tacos", "Sushi"].map((suggestion) => (
+                  {["Paneer Tikka", "Masala Dosa", "Veg Biryani", "Margherita Pizza", "Rajma Chawal", "Veg Hakka Noodles"].map((suggestion) => (
                     <button
                       key={suggestion}
                       className="btn btn-outline-secondary btn-sm"
-                      onClick={() => {
-                        navigate(`/search?q=${suggestion}`);
-                        setShowSearchModal(false);
-                      }}
+                      onClick={() => openRecipe(suggestion)}
                     >
                       {suggestion}
                     </button>
@@ -197,8 +304,38 @@ export default function Home() {
           </div>
         </div>
       )}
+
+      {/* ---------------- CATEGORY DISH MODAL ---------------- */}
+      {selectedCategory && (
+        <div className="search-modal-overlay" onClick={() => setSelectedCategory(null)}>
+          <div className="search-modal-content category-dishes-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="search-modal-header">
+              <h3 className="fw-bold mb-0">
+                {selectedCategory.icon} {selectedCategory.name} Dishes
+              </h3>
+              <button
+                className="btn-close"
+                onClick={() => setSelectedCategory(null)}
+              ></button>
+            </div>
+
+            <div className="search-modal-body">
+              <div className="category-dish-grid">
+                {selectedCategory.dishes.map((dish) => (
+                  <button
+                    key={dish}
+                    className="category-dish-btn"
+                    onClick={() => openRecipe(dish)}
+                  >
+                    {dish}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
     </>
   );
 }
-

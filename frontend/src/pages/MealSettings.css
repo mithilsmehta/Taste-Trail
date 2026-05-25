@@ -27,15 +27,118 @@
   box-shadow: 0 0 0 4px rgba(255, 193, 7, 0.1);
 }
 
+.time-dropdown-picker {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(76px, 0.8fr);
+  gap: 10px;
+}
+
+.time-dropdown-picker .form-select {
+  font-weight: 700;
+  text-align: center;
+  text-align-last: center;
+}
+
 .notification-status {
   padding: 16px;
   background: #f8f9fa;
   border-radius: 8px;
 }
 
+.notification-toggle {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+  padding: 16px;
+  background: #f8f9fa;
+  border: 1px solid #e9ecef;
+  border-radius: 8px;
+}
+
+.notification-toggle .form-switch {
+  padding-left: 0;
+}
+
+.notification-toggle .form-check-input {
+  width: 3rem;
+  height: 1.55rem;
+  margin-left: 0;
+  cursor: pointer;
+}
+
+.reminder-mode-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.reminder-mode-option {
+  border: 2px solid #e0e0e0;
+  background: #fff;
+  border-radius: 8px;
+  color: #212529;
+  font-weight: 700;
+  padding: 12px;
+  transition: all 0.2s ease;
+}
+
+.reminder-mode-option.active {
+  background: #ffc107;
+  border-color: #ffc107;
+}
+
+.reminder-time-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px;
+}
+
 @media (max-width: 768px) {
   .info-card {
     position: static;
     margin-top: 20px;
+  }
+
+  .settings-card {
+    padding: 18px !important;
+  }
+
+  .notification-status .d-flex {
+    align-items: flex-start !important;
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .notification-status .btn {
+    width: 100%;
+  }
+
+  .notification-toggle {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .time-dropdown-picker {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(76px, 0.8fr);
+  }
+
+  .reminder-time-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 480px) {
+  .reminder-mode-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .time-dropdown-picker {
+    gap: 8px;
+  }
+
+  .time-dropdown-picker .form-select {
+    padding-left: 8px;
+    padding-right: 8px;
   }
 }

@@ -16,10 +16,87 @@
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
 }
 
+.meal-section h4 {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.meal-count {
+  color: #6c757d;
+  font-size: 0.95rem;
+  font-weight: 600;
+  text-transform: none;
+}
+
+.recipe-grocery-list {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.recipe-grocery-group {
+  border: 2px solid #e9ecef;
+  border-radius: 12px;
+  overflow: hidden;
+  background: #fff;
+}
+
+.recipe-grocery-header {
+  width: 100%;
+  border: 0;
+  background: #fff8e1;
+  padding: 16px 18px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  text-align: left;
+}
+
+.recipe-grocery-title,
+.recipe-grocery-meta {
+  display: block;
+}
+
+.recipe-grocery-title {
+  color: #212529;
+  font-size: 1.15rem;
+  font-weight: 800;
+}
+
+.recipe-grocery-meta {
+  margin-top: 2px;
+  color: #6c757d;
+  font-size: 0.95rem;
+  font-weight: 600;
+}
+
+.recipe-chevron {
+  width: 34px;
+  height: 34px;
+  border-radius: 999px;
+  background: #ffc107;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  color: #212529;
+  font-size: 1.5rem;
+  line-height: 1;
+  transition: transform 0.2s ease;
+}
+
+.recipe-chevron.expanded {
+  transform: rotate(180deg);
+}
+
 .grocery-items {
   display: flex;
   flex-direction: column;
   gap: 12px;
+  padding: 14px;
 }
 
 .grocery-item {
@@ -47,6 +124,8 @@
   display: flex;
   align-items: center;
   flex: 1;
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 
 .form-check-input {
@@ -56,20 +135,29 @@
 }
 
 .btn-blinkit {
-  background: #F8CB46;
-  color: #000;
+  background: #ffd43b;
+  color: #1f1f1f;
   font-weight: 600;
-  border: none;
-  padding: 8px 16px;
+  border: 2px solid #f2b705;
+  border-radius: 999px;
+  padding: 8px 18px;
   display: flex;
   align-items: center;
+  box-shadow: 0 3px 0 #d99a00;
   transition: all 0.2s ease;
 }
 
 .btn-blinkit:hover {
-  background: #f0c040;
-  transform: scale(1.05);
-  color: #000;
+  background: #ffc107;
+  border-color: #d99a00;
+  transform: translateY(-1px);
+  color: #1f1f1f;
+  box-shadow: 0 4px 0 #c28600;
+}
+
+.btn-blinkit:active {
+  transform: translateY(1px);
+  box-shadow: 0 1px 0 #c28600;
 }
 
 .empty-state {
@@ -87,6 +175,23 @@
 }
 
 @media (max-width: 768px) {
+  .meal-section {
+    padding: 16px;
+  }
+
+  .recipe-grocery-header {
+    padding: 14px;
+  }
+
+  .recipe-grocery-title {
+    font-size: 1rem;
+  }
+
+  .recipe-grocery-meta,
+  .meal-count {
+    font-size: 0.85rem;
+  }
+
   .grocery-item {
     flex-direction: column;
     align-items: flex-start;
@@ -108,5 +213,9 @@
 
   .filter-buttons .btn {
     width: 100%;
+  }
+
+  .empty-state {
+    padding: 36px 16px;
   }
 }

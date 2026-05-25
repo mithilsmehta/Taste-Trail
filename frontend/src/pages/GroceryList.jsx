@@ -1,13 +1,83 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import Navbar from "../components/Navbar";
+import { formatIngredientAmount, splitIngredientLine } from "../utils/recipeFormatting";
+import { getMondayDateKey, getWeekFromDateKey, toDateKey } from "../utils/weekPlan";
 import "./GroceryList.css";
+
+const quantityWords = new Set([
+  "a",
+  "an",
+  "one",
+  "two",
+  "three",
+  "four",
+  "five",
+  "six",
+  "seven",
+  "eight",
+  "nine",
+  "ten"
+]);
+
+const units = new Set([
+  "cup",
+  "cups",
+  "teaspoon",
+  "teaspoons",
+  "tsp",
+  "tablespoon",
+  "tablespoons",
+  "tbsp",
+  "gram",
+  "grams",
+  "g",
+  "kg",
+  "kilogram",
+  "kilograms",
+  "ml",
+  "liter",
+  "liters",
+  "litre",
+  "litres",
+  "pinch",
+  "pinches",
+  "piece",
+  "pieces",
+  "clove",
+  "cloves",
+  "slice",
+  "slices",
+  "small",
+  "medium",
+  "large"
+]);
+
+const prepWords = new Set([
+  "chopped",
+  "diced",
+  "sliced",
+  "minced",
+  "grated",
+  "crushed",
+  "finely",
+  "roughly",
+  "thinly",
+  "fresh",
+  "optional",
+  "to",
+  "taste"
+]);
 
 export default function GroceryList() {
   const navigate = useNavigate();
-  const [groceryItems, setGroceryItems] = useState([]);
+  const [mealPlans, setMealPlans] = useState([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState("all");
+  const [expandedRecipes, setExpandedRecipes] = useState({});
+  const [checkedItems, setCheckedItems] = useState({});
+  const currentWeekStartDate = getMondayDateKey(toDateKey(new Date()));
+  const currentWeekDays = getWeekFromDateKey(currentWeekStartDate);
 
   useEffect(() => {
     loadGroceryList();
@@ -16,12 +86,26 @@ export default function GroceryList() {
   const loadGroceryList = async () => {
     try {
       const token = localStorage.getItem("token");
-      const res = await fetch("http://localhost:5000/api/grocery/list", {
+      await fetch(`http://localhost:5000/api/grocery/list?startDate=${currentWeekStartDate}`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+
+      const res = await fetch(`http://localhost:5000/api/meal-plans/my?startDate=${currentWeekStartDate}`, {
         headers: { Authorization: `Bearer ${token}` }
       });
 
       const data = await res.json();
-      setGroceryItems(data.items || []);
+      const plans = ["breakfast", "lunch", "dinner"].flatMap((mealType) => {
+        return Array.isArray(data?.[mealType])
+          ? data[mealType].filter(Boolean).map((plan, dayIndex) => ({
+              ...plan,
+              mealType,
+              displayDayIndex: dayIndex
+            }))
+          : [];
+      });
+
+      setMealPlans(plans);
     } catch (err) {
       console.error(err);
       alert("Failed to load grocery list");
@@ -29,44 +113,49 @@ export default function GroceryList() {
     setLoading(false);
   };
 
-  const toggleMark = async (itemId, currentMarked) => {
-    try {
-      const token = localStorage.getItem("token");
-      const res = await fetch(`http://localhost:5000/api/grocery/mark/${itemId}`, {
-        method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`
-        },
-        body: JSON.stringify({ marked: !currentMarked })
-      });
+  const toggleMark = (itemId) => {
+    setCheckedItems(prev => ({
+      ...prev,
+      [itemId]: !prev[itemId]
+    }));
+  };
 
-      const data = await res.json();
+  const getBlinkitSearchTerm = (ingredient) => {
+    const withoutParentheses = ingredient.replace(/\([^)]*\)/g, " ");
+    const normalized = withoutParentheses
+      .replace(/[¼½¾⅓⅔]/g, " ")
+      .replace(/\b\d+(?:\.\d+)?(?:\/\d+)?\b/g, " ")
+      .replace(/[,+]/g, " ")
+      .toLowerCase()
+      .trim();
 
-      if (!res.ok) {
-        alert(data.msg || "Failed to update");
-        return;
-      }
+    const words = normalized
+      .split(/\s+/)
+      .filter(Boolean)
+      .filter((word) => !quantityWords.has(word))
+      .filter((word) => !units.has(word))
+      .filter((word) => !prepWords.has(word));
 
-      // Update local state
-      setGroceryItems(items =>
-        items.map(item =>
-          item._id === itemId ? { ...item, marked: !currentMarked } : item
-        )
-      );
-    } catch (err) {
-      console.error(err);
-      alert("Failed to update item");
-    }
+    const cleaned = words.join(" ").trim();
+
+    return cleaned
+      .replace(/\btomatoes\b/g, "tomato")
+      .replace(/\bpotatoes\b/g, "potato")
+      .replace(/\bonions\b/g, "onion")
+      .replace(/\bchilies\b/g, "chilli")
+      .replace(/\bchillies\b/g, "chilli")
+      .replace(/\bleaves\b/g, "leaf")
+      .trim() || ingredient;
   };
 
   const openBlinkit = (ingredient) => {
     const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
-    const blinkitLink = `https://blinkit.com/s/?q=${encodeURIComponent(ingredient)}`;
+    const searchTerm = getBlinkitSearchTerm(ingredient);
+    const blinkitLink = `https://blinkit.com/s/?q=${encodeURIComponent(searchTerm)}`;
 
     if (isMobile) {
       // Try to open Blinkit app first
-      window.location.href = `blinkit://search?q=${encodeURIComponent(ingredient)}`;
+      window.location.href = `blinkit://search?q=${encodeURIComponent(searchTerm)}`;
 
       // Fallback to web after 2 seconds if app doesn't open
       setTimeout(() => {
@@ -78,34 +167,74 @@ export default function GroceryList() {
     }
   };
 
+  const getDisplayItems = () => {
+    return mealPlans.flatMap((mealPlan) => {
+      const ingredients = mealPlan.recipe?.ingredients || [];
+
+      return ingredients.flatMap((ingredient, ingredientIndex) => {
+        return splitIngredientLine(ingredient).map((part, partIndex) => ({
+          _displayId: `${mealPlan._id}-${ingredientIndex}-${partIndex}`,
+          _sourceId: `${mealPlan._id}-${ingredientIndex}-${partIndex}`,
+          _recipeId: String(mealPlan._id),
+          _recipeTitle: mealPlan.recipe?.title || "Recipe",
+          _planDate: mealPlan.planDate || currentWeekDays[mealPlan.displayDayIndex]?.dateKey,
+          mealType: mealPlan.mealType,
+          marked: false,
+          name: part
+        }));
+      });
+    });
+  };
+
   const getFilteredItems = () => {
-    if (filter === "all") return groceryItems;
-    return groceryItems.filter(item => item.mealType === filter);
+    const displayItems = getDisplayItems();
+    if (filter === "all") return displayItems;
+    return displayItems.filter(item => item.mealType === filter);
+  };
+
+  const getMealTypeCount = (mealType) => {
+    return getDisplayItems().filter((item) => item.mealType === mealType).length;
   };
 
   const getMealIcon = (mealType) => {
     const icons = {
-      breakfast: "🍳",
+      breakfast: "🥣",
       lunch: "🍱",
       dinner: "🍽️"
     };
     return icons[mealType];
   };
 
-  const groupByMealType = (items) => {
+  const groupByMealAndRecipe = (items) => {
     const grouped = {
-      breakfast: [],
-      lunch: [],
-      dinner: []
+      breakfast: {},
+      lunch: {},
+      dinner: {}
     };
 
     items.forEach(item => {
-      if (grouped[item.mealType]) {
-        grouped[item.mealType].push(item);
+      if (!grouped[item.mealType]) return;
+
+      if (!grouped[item.mealType][item._recipeId]) {
+        grouped[item.mealType][item._recipeId] = {
+          id: item._recipeId,
+          title: item._recipeTitle,
+          mealType: item.mealType,
+          items: []
+        };
       }
+
+      grouped[item.mealType][item._recipeId].items.push(item);
     });
 
     return grouped;
+  };
+
+  const toggleRecipe = (recipeId) => {
+    setExpandedRecipes(prev => ({
+      ...prev,
+      [recipeId]: !prev[recipeId]
+    }));
   };
 
   if (loading) {
@@ -123,7 +252,8 @@ export default function GroceryList() {
   }
 
   const filteredItems = getFilteredItems();
-  const groupedItems = groupByMealType(filteredItems);
+  const groupedItems = groupByMealAndRecipe(filteredItems);
+  const displayItemCount = getDisplayItems().length;
 
   return (
     <>
@@ -149,25 +279,25 @@ export default function GroceryList() {
             className={`btn ${filter === "all" ? "btn-warning" : "btn-outline-warning"} me-2`}
             onClick={() => setFilter("all")}
           >
-            All ({groceryItems.length})
+            All ({displayItemCount})
           </button>
           <button
             className={`btn ${filter === "breakfast" ? "btn-warning" : "btn-outline-warning"} me-2`}
             onClick={() => setFilter("breakfast")}
           >
-            🍳 Breakfast ({groceryItems.filter(i => i.mealType === "breakfast").length})
+            🥣 Breakfast ({getMealTypeCount("breakfast")})
           </button>
           <button
             className={`btn ${filter === "lunch" ? "btn-warning" : "btn-outline-warning"} me-2`}
             onClick={() => setFilter("lunch")}
           >
-            🍱 Lunch ({groceryItems.filter(i => i.mealType === "lunch").length})
+            🍱 Lunch ({getMealTypeCount("lunch")})
           </button>
           <button
             className={`btn ${filter === "dinner" ? "btn-warning" : "btn-outline-warning"}`}
             onClick={() => setFilter("dinner")}
           >
-            🍽️ Dinner ({groceryItems.filter(i => i.mealType === "dinner").length})
+            🍽️ Dinner ({getMealTypeCount("dinner")})
           </button>
         </div>
 
@@ -189,43 +319,71 @@ export default function GroceryList() {
         {/* Grocery Items by Meal Type */}
         {filteredItems.length > 0 && (
           <div className="grocery-sections">
-            {Object.entries(groupedItems).map(([mealType, items]) => {
-              if (items.length === 0) return null;
+            {Object.entries(groupedItems).map(([mealType, recipesById]) => {
+              const recipeGroups = Object.values(recipesById);
+              if (recipeGroups.length === 0) return null;
+              const mealItemCount = recipeGroups.reduce((total, recipeGroup) => total + recipeGroup.items.length, 0);
 
               return (
                 <div key={mealType} className="meal-section mb-4">
                   <h4 className="fw-bold mb-3 text-capitalize">
                     {getMealIcon(mealType)} {mealType}
+                    <span className="meal-count">{recipeGroups.length} recipe{recipeGroups.length !== 1 ? "s" : ""} • {mealItemCount} items</span>
                   </h4>
 
-                  <div className="grocery-items">
-                    {items.map((item) => (
-                      <div key={item._id} className={`grocery-item ${item.marked ? 'marked' : ''}`}>
-                        <div className="item-left">
-                          <input
-                            type="checkbox"
-                            className="form-check-input me-3"
-                            checked={item.marked}
-                            onChange={() => toggleMark(item._id, item.marked)}
-                          />
-                          <span className={item.marked ? 'text-decoration-line-through text-muted' : ''}>
-                            {item.name}
-                          </span>
-                        </div>
+                  <div className="recipe-grocery-list">
+                    {recipeGroups.map((recipeGroup) => {
+                      const expanded = expandedRecipes[recipeGroup.id] ?? false;
 
-                        <button
-                          className="btn btn-blinkit btn-sm"
-                          onClick={() => openBlinkit(item.name)}
-                        >
-                          <img 
-                            src="https://cdn.grofers.com/cdn-cgi/image/f=auto,fit=scale-down,q=70,metadata=none,w=135/assets/eta-icons/15-mins-filled.png" 
-                            alt="Blinkit"
-                            style={{ width: '20px', height: '20px', marginRight: '6px' }}
-                          />
-                          Order on Blinkit
-                        </button>
-                      </div>
-                    ))}
+                      return (
+                        <div key={recipeGroup.id} className="recipe-grocery-group">
+                          <button
+                            className="recipe-grocery-header"
+                            onClick={() => toggleRecipe(recipeGroup.id)}
+                          >
+                            <div>
+                              <span className="recipe-grocery-title">{recipeGroup.title}</span>
+                              <span className="recipe-grocery-meta">
+                                {recipeGroup.items.length} ingredient{recipeGroup.items.length !== 1 ? "s" : ""}
+                              </span>
+                            </div>
+                            <span className={`recipe-chevron ${expanded ? "expanded" : ""}`}>⌄</span>
+                          </button>
+
+                          {expanded && (
+                            <div className="grocery-items">
+                              {recipeGroup.items.map((item) => (
+                                <div key={item._displayId} className={`grocery-item ${checkedItems[item._sourceId] ? 'marked' : ''}`}>
+                                  <div className="item-left">
+                                    <input
+                                      type="checkbox"
+                                      className="form-check-input me-3"
+                                      checked={Boolean(checkedItems[item._sourceId])}
+                                      onChange={() => toggleMark(item._sourceId)}
+                                    />
+                                    <span className={checkedItems[item._sourceId] ? 'text-decoration-line-through text-muted' : ''}>
+                                      {formatIngredientAmount(item.name)}
+                                    </span>
+                                  </div>
+
+                                  <button
+                                    className="btn btn-blinkit btn-sm"
+                                    onClick={() => openBlinkit(item.name)}
+                                  >
+                                    <img 
+                                      src="https://cdn.grofers.com/cdn-cgi/image/f=auto,fit=scale-down,q=70,metadata=none,w=135/assets/eta-icons/15-mins-filled.png" 
+                                      alt="Blinkit"
+                                      style={{ width: '20px', height: '20px', marginRight: '6px' }}
+                                    />
+                                    Order on Blinkit
+                                  </button>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
                   </div>
                 </div>
               );

@@ -43,7 +43,7 @@ export default function Register() {
 
       <form onSubmit={handleRegister}>
         <div className="row">
-          <div className="col-6 mb-3">
+          <div className="col-12 col-sm-6 mb-3">
             <label className="form-label fw-semibold">First Name</label>
             <input
               className="form-control auth-input"
@@ -52,7 +52,7 @@ export default function Register() {
             />
           </div>
 
-          <div className="col-6 mb-3">
+          <div className="col-12 col-sm-6 mb-3">
             <label className="form-label fw-semibold">Last Name</label>
             <input
               className="form-control auth-input"

@@ -3,7 +3,7 @@ import { motion } from "framer-motion";
 export default function AnimatedWrapper({ children }) {
   return (
     <div
-      className="d-flex justify-content-center align-items-center min-vh-100"
+      className="animated-auth-wrapper d-flex justify-content-center align-items-center min-vh-100"
       style={{
         backgroundImage: "url('/src/assets/food-bg.jpg')",
         backgroundSize: "cover",
@@ -12,6 +12,7 @@ export default function AnimatedWrapper({ children }) {
       }}
     >
       <motion.div
+        className="animated-auth-card"
         initial={{ opacity: 0, y: 40 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.6 }}

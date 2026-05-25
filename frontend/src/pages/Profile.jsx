@@ -2,6 +2,7 @@ import { useContext, useState, useEffect } from "react";
 import { AuthContext } from "../context/AuthContext";
 import axios from "axios";
 import toast from "react-hot-toast";
+import Navbar from "../components/Navbar";
 
 export default function Profile() {
   const { user, setUser } = useContext(AuthContext);
@@ -81,19 +82,22 @@ const handleProfileUpdate = async (e) => {
   };
 
   return (
-    <div className="container mt-4">
+    <>
+    <Navbar />
+    <div className="container mt-4 mb-5">
+
+      <div className="profile-topbar d-flex justify-content-between align-items-center mt-4 mb-4">
+        <button
+          className="btn btn-outline-secondary"
+          onClick={() => window.location.href = "/home"}
+        >
+          ← Back to Home
+        </button>
+
+        <h2 className="fw-bold text-center flex-grow-1 mb-0">Your Profile</h2>
+      </div>
 
       <div className="row g-4 mt-3">
-<div className="container d-flex justify-content-between align-items-center mt-4">
-  <button
-    className="btn btn-outline-secondary"
-    onClick={() => window.location.href = "/home"}
-  >
-    ← Back to Home
-  </button>
-
-  <h2 className="fw-bold text-center flex-grow-1">Your Profile</h2>
-</div>
         {/* LEFT CARD — PROFILE DETAILS */}
         <div className="col-md-6">
           <div className="card shadow p-4">
@@ -180,6 +184,29 @@ const handleProfileUpdate = async (e) => {
         </div>
 
       </div>
+
+      <style>{`
+        @media (max-width: 767.98px) {
+          .profile-topbar {
+            flex-direction: column;
+            align-items: stretch !important;
+            gap: 14px;
+          }
+
+          .profile-topbar .btn {
+            width: 100%;
+          }
+
+          .profile-topbar h2 {
+            font-size: 1.6rem;
+          }
+
+          .card {
+            padding: 20px !important;
+          }
+        }
+      `}</style>
     </div>
+    </>
   );
 }

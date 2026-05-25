@@ -1,29 +1,69 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import Navbar from "../components/Navbar";
+import { getMondayDateKey, getWeekFromDateKey, toDateKey } from "../utils/weekPlan";
+import { getDisplayIngredients } from "../utils/recipeFormatting";
+
+const defaultTimes = {
+  breakfast: "08:00",
+  lunch: "13:00",
+  dinner: "20:00"
+};
+
+const mealOptions = [
+  { type: "breakfast", icon: "🥣", name: "Breakfast" },
+  { type: "lunch", icon: "🍱", name: "Lunch" },
+  { type: "dinner", icon: "🍽️", name: "Dinner" }
+];
 
 export default function SavedRecipes() {
   const navigate = useNavigate();
+  const currentWeekStartDate = getMondayDateKey(toDateKey(new Date()));
+  const weekDays = getWeekFromDateKey(currentWeekStartDate);
   const [recipes, setRecipes] = useState([]);
+  const [mealPlans, setMealPlans] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showMealModal, setShowMealModal] = useState(false);
   const [selectedRecipe, setSelectedRecipe] = useState(null);
+  const [viewRecipe, setViewRecipe] = useState(null);
+  const [mealPlanChoice, setMealPlanChoice] = useState({
+    mealType: "",
+    dayIndex: null,
+    planDate: "",
+    existingMealPlanId: ""
+  });
 
   const fetchRecipes = async () => {
     try {
       const token = localStorage.getItem("token");
 
-      const res = await fetch("http://localhost:5000/api/recipes/my-recipes", {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      });
+      const [recipesRes, mealPlansRes] = await Promise.all([
+        fetch("http://localhost:5000/api/recipes/my-recipes", {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        }),
+        fetch("http://localhost:5000/api/meal-plans/all", {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        })
+      ]);
 
-      const data = await res.json();
-      setRecipes(data || []);
+      const recipesData = await recipesRes.json();
+      const mealPlansData = await mealPlansRes.json();
+
+      if (!recipesRes.ok) {
+        throw new Error(recipesData.msg || "Failed to load recipes");
+      }
+
+      setRecipes(recipesData || []);
+      if (mealPlansRes.ok) {
+        setMealPlans(Array.isArray(mealPlansData) ? mealPlansData : []);
+      }
     } catch (err) {
       console.error(err);
-      alert("Failed to load recipes");
+      alert(err.message || "Failed to load recipes");
     }
 
     setLoading(false);
@@ -55,29 +95,74 @@ export default function SavedRecipes() {
     }
   };
 
+  const getPlannedRecipe = (recipe) => {
+    const mealPlan = mealPlans.find((plan) => {
+      return plan?.recipe?.id === recipe._id || plan?.recipe?.title === recipe.title;
+    });
+
+    if (mealPlan) {
+      return {
+        mealPlan,
+        mealType: mealPlan.mealType,
+        dayIndex: getDayIndexForDate(mealPlan.planDate || weekDays[mealPlan.dayIndex || 0]?.dateKey),
+        planDate: mealPlan.planDate || weekDays[mealPlan.dayIndex || 0]?.dateKey || ""
+      };
+    }
+
+    return null;
+  };
+
+  const getDayIndexForDate = (dateKey) => {
+    if (!dateKey) return null;
+    const week = getWeekFromDateKey(getMondayDateKey(dateKey));
+    const dayIndex = week.findIndex((day) => day.dateKey === dateKey);
+    return dayIndex >= 0 ? dayIndex : 0;
+  };
+
+  const getDateLabel = (dateKey) => {
+    if (!dateKey) return "";
+    const week = getWeekFromDateKey(getMondayDateKey(dateKey));
+    return week.find((day) => day.dateKey === dateKey)?.fullLabel || dateKey;
+  };
+
   const openMealModal = (recipe) => {
+    const plannedRecipe = getPlannedRecipe(recipe);
+
     setSelectedRecipe(recipe);
+    setMealPlanChoice({
+      mealType: plannedRecipe?.mealType || "",
+      dayIndex: plannedRecipe?.dayIndex ?? null,
+      planDate: plannedRecipe?.planDate || "",
+      existingMealPlanId: plannedRecipe?.mealPlan?._id || ""
+    });
     setShowMealModal(true);
   };
 
-  const addToMealPlan = async (mealType) => {
+  const addToMealPlan = async () => {
+    const { mealType, dayIndex, planDate, existingMealPlanId } = mealPlanChoice;
+
+    if (!mealType || dayIndex === null || !planDate) {
+      alert("Please choose a meal and date first");
+      return;
+    }
+
     try {
       const token = localStorage.getItem("token");
 
-      const defaultTimes = {
-        breakfast: "08:00",
-        lunch: "13:00",
-        dinner: "20:00"
-      };
+      const mealPlanUrl = existingMealPlanId
+        ? `http://localhost:5000/api/meal-plans/${existingMealPlanId}`
+        : "http://localhost:5000/api/meal-plans/create";
 
-      const res = await fetch("http://localhost:5000/api/meal-plans/create", {
-        method: "POST",
+      const res = await fetch(mealPlanUrl, {
+        method: existingMealPlanId ? "PUT" : "POST",
         headers: {
           "Content-Type": "application/json",
           Authorization: `Bearer ${token}`
         },
         body: JSON.stringify({
           mealType,
+          dayIndex,
+          planDate,
           recipe: {
             id: selectedRecipe._id,
             title: selectedRecipe.title,
@@ -96,8 +181,9 @@ export default function SavedRecipes() {
         return;
       }
 
-      alert(`✅ Added to ${mealType} meal plan!`);
+      alert(`✅ ${existingMealPlanId ? "Updated" : "Added"} ${mealType} for ${getDateLabel(planDate)}!`);
       setShowMealModal(false);
+      fetchRecipes();
     } catch (err) {
       console.error(err);
       alert("Failed to add to meal plan");
@@ -162,7 +248,10 @@ export default function SavedRecipes() {
 
         {/* Recipe Cards */}
         <div className="row g-4">
-          {recipes.map((recipe) => (
+          {recipes.map((recipe) => {
+            const plannedRecipe = getPlannedRecipe(recipe);
+
+            return (
             <div key={recipe._id} className="col-md-6 col-lg-4">
               <div className="saved-recipe-card shadow-sm p-4 rounded h-100">
                 <div className="recipe-icon mb-3">🍽️</div>
@@ -171,7 +260,7 @@ export default function SavedRecipes() {
                 {recipe.ingredients && recipe.ingredients.length > 0 && (
                   <div className="recipe-preview mb-3">
                     <small className="text-muted">
-                      {recipe.ingredients.length} ingredients
+                        {getDisplayIngredients(recipe.ingredients).length} ingredients
                     </small>
                   </div>
                 )}
@@ -179,17 +268,24 @@ export default function SavedRecipes() {
                 <div className="d-flex flex-column gap-2 mt-auto">
                   <button
                     className="btn btn-warning w-100"
-                    onClick={() => navigate(`/search?q=${recipe.title}`)}
+                    onClick={() => setViewRecipe(recipe)}
                   >
                     👁️ View Recipe
                   </button>
 
                   <button
-                    className="btn btn-success w-100"
+                    className={`btn ${plannedRecipe ? "btn-outline-success" : "btn-success"} w-100`}
                     onClick={() => openMealModal(recipe)}
                   >
-                    📅 Add to Meal Plan
+                    {plannedRecipe ? "🔁 Change Meal Plan" : "📅 Add to Meal Plan"}
                   </button>
+
+                  {plannedRecipe && (
+                    <div className="planned-badge">
+                      {mealOptions.find((meal) => meal.type === plannedRecipe.mealType)?.icon}{" "}
+                      {plannedRecipe.mealType} • {getDateLabel(plannedRecipe.planDate)}
+                    </div>
+                  )}
 
                   <button
                     className="btn btn-outline-danger w-100"
@@ -200,7 +296,8 @@ export default function SavedRecipes() {
                 </div>
               </div>
             </div>
-          ))}
+            );
+          })}
         </div>
       </div>
 
@@ -245,50 +342,151 @@ export default function SavedRecipes() {
           font-size: 4rem;
         }
 
+        .saved-detail-list {
+          display: flex;
+          flex-direction: column;
+          gap: 10px;
+          padding-left: 22px;
+        }
+
+        .saved-ingredient-list {
+          display: flex;
+          flex-direction: column;
+          gap: 12px;
+        }
+
+        .saved-ingredient-item {
+          display: flex;
+          align-items: flex-start;
+          gap: 12px;
+          padding: 14px 16px;
+          border: 1px solid #e9ecef;
+          border-radius: 10px;
+          background: #f8f9fa;
+          line-height: 1.45;
+        }
+
+        .ingredient-dot {
+          width: 7px;
+          height: 7px;
+          border-radius: 999px;
+          background: #ffc107;
+          flex: 0 0 auto;
+          margin-top: 9px;
+        }
+
+        .planned-badge {
+          border: 1px solid #badbcc;
+          border-radius: 8px;
+          background: #f0fff4;
+          color: #146c43;
+          font-size: 0.9rem;
+          font-weight: 700;
+          padding: 8px 10px;
+          text-align: center;
+        }
+
         @media (max-width: 768px) {
           .saved-recipe-card {
             margin-bottom: 16px;
           }
+
+          .empty-state {
+            padding: 36px 16px;
+          }
         }
       `}</style>
+
+      {/* Saved Recipe Detail Modal */}
+      {viewRecipe && (
+        <div className="modal-overlay" onClick={() => setViewRecipe(null)}>
+          <div className="modal-content-meal recipe-view-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header-meal">
+              <div>
+                <h4 className="fw-bold mb-1">{viewRecipe.title}</h4>
+                <p className="text-muted small mb-0">Saved recipe from your database</p>
+              </div>
+              <button className="btn-close" onClick={() => setViewRecipe(null)}></button>
+            </div>
+
+            <div className="modal-body-meal">
+              <h5 className="fw-bold mb-3">Ingredients</h5>
+              <div className="saved-ingredient-list mb-4">
+                {getDisplayIngredients(viewRecipe.ingredients).map((ingredient, index) => (
+                  <div key={index} className="saved-ingredient-item">
+                    <span className="ingredient-dot"></span>
+                    <span>{ingredient}</span>
+                  </div>
+                ))}
+              </div>
+
+              <h5 className="fw-bold mb-3">Cooking Steps</h5>
+              <ol className="saved-detail-list">
+                {viewRecipe.steps?.map((step, index) => (
+                  <li key={index}>{step}</li>
+                ))}
+              </ol>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Meal Selection Modal */}
       {showMealModal && (
         <div className="modal-overlay" onClick={() => setShowMealModal(false)}>
           <div className="modal-content-meal" onClick={(e) => e.stopPropagation()}>
             <div className="modal-header-meal">
-              <h4 className="fw-bold mb-0">Add to Meal Plan</h4>
+              <h4 className="fw-bold mb-0">
+                {mealPlanChoice.existingMealPlanId ? "Change Meal Plan" : "Add to Meal Plan"}
+              </h4>
               <button className="btn-close" onClick={() => setShowMealModal(false)}></button>
             </div>
 
             <div className="modal-body-meal">
-              <p className="text-muted mb-4">Select which meal to add "{selectedRecipe?.title}" to:</p>
+              <p className="text-muted mb-4">Select meal and date for "{selectedRecipe?.title}":</p>
 
+              <h6 className="fw-bold mb-2">Meal</h6>
               <div className="meal-options">
-                <button
-                  className="meal-option-btn"
-                  onClick={() => addToMealPlan("breakfast")}
-                >
-                  <span className="meal-icon">🍳</span>
-                  <span className="meal-name">Breakfast</span>
-                </button>
-
-                <button
-                  className="meal-option-btn"
-                  onClick={() => addToMealPlan("lunch")}
-                >
-                  <span className="meal-icon">🍱</span>
-                  <span className="meal-name">Lunch</span>
-                </button>
-
-                <button
-                  className="meal-option-btn"
-                  onClick={() => addToMealPlan("dinner")}
-                >
-                  <span className="meal-icon">🍽️</span>
-                  <span className="meal-name">Dinner</span>
-                </button>
+                {mealOptions.map((meal) => (
+                  <button
+                    key={meal.type}
+                    className={`meal-option-btn ${mealPlanChoice.mealType === meal.type ? "selected" : ""}`}
+                    onClick={() => setMealPlanChoice(prev => ({ ...prev, mealType: meal.type }))}
+                  >
+                    <span className="meal-icon">{meal.icon}</span>
+                    <span className="meal-name">{meal.name}</span>
+                  </button>
+                ))}
               </div>
+
+              <h6 className="fw-bold mt-4 mb-2">Day & Date</h6>
+              <input
+                type="date"
+                className="meal-date-picker"
+                value={mealPlanChoice.planDate}
+                onChange={(event) => {
+                  const planDate = event.target.value;
+                  setMealPlanChoice(prev => ({
+                    ...prev,
+                    dayIndex: getDayIndexForDate(planDate),
+                    planDate
+                  }));
+                  event.currentTarget.blur();
+                }}
+              />
+              {mealPlanChoice.planDate && (
+                <p className="selected-date-label mb-0 mt-2">
+                  {getDateLabel(mealPlanChoice.planDate)}
+                </p>
+              )}
+
+              <button
+                className="btn btn-success w-100 mt-4"
+                onClick={addToMealPlan}
+                disabled={!mealPlanChoice.mealType || mealPlanChoice.dayIndex === null}
+              >
+                {mealPlanChoice.existingMealPlanId ? "Update Meal Planner" : "Save to Meal Planner"}
+              </button>
             </div>
           </div>
         </div>
@@ -314,8 +512,15 @@ export default function SavedRecipes() {
           border-radius: 16px;
           width: 90%;
           max-width: 500px;
+          max-height: 82vh;
+          display: flex;
+          flex-direction: column;
           box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
           animation: slideUp 0.3s ease-out;
+        }
+
+        .recipe-view-modal {
+          max-width: 820px;
         }
 
         .modal-header-meal {
@@ -328,6 +533,7 @@ export default function SavedRecipes() {
 
         .modal-body-meal {
           padding: 24px;
+          overflow-y: auto;
         }
 
         .meal-options {
@@ -354,6 +560,11 @@ export default function SavedRecipes() {
           transform: translateX(5px);
         }
 
+        .meal-option-btn.selected {
+          border-color: #198754;
+          background: #eaf7ef;
+        }
+
         .meal-icon {
           font-size: 2rem;
           margin-right: 16px;
@@ -361,6 +572,25 @@ export default function SavedRecipes() {
 
         .meal-name {
           font-weight: 600;
+        }
+
+        .meal-date-picker {
+          width: 100%;
+          border: 2px solid #e0e0e0;
+          border-radius: 12px;
+          padding: 12px 14px;
+          font-weight: 700;
+        }
+
+        .meal-date-picker:focus {
+          outline: none;
+          border-color: #ffc107;
+          box-shadow: 0 0 0 3px rgba(255, 193, 7, 0.18);
+        }
+
+        .selected-date-label {
+          color: #146c43;
+          font-weight: 700;
         }
 
         @keyframes fadeIn {
@@ -376,6 +606,28 @@ export default function SavedRecipes() {
           to {
             transform: translateY(0);
             opacity: 1;
+          }
+        }
+
+        @media (max-width: 768px) {
+          .modal-overlay {
+            align-items: flex-end;
+            padding: 12px;
+          }
+
+          .modal-content-meal {
+            width: 100%;
+            border-radius: 16px;
+          }
+
+          .modal-header-meal,
+          .modal-body-meal {
+            padding: 16px;
+          }
+
+          .meal-option-btn {
+            padding: 14px 16px;
+            font-size: 1rem;
           }
         }
       `}</style>

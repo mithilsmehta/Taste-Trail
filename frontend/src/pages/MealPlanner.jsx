@@ -1,34 +1,69 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import Navbar from "../components/Navbar";
+import { getMondayDateKey, getTomorrowDateKey, getWeekFromDateKey, parseDateKey, toDateKey } from "../utils/weekPlan";
+import { getDisplayIngredients } from "../utils/recipeFormatting";
 import "./MealPlanner.css";
+
+const mealTypes = ["breakfast", "lunch", "dinner"];
+
+const defaultTimes = {
+  breakfast: "08:00",
+  lunch: "13:00",
+  dinner: "20:00"
+};
+
+const emptyMealPlans = {
+  breakfast: Array(7).fill(null),
+  lunch: Array(7).fill(null),
+  dinner: Array(7).fill(null)
+};
 
 export default function MealPlanner() {
   const navigate = useNavigate();
-  const [mealPlans, setMealPlans] = useState({
-    breakfast: null,
-    lunch: null,
-    dinner: null
-  });
+  const [selectedDate, setSelectedDate] = useState(getTomorrowDateKey());
+  const weekStartDate = getMondayDateKey(selectedDate);
+  const weekDays = getWeekFromDateKey(weekStartDate);
+  const weekRangeLabel = `${weekDays[0].dateLabel} - ${weekDays[6].dateLabel}`;
+  const [mealPlans, setMealPlans] = useState(emptyMealPlans);
   const [loading, setLoading] = useState(true);
   const [showRecipeModal, setShowRecipeModal] = useState(false);
-  const [selectedMealType, setSelectedMealType] = useState(null);
+  const [selectedSlot, setSelectedSlot] = useState(null);
+  const [selectedPlan, setSelectedPlan] = useState(null);
   const [savedRecipes, setSavedRecipes] = useState([]);
 
   useEffect(() => {
     loadMealPlans();
     loadSavedRecipes();
-  }, []);
+  }, [weekStartDate]);
+
+  const normalizeMealPlans = (data) => {
+    const normalized = {
+      breakfast: Array(7).fill(null),
+      lunch: Array(7).fill(null),
+      dinner: Array(7).fill(null)
+    };
+
+    mealTypes.forEach((mealType) => {
+      if (Array.isArray(data?.[mealType])) {
+        normalized[mealType] = [...data[mealType], ...Array(7).fill(null)].slice(0, 7);
+      } else if (data?.[mealType]) {
+        normalized[mealType][0] = data[mealType];
+      }
+    });
+
+    return normalized;
+  };
 
   const loadMealPlans = async () => {
     try {
       const token = localStorage.getItem("token");
-      const res = await fetch("http://localhost:5000/api/meal-plans/my", {
+      const res = await fetch(`http://localhost:5000/api/meal-plans/my?startDate=${weekDays[0].dateKey}`, {
         headers: { Authorization: `Bearer ${token}` }
       });
 
       const data = await res.json();
-      setMealPlans(data);
+      setMealPlans(normalizeMealPlans(data));
     } catch (err) {
       console.error(err);
       alert("Failed to load meal plans");
@@ -50,21 +85,23 @@ export default function MealPlanner() {
     }
   };
 
-  const openRecipeModal = (mealType) => {
-    setSelectedMealType(mealType);
+  const openRecipeModal = (mealType, dayIndex, planDate) => {
+    setSelectedSlot({ mealType, dayIndex, planDate });
     setShowRecipeModal(true);
   };
 
+  const shiftWeek = (amount) => {
+    const date = parseDateKey(weekStartDate);
+    date.setDate(date.getDate() + amount);
+    setSelectedDate(toDateKey(date));
+  };
+
   const assignRecipe = async (recipe) => {
+    if (!selectedSlot) return;
+
     try {
       const token = localStorage.getItem("token");
-
-      // Get default time for meal type
-      const defaultTimes = {
-        breakfast: "08:00",
-        lunch: "13:00",
-        dinner: "20:00"
-      };
+      const { mealType, dayIndex, planDate } = selectedSlot;
 
       const res = await fetch("http://localhost:5000/api/meal-plans/create", {
         method: "POST",
@@ -73,7 +110,9 @@ export default function MealPlanner() {
           Authorization: `Bearer ${token}`
         },
         body: JSON.stringify({
-          mealType: selectedMealType,
+          mealType,
+          dayIndex,
+          planDate,
           recipe: {
             id: recipe._id,
             title: recipe.title,
@@ -81,7 +120,7 @@ export default function MealPlanner() {
             steps: recipe.steps,
             image: recipe.image || ""
           },
-          time: defaultTimes[selectedMealType]
+          time: defaultTimes[mealType]
         })
       });
 
@@ -92,8 +131,9 @@ export default function MealPlanner() {
         return;
       }
 
-      alert("✅ Recipe assigned to " + selectedMealType + "!");
+      alert(`✅ Recipe assigned to ${mealType} for ${weekDays[dayIndex].fullLabel}!`);
       setShowRecipeModal(false);
+      setSelectedSlot(null);
       loadMealPlans();
     } catch (err) {
       console.error(err);
@@ -101,11 +141,10 @@ export default function MealPlanner() {
     }
   };
 
-  const deleteMealPlan = async (mealType) => {
-    const mealPlan = mealPlans[mealType];
+  const deleteMealPlan = async (mealPlan) => {
     if (!mealPlan) return;
 
-    if (!confirm(`Delete ${mealType} meal plan?`)) return;
+    if (!confirm(`Remove "${mealPlan.recipe.title}" from your meal plan?`)) return;
 
     try {
       const token = localStorage.getItem("token");
@@ -131,7 +170,7 @@ export default function MealPlanner() {
 
   const getMealIcon = (mealType) => {
     const icons = {
-      breakfast: "🍳",
+      breakfast: "🥣",
       lunch: "🍱",
       dinner: "🍽️"
     };
@@ -155,7 +194,7 @@ export default function MealPlanner() {
   return (
     <>
       <Navbar />
-      <div className="container mt-4 mb-5">
+      <div className="container-fluid px-4 mt-4 mb-5">
         <button 
           className="btn btn-outline-secondary mb-4"
           onClick={() => navigate("/home")}
@@ -164,65 +203,108 @@ export default function MealPlanner() {
         </button>
 
         <div className="meal-planner-header mb-4">
-          <h2 className="fw-bold">📅 My Meal Planner</h2>
-          <p className="text-muted">Plan your daily meals and manage your grocery list</p>
+          <div>
+            <h2 className="fw-bold">📅 My 7-Day Meal Planner</h2>
+            <p className="text-muted mb-0">Save recipes for breakfast, lunch, and dinner across the week</p>
+          </div>
+
+          <div className="week-navigation">
+            <button
+              className="week-arrow-btn"
+              onClick={() => shiftWeek(-7)}
+              aria-label="Previous 7 days"
+            >
+              ‹
+            </button>
+            <div className="week-range">
+              <span>7 days</span>
+              <strong>{weekRangeLabel}</strong>
+              <input
+                type="date"
+                className="week-date-picker"
+                value={selectedDate}
+                onChange={(event) => {
+                  setSelectedDate(event.target.value);
+                  event.currentTarget.blur();
+                }}
+                aria-label="Choose week date"
+              />
+            </div>
+            <button
+              className="week-arrow-btn"
+              onClick={() => shiftWeek(7)}
+              aria-label="Next 7 days"
+            >
+              ›
+            </button>
+          </div>
         </div>
 
-        <div className="row g-4 mb-5">
-          {["breakfast", "lunch", "dinner"].map((mealType) => (
-            <div key={mealType} className="col-md-4">
-              <div className="meal-card shadow-sm p-4 rounded">
-                <div className="meal-card-header">
-                  <h4 className="fw-bold text-capitalize">
-                    {getMealIcon(mealType)} {mealType}
-                  </h4>
-                  <p className="text-muted mb-3">
-                    Time: {mealPlans[mealType]?.time || "Not set"}
-                  </p>
+        <div className="weekly-planner">
+          <div className="planner-grid">
+            <div className="planner-corner">Meal</div>
+            {weekDays.map((day) => (
+              <div key={day.dateKey} className="planner-day-header">
+                <span className="planner-day-name">{day.dayName}</span>
+                <span className="planner-date-label">{day.dateLabel}</span>
+              </div>
+            ))}
+
+            {mealTypes.map((mealType) => (
+              <div key={mealType} className="planner-row">
+                <div className="planner-meal-label text-capitalize">
+                  <span>{getMealIcon(mealType)}</span>
+                  <strong>{mealType}</strong>
+                  <small>{defaultTimes[mealType]}</small>
                 </div>
 
-                {mealPlans[mealType] ? (
-                  <div className="meal-content">
-                    <h5 className="fw-bold mb-2">{mealPlans[mealType].recipe.title}</h5>
-                    <p className="text-muted small mb-3">
-                      {mealPlans[mealType].recipe.ingredients.length} ingredients
-                    </p>
+                {weekDays.map((day, dayIndex) => {
+                  const mealPlan = mealPlans[mealType]?.[dayIndex];
 
-                    <div className="d-flex flex-column gap-2">
-                      <button
-                        className="btn btn-warning btn-sm"
-                        onClick={() => navigate(`/search?q=${mealPlans[mealType].recipe.title}`)}
-                      >
-                        👁️ View Recipe
-                      </button>
-                      <button
-                        className="btn btn-outline-primary btn-sm"
-                        onClick={() => openRecipeModal(mealType)}
-                      >
-                        🔄 Change Recipe
-                      </button>
-                      <button
-                        className="btn btn-outline-danger btn-sm"
-                        onClick={() => deleteMealPlan(mealType)}
-                      >
-                        🗑️ Remove
-                      </button>
+                  return (
+                    <div key={`${mealType}-${day.dateKey}`} className="planner-slot">
+                      {mealPlan ? (
+                        <div className="planned-recipe">
+                          <h6 className="fw-bold mb-2">{mealPlan.recipe.title}</h6>
+                          <p className="text-muted small mb-3">
+                            {getDisplayIngredients(mealPlan.recipe.ingredients).length} ingredients
+                          </p>
+
+                          <div className="slot-actions">
+                            <button
+                              className="btn btn-warning btn-sm"
+                              onClick={() => setSelectedPlan({ ...mealPlan, displayDayIndex: dayIndex })}
+                            >
+                              View
+                            </button>
+                            <button
+                              className="btn btn-outline-primary btn-sm"
+                              onClick={() => openRecipeModal(mealType, dayIndex, day.dateKey)}
+                            >
+                              Change
+                            </button>
+                            <button
+                              className="btn btn-outline-danger btn-sm"
+                              onClick={() => deleteMealPlan(mealPlan)}
+                            >
+                              Remove
+                            </button>
+                          </div>
+                        </div>
+                      ) : (
+                        <button
+                          className="empty-slot-btn"
+                          onClick={() => openRecipeModal(mealType, dayIndex, day.dateKey)}
+                        >
+                          + Add Recipe
+                        </button>
+                      )}
                     </div>
-                  </div>
-                ) : (
-                  <div className="meal-empty">
-                    <p className="text-muted mb-3">No meal planned</p>
-                    <button
-                      className="btn btn-warning w-100"
-                      onClick={() => openRecipeModal(mealType)}
-                    >
-                      + Add Recipe
-                    </button>
-                  </div>
-                )}
+                  );
+                })}
               </div>
-            </div>
-          ))}
+            ))}
+          </div>
         </div>
 
         <div className="quick-actions">
@@ -240,12 +322,13 @@ export default function MealPlanner() {
           </button>
         </div>
 
-        {/* Recipe Selection Modal */}
-        {showRecipeModal && (
+        {showRecipeModal && selectedSlot && (
           <div className="modal-overlay" onClick={() => setShowRecipeModal(false)}>
             <div className="modal-content-custom" onClick={(e) => e.stopPropagation()}>
               <div className="modal-header-custom">
-                <h4 className="fw-bold mb-0">Select Recipe for {selectedMealType}</h4>
+                <h4 className="fw-bold mb-0">
+                  Select Recipe for {getMealIcon(selectedSlot.mealType)} {selectedSlot.mealType} - {weekDays[selectedSlot.dayIndex].fullLabel}
+                </h4>
                 <button className="btn-close" onClick={() => setShowRecipeModal(false)}></button>
               </div>
 
@@ -272,6 +355,41 @@ export default function MealPlanner() {
                     ))}
                   </div>
                 )}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {selectedPlan && (
+          <div className="modal-overlay" onClick={() => setSelectedPlan(null)}>
+            <div className="modal-content-custom recipe-detail-modal" onClick={(e) => e.stopPropagation()}>
+              <div className="modal-header-custom">
+                <div>
+                  <h4 className="fw-bold mb-1">{selectedPlan.recipe.title}</h4>
+                  <p className="text-muted mb-0 text-capitalize">
+                    {getMealIcon(selectedPlan.mealType)} {selectedPlan.mealType} - {weekDays[selectedPlan.displayDayIndex ?? selectedPlan.dayIndex ?? 0].fullLabel}
+                  </p>
+                </div>
+                <button className="btn-close" onClick={() => setSelectedPlan(null)}></button>
+              </div>
+
+              <div className="modal-body-custom">
+                <h5 className="fw-bold mb-3">Ingredients</h5>
+                <div className="recipe-ingredient-list mb-4">
+                  {getDisplayIngredients(selectedPlan.recipe.ingredients).map((ingredient, index) => (
+                    <div key={index} className="recipe-ingredient-item">
+                      <span className="ingredient-dot"></span>
+                      <span>{ingredient}</span>
+                    </div>
+                  ))}
+                </div>
+
+                <h5 className="fw-bold mb-3">Cooking Steps</h5>
+                <ol className="recipe-detail-list">
+                  {selectedPlan.recipe.steps?.map((step, index) => (
+                    <li key={index}>{step}</li>
+                  ))}
+                </ol>
               </div>
             </div>
           </div>

@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useParams } from "react-router-dom";
+import { useParams, useNavigate } from "react-router-dom";
 import axios from "axios";
 import toast from "react-hot-toast";
 import AnimatedWrapper from "../components/AnimatedWrapper";
@@ -8,8 +8,11 @@ import { motion } from "framer-motion";
 
 export default function ResetPassword() {
   const { token } = useParams();
+  const navigate = useNavigate();
   const [pass1, setPass1] = useState("");
   const [pass2, setPass2] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [resetSuccess, setResetSuccess] = useState(false);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -19,15 +22,31 @@ export default function ResetPassword() {
       return;
     }
 
+    if (pass1.length < 6) {
+      toast.error("Password must be at least 6 characters!");
+      return;
+    }
+
+    setLoading(true);
+
     try {
-      await axios.post("http://localhost:5000/api/auth/reset-password", {
+      const response = await axios.post("http://localhost:5000/api/auth/reset-password", {
         token,
         newPassword: pass1
       });
 
       toast.success("Password reset successfully!");
+      setResetSuccess(true);
+
+      // Redirect to login after 2 seconds
+      setTimeout(() => {
+        navigate("/login");
+      }, 2000);
     } catch (err) {
-      toast.error("Invalid or expired link");
+      console.error("Reset error:", err);
+      toast.error(err.response?.data?.msg || "Invalid or expired link");
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -41,22 +60,82 @@ export default function ResetPassword() {
         style={{
           width: "100%",
           maxWidth: "420px",
-          background: "rgba(255,255,255,0.15)",
+          background: "rgba(255,255,255,0.95)",
           backdropFilter: "blur(10px)",
           borderRadius: "20px",
           boxShadow: "0 8px 20px rgba(0,0,0,0.2)"
         }}
       >
-        <h3 className="text-center text-white fw-bold mb-4">Reset Password</h3>
+        <h3 className="text-center fw-bold mb-4" style={{ color: "#333" }}>
+          Reset Password
+        </h3>
 
-        <form onSubmit={handleSubmit}>
-          <FormInput label="New Password" type="password" value={pass1} onChange={(e) => setPass1(e.target.value)} />
-          <FormInput label="Confirm Password" type="password" value={pass2} onChange={(e) => setPass2(e.target.value)} />
+        {!resetSuccess ? (
+          <form onSubmit={handleSubmit}>
+            <div className="mb-3">
+              <label className="form-label fw-semibold" style={{ color: "#555" }}>
+                New Password
+              </label>
+              <input
+                type="password"
+                className="form-control p-3"
+                value={pass1}
+                onChange={(e) => setPass1(e.target.value)}
+                placeholder="Enter new password"
+                required
+                minLength={6}
+                style={{
+                  border: "2px solid #e0e0e0",
+                  borderRadius: "10px"
+                }}
+              />
+            </div>
 
-          <button className="btn btn-light w-100 py-2 fw-semibold rounded-pill mt-2">
-            Reset Password
-          </button>
-        </form>
+            <div className="mb-3">
+              <label className="form-label fw-semibold" style={{ color: "#555" }}>
+                Confirm Password
+              </label>
+              <input
+                type="password"
+                className="form-control p-3"
+                value={pass2}
+                onChange={(e) => setPass2(e.target.value)}
+                placeholder="Confirm new password"
+                required
+                minLength={6}
+                style={{
+                  border: "2px solid #e0e0e0",
+                  borderRadius: "10px"
+                }}
+              />
+            </div>
+
+            <button 
+              className="btn btn-warning w-100 py-3 fw-semibold rounded-pill mt-3"
+              disabled={loading}
+              style={{ fontSize: "1.1rem" }}
+            >
+              {loading ? "Resetting..." : "Reset Password"}
+            </button>
+          </form>
+        ) : (
+          <div className="text-center" style={{ color: "#333" }}>
+            <div className="mb-3" style={{ fontSize: "4rem" }}>✅</div>
+            <h4 className="fw-bold mb-3">Password Reset Successful!</h4>
+            <p className="mb-3">
+              Your password has been updated successfully.
+            </p>
+            <p className="text-muted">
+              Redirecting to login page...
+            </p>
+          </div>
+        )}
+
+        <div className="text-center mt-3">
+          <a href="/login" style={{ color: "#FFC107", textDecoration: "none", fontWeight: "600" }}>
+            Back to Login
+          </a>
+        </div>
       </motion.div>
     </AnimatedWrapper>
   );

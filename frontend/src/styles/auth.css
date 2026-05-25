@@ -1,7 +1,7 @@
 /* MAIN LAYOUT */
 .auth-container {
   display: flex;
-  height: 100vh;
+  min-height: 100vh;
   width: 100%;
   overflow: hidden;
 }
@@ -99,17 +99,43 @@
 @media (max-width: 900px) {
   .auth-container {
     flex-direction: column;
+    min-height: 100vh;
+    overflow-y: auto;
   }
 
   .auth-left {
-    height: 30vh;
+    height: 28vh;
+    flex: none;
   }
 
   .auth-right {
-    height: 70vh;
+    min-height: 72vh;
+    height: auto;
+    padding: 24px 0;
   }
 
   .auth-box {
     width: 90%;
+    padding: 24px;
+  }
+}
+
+@media (max-width: 575.98px) {
+  .auth-left {
+    display: none;
+  }
+
+  .auth-right {
+    min-height: 100vh;
+  }
+
+  .auth-box {
+    width: 100%;
+    padding: 22px 16px;
+    border-radius: 0;
+  }
+
+  .auth-title {
+    font-size: 22px;
   }
 }

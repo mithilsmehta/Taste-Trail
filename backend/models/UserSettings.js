@@ -27,12 +27,42 @@ const userSettingsSchema = new mongoose.Schema({
   },
   notificationOffset: { 
     type: Number, 
-    enum: [30, 60], 
+    enum: [30, 60, 90, 120], 
     default: 30 
+  },
+  reminderMode: {
+    type: String,
+    enum: ["offset", "time"],
+    default: "offset"
+  },
+  reminderTimes: {
+    breakfast: {
+      type: String,
+      default: "07:30",
+      match: /^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/
+    },
+    lunch: {
+      type: String,
+      default: "12:30",
+      match: /^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/
+    },
+    dinner: {
+      type: String,
+      default: "19:30",
+      match: /^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/
+    }
   },
   notificationsEnabled: { 
     type: Boolean, 
     default: false 
+  },
+  appNotificationsEnabled: {
+    type: Boolean,
+    default: false
+  },
+  emailNotificationsEnabled: {
+    type: Boolean,
+    default: false
   },
   updatedAt: { 
     type: Date, 

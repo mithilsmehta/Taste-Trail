@@ -1,6 +1,6 @@
 .auth-wrapper {
   display: flex;
-  height: 100vh;
+  min-height: 100vh;
   width: 100%;
   overflow: hidden;
 }
@@ -94,5 +94,20 @@
   .auth-right {
     width: 100%;
     background: #ffffff;
+    min-height: 100vh;
+  }
+
+  .auth-form-container {
+    width: min(92%, 420px);
+  }
+}
+
+@media (max-width: 575.98px) {
+  .auth-right {
+    padding: 18px;
+  }
+
+  .auth-logo h2 {
+    font-size: 28px;
   }
 }

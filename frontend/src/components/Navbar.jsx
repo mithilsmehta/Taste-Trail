@@ -12,7 +12,7 @@ export default function Navbar() {
   };
 
   return (
-    <nav className="navbar navbar-expand-lg bg-white shadow-sm px-3 py-2">
+    <nav className="navbar navbar-expand-lg bg-white shadow-sm px-3 py-2 taste-navbar">
       <div className="container-fluid">
 
         {/* LEFT SIDE - BRAND NAME */}
@@ -33,20 +33,20 @@ export default function Navbar() {
 
      <div className="collapse navbar-collapse justify-content-end" id="navbarNav">
   {user && (
-    <>
-      <Link to="/meal-planner" className="btn btn-outline-success me-2">
+    <div className="navbar-actions">
+      <Link to="/meal-planner" className="btn btn-outline-success">
         📅 Meal Planner
       </Link>
 
-      <Link to="/grocery-list" className="btn btn-outline-info me-2">
+      <Link to="/grocery-list" className="btn btn-outline-info">
         🛒 Grocery List
       </Link>
 
-      <Link to="/saved" className="btn btn-outline-warning me-2">
+      <Link to="/saved" className="btn btn-outline-warning">
         ❤️ Saved Recipes
       </Link>
 
-      <Link to="/profile" className="btn btn-outline-dark me-2">
+      <Link to="/profile" className="btn btn-outline-dark">
         👤 Profile
       </Link>
 
@@ -56,7 +56,7 @@ export default function Navbar() {
       >
         Logout
       </button>
-    </>
+    </div>
   )}
 </div>
 
