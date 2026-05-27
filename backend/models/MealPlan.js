@@ -30,7 +30,13 @@ const mealPlanSchema = new mongoose.Schema({
     title: { type: String, required: true },
     ingredients: { type: [String], required: true },
     steps: { type: [String], required: true },
-    image: { type: String, default: "" }
+    image: { type: String, default: "" },
+    nutrition: {
+      calories: { type: Number, default: 0 },
+      protein: { type: Number, default: 0 },
+      carbs: { type: Number, default: 0 },
+      fat: { type: Number, default: 0 }
+    }
   },
   time: { 
     type: String, 

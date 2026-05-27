@@ -32,6 +32,11 @@ app.use("/api/settings", settingsRoutes);
 const visionRoutes = require("./routes/visionRoutes");
 app.use("/api/vision", visionRoutes);
 
+// Admin dashboard is disabled for now.
+// Uncomment these lines when you want to enable the admin API again.
+// const adminRoutes = require("./routes/adminRoutes");
+// app.use("/api/admin", adminRoutes);
+
 app.listen(5000, () => {
   console.log("Server running on 5000");
   startMealReminderService();

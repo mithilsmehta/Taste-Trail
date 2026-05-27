@@ -3,6 +3,14 @@ import { useNavigate } from "react-router-dom";
 import Navbar from "../components/Navbar";
 import { getMondayDateKey, getWeekFromDateKey, toDateKey } from "../utils/weekPlan";
 import { getDisplayIngredients } from "../utils/recipeFormatting";
+// Saved recipe photos are disabled for now.
+// Uncomment these imports and the RecipeImage code below when you want photos again.
+// import fallbackFood1 from "../assets/img1.jpg";
+// import fallbackFood2 from "../assets/img2.jpg";
+// import fallbackFood3 from "../assets/img3.jpg";
+// import fallbackFood4 from "../assets/img4.jpg";
+// import fallbackFood5 from "../assets/img5.jpg";
+// import fallbackFood6 from "../assets/img6.jpg";
 
 const defaultTimes = {
   breakfast: "08:00",
@@ -15,6 +23,85 @@ const mealOptions = [
   { type: "lunch", icon: "🍱", name: "Lunch" },
   { type: "dinner", icon: "🍽️", name: "Dinner" }
 ];
+
+const emptyNutrition = {
+  calories: 0,
+  protein: 0,
+  carbs: 0,
+  fat: 0
+};
+
+/*
+Saved recipe photos are disabled for now.
+Uncomment this whole block and the image JSX/CSS below when you want photos again.
+
+const fallbackRecipeImages = [
+  fallbackFood1,
+  fallbackFood2,
+  fallbackFood3,
+  fallbackFood4,
+  fallbackFood6
+];
+
+const getFallbackRecipeImage = (title = "") => {
+  const seed = Array.from(String(title || "recipe")).reduce((total, char) => total + char.charCodeAt(0), 0);
+  return fallbackRecipeImages[seed % fallbackRecipeImages.length];
+};
+
+const commonsImage = (fileName) =>
+  `https://commons.wikimedia.org/wiki/Special:FilePath/${encodeURIComponent(fileName)}?width=900`;
+
+const dishImageRules = [
+  { pattern: /jain.*pav\s*bhaji|pav\s*bhaji.*jain/i, image: commonsImage("Jain dosa, Pav bhaji, Chole bhature.jpg") },
+  { pattern: /tiramisu|tiramisù/i, image: commonsImage("Tiramisu (44840044151).jpg") },
+  { pattern: /paneer.*salad|salad.*paneer/i, image: commonsImage("Paneer masaledar and fresh veggies salad.png") },
+  { pattern: /manchurian/i, image: commonsImage("Manchurian.jpg") },
+  { pattern: /poha|pohe/i, image: commonsImage("poha.jpg") },
+  { pattern: /chole|cholle|bhature|bhatura/i, image: commonsImage("Cholle-Bhature.jpg") },
+  { pattern: /dosa/i, image: commonsImage("Masala_Dosa.JPG") },
+  { pattern: /pav\s*bhaji/i, image: commonsImage("Pav_Bhaji.jpg") },
+  { pattern: /paneer\s*tikka/i, image: commonsImage("Paneer_Tikka.jpg") },
+  { pattern: /biryani/i, image: commonsImage("Vegetable-biryani.jpg") },
+  { pattern: /pizza/i, image: fallbackFood3 },
+  { pattern: /pasta|noodle|lo mein/i, image: fallbackFood2 },
+  { pattern: /salad|healthy/i, image: fallbackFood1 }
+];
+
+const getDishSpecificImage = (title = "") =>
+  dishImageRules.find((rule) => rule.pattern.test(String(title)))?.image || "";
+
+const isUnreliableRecipeImage = (image = "") =>
+  /image\.pollinations\.ai|source\.unsplash\.com/i.test(String(image));
+
+const isExplicitNonVegRecipe = (title = "") =>
+  /\b(chicken|mutton|lamb|fish|prawn|shrimp|egg|beef|pork|bacon|ham|seafood|keema)\b/i.test(String(title));
+
+function RecipeImage({ recipe, className = "", detail = false }) {
+  const [useFallback, setUseFallback] = useState(false);
+  const title = recipe?.title || recipe?.name;
+  const dishImage = getDishSpecificImage(title);
+  const fallbackImage = getFallbackRecipeImage(title);
+  const canUseRecipeImage = recipe?.image && !isUnreliableRecipeImage(recipe.image);
+  const shouldPreferDishImage = dishImage && !isExplicitNonVegRecipe(title);
+  const imageSrc = useFallback
+    ? fallbackImage
+    : shouldPreferDishImage
+      ? dishImage
+      : canUseRecipeImage
+        ? recipe.image
+        : dishImage || fallbackImage;
+
+  return (
+    <img
+      className={className}
+      src={imageSrc}
+      alt={recipe?.title || recipe?.name || "Recipe"}
+      onError={() => setUseFallback(true)}
+      loading={detail ? "eager" : "lazy"}
+    />
+  );
+}
+*/
 
 export default function SavedRecipes() {
   const navigate = useNavigate();
@@ -36,6 +123,7 @@ export default function SavedRecipes() {
   const fetchRecipes = async () => {
     try {
       const token = localStorage.getItem("token");
+      const todayKey = toDateKey(new Date());
 
       const [recipesRes, mealPlansRes] = await Promise.all([
         fetch("http://localhost:5000/api/recipes/my-recipes", {
@@ -43,7 +131,7 @@ export default function SavedRecipes() {
             Authorization: `Bearer ${token}`,
           },
         }),
-        fetch("http://localhost:5000/api/meal-plans/all", {
+        fetch(`http://localhost:5000/api/meal-plans/all?fromDate=${todayKey}`, {
           headers: {
             Authorization: `Bearer ${token}`,
           },
@@ -59,7 +147,9 @@ export default function SavedRecipes() {
 
       setRecipes(recipesData || []);
       if (mealPlansRes.ok) {
-        setMealPlans(Array.isArray(mealPlansData) ? mealPlansData : []);
+        setMealPlans(Array.isArray(mealPlansData)
+          ? mealPlansData.filter((plan) => plan?.planDate && plan.planDate >= todayKey)
+          : []);
       }
     } catch (err) {
       console.error(err);
@@ -96,7 +186,10 @@ export default function SavedRecipes() {
   };
 
   const getPlannedRecipe = (recipe) => {
+    const todayKey = toDateKey(new Date());
     const mealPlan = mealPlans.find((plan) => {
+      const planDate = plan?.planDate || "";
+      if (planDate && planDate < todayKey) return false;
       return plan?.recipe?.id === recipe._id || plan?.recipe?.title === recipe.title;
     });
 
@@ -254,7 +347,13 @@ export default function SavedRecipes() {
             return (
             <div key={recipe._id} className="col-md-6 col-lg-4">
               <div className="saved-recipe-card shadow-sm p-4 rounded h-100">
-                <div className="recipe-icon mb-3">🍽️</div>
+                {/*
+                Saved recipe card photo is disabled for now.
+                Uncomment this block with the RecipeImage code at the top of this file to show photos again.
+                <div className="saved-recipe-image mb-3">
+                  <RecipeImage recipe={recipe} />
+                </div>
+                */}
                 <h4 className="fw-bold mb-3">{recipe.title}</h4>
 
                 {recipe.ingredients && recipe.ingredients.length > 0 && (
@@ -262,6 +361,15 @@ export default function SavedRecipes() {
                     <small className="text-muted">
                         {getDisplayIngredients(recipe.ingredients).length} ingredients
                     </small>
+                  </div>
+                )}
+
+                {recipe.nutrition && (
+                  <div className="nutrition-mini-grid mb-3">
+                    <span>{recipe.nutrition.calories || 0} cal</span>
+                    <span>{recipe.nutrition.protein || 0}g protein</span>
+                    <span>{recipe.nutrition.carbs || 0}g carbs</span>
+                    <span>{recipe.nutrition.fat || 0}g fat</span>
                   </div>
                 )}
 
@@ -321,10 +429,30 @@ export default function SavedRecipes() {
           border-color: #ffc107;
         }
 
-        .recipe-icon {
-          font-size: 2.5rem;
-          text-align: center;
+        /*
+        Saved recipe photo styles are disabled for now.
+        Uncomment this CSS with the RecipeImage code at the top of this file to show photos again.
+
+        .saved-recipe-image {
+          align-items: center;
+          aspect-ratio: 16 / 9;
+          background: #f8f9fa;
+          border-radius: 10px;
+          display: flex;
+          justify-content: center;
+          overflow: hidden;
         }
+
+        .saved-recipe-image img {
+          height: 100%;
+          object-fit: cover;
+          width: 100%;
+        }
+
+        .saved-recipe-image span {
+          font-size: 2.5rem;
+        }
+        */
 
         .recipe-preview {
           padding: 8px 12px;
@@ -386,6 +514,50 @@ export default function SavedRecipes() {
           text-align: center;
         }
 
+        .nutrition-mini-grid,
+        .nutrition-grid {
+          display: grid;
+          gap: 8px;
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+
+        .nutrition-mini-grid span,
+        .nutrition-grid div {
+          background: #fff9e6;
+          border: 1px solid #ffe082;
+          border-radius: 8px;
+          padding: 8px 10px;
+          text-transform: capitalize;
+        }
+
+        .nutrition-mini-grid span {
+          font-size: 0.86rem;
+          font-weight: 800;
+          text-align: center;
+        }
+
+        .nutrition-grid strong,
+        .nutrition-grid span {
+          display: block;
+        }
+
+        .nutrition-grid strong {
+          font-size: 1.15rem;
+        }
+
+        .nutrition-grid span {
+          color: #6c757d;
+          font-size: 0.86rem;
+          font-weight: 700;
+        }
+
+        .recipe-detail-image {
+          border-radius: 12px;
+          max-height: 320px;
+          object-fit: cover;
+          width: 100%;
+        }
+
         @media (max-width: 768px) {
           .saved-recipe-card {
             margin-bottom: 16px;
@@ -410,6 +582,22 @@ export default function SavedRecipes() {
             </div>
 
             <div className="modal-body-meal">
+              {/*
+              Saved recipe detail photo is disabled for now.
+              Uncomment this block with the RecipeImage code at the top of this file to show photos again.
+              <RecipeImage recipe={viewRecipe} className="recipe-detail-image mb-4" detail />
+              */}
+
+              <h5 className="fw-bold mb-3">Nutrition Estimate</h5>
+              <div className="nutrition-grid mb-4">
+                {Object.entries(viewRecipe.nutrition || emptyNutrition).map(([key, value]) => (
+                  <div key={key}>
+                    <strong>{value || 0}{key === "calories" ? "" : "g"}</strong>
+                    <span>{key}</span>
+                  </div>
+                ))}
+              </div>
+
               <h5 className="fw-bold mb-3">Ingredients</h5>
               <div className="saved-ingredient-list mb-4">
                 {getDisplayIngredients(viewRecipe.ingredients).map((ingredient, index) => (

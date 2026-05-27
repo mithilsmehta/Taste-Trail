@@ -50,6 +50,16 @@ export default function Navbar() {
         👤 Profile
       </Link>
 
+      {/*
+      Admin dashboard is disabled for now.
+      Uncomment this link when the admin route is enabled again.
+      {user.role === "admin" && (
+        <Link to="/admin" className="btn btn-outline-danger">
+          📊 Admin
+        </Link>
+      )}
+      */}
+
       <button
         className="btn btn-warning fw-semibold px-4"
         onClick={handleLogout}

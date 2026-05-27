@@ -1,0 +1,125 @@
+/*
+Admin dashboard styles are disabled for now.
+Uncomment this file when AdminDashboard.jsx is enabled again.
+
+.admin-page {
+  margin-bottom: 56px;
+  margin-top: 24px;
+}
+*/
+
+.admin-header {
+  border-bottom: 3px solid #ffc107;
+  margin-bottom: 24px;
+  padding-bottom: 16px;
+}
+
+.admin-header h1 {
+  font-size: 2.35rem;
+  font-weight: 800;
+  margin: 0 0 6px;
+}
+
+.admin-header p {
+  color: #6c757d;
+  margin: 0;
+}
+
+.admin-stat-grid {
+  display: grid;
+  gap: 16px;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  margin-bottom: 24px;
+}
+
+.admin-stat-card,
+.admin-panel {
+  background: #fff;
+  border: 1px solid #e9ecef;
+  border-radius: 8px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.06);
+}
+
+.admin-stat-card {
+  padding: 20px;
+}
+
+.admin-stat-card span {
+  color: #6c757d;
+  display: block;
+  font-weight: 800;
+  text-transform: capitalize;
+}
+
+.admin-stat-card strong {
+  display: block;
+  font-size: 2rem;
+  line-height: 1.1;
+  margin-top: 8px;
+}
+
+.admin-grid {
+  display: grid;
+  gap: 18px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.admin-panel {
+  padding: 20px;
+}
+
+.admin-panel h3 {
+  font-size: 1.2rem;
+  font-weight: 800;
+  margin-bottom: 14px;
+}
+
+.admin-list,
+.admin-user-list {
+  display: grid;
+  gap: 10px;
+}
+
+.admin-list div,
+.admin-user-list div {
+  align-items: center;
+  background: #f8f9fa;
+  border-radius: 8px;
+  display: flex;
+  gap: 12px;
+  justify-content: space-between;
+  padding: 12px;
+}
+
+.admin-list span,
+.admin-user-list span {
+  color: #495057;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.admin-user-list div {
+  align-items: flex-start;
+  flex-direction: column;
+}
+
+.admin-user-list small {
+  background: #fff9e6;
+  border-radius: 999px;
+  font-weight: 800;
+  padding: 4px 10px;
+}
+
+@media (max-width: 991.98px) {
+  .admin-stat-grid,
+  .admin-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 575.98px) {
+  .admin-stat-grid,
+  .admin-grid {
+    grid-template-columns: 1fr;
+  }
+}

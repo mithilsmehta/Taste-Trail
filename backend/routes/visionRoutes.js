@@ -1,6 +1,8 @@
 const express = require("express");
 const { GoogleGenerativeAI } = require("@google/generative-ai");
 const authMiddleware = require("../middleware/authMiddleware");
+const VisionScan = require("../models/VisionScan");
+const { enhanceRecipe } = require("../utils/recipeEnhancements");
 
 const router = express.Router();
 
@@ -187,9 +189,18 @@ Format:
     ]);
     const parsed = extractJson(result.response.text());
 
+    const detectedIngredients = cleanIngredients(parsed.ingredients);
+    const rejectedItems = Array.isArray(parsed.rejectedItems) ? parsed.rejectedItems.filter(Boolean) : [];
+
+    await VisionScan.create({
+      userId: req.user.id,
+      ingredients: detectedIngredients.map((item) => item.name),
+      rejectedItems
+    });
+
     res.json({
-      ingredients: cleanIngredients(parsed.ingredients),
-      rejectedItems: Array.isArray(parsed.rejectedItems) ? parsed.rejectedItems.filter(Boolean) : [],
+      ingredients: detectedIngredients,
+      rejectedItems,
       notes: parsed.notes || ""
     });
   } catch (err) {
@@ -263,12 +274,22 @@ Format:
       return res.status(422).json({ msg: "Generated recipe was blocked because it included non-vegetarian content." });
     }
 
-    res.json({
-      recipe: {
+    const enhancedRecipe = enhanceRecipe({
         name: recipe.name || recipeName,
+        title: recipe.name || recipeName,
         ingredients: Array.isArray(recipe.ingredients) ? recipe.ingredients : [],
         steps: Array.isArray(recipe.steps) ? recipe.steps : [],
         servings: recipe.servings || 2
+    });
+
+    res.json({
+      recipe: {
+        name: enhancedRecipe.name || enhancedRecipe.title,
+        ingredients: enhancedRecipe.ingredients,
+        steps: enhancedRecipe.steps,
+        servings: enhancedRecipe.servings || 2,
+        image: enhancedRecipe.image,
+        nutrition: enhancedRecipe.nutrition
       }
     });
   } catch (err) {

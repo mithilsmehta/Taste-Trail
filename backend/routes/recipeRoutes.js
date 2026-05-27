@@ -2,11 +2,13 @@ const express = require("express");
 const router = express.Router();
 const SavedRecipe = require("../models/SavedRecipe");
 const authMiddleware = require("../middleware/authMiddleware");
+const { enhanceRecipe } = require("../utils/recipeEnhancements");
 
 // SAVE RECIPE
 router.post("/save", authMiddleware, async (req, res) => {
   try {
-    const { title, ingredients, steps, image } = req.body;
+    const { title, ingredients, steps, image, nutrition } = req.body;
+    const enhancedRecipe = enhanceRecipe({ title, ingredients, steps, image, nutrition });
 
     // Check if recipe already exists for this user
     const existing = await SavedRecipe.findOne({ 
@@ -23,7 +25,8 @@ router.post("/save", authMiddleware, async (req, res) => {
       title,
       ingredients,
       steps,
-      image,
+      image: enhancedRecipe.image,
+      nutrition: enhancedRecipe.nutrition,
     });
 
     res.json({ msg: "Recipe saved!", recipe: saved });
@@ -35,8 +38,8 @@ router.post("/save", authMiddleware, async (req, res) => {
 // GET ALL SAVED RECIPES FOR USER
 router.get("/my-recipes", authMiddleware, async (req, res) => {
   try {
-    const recipes = await SavedRecipe.find({ userId: req.user.id });
-    res.json(recipes);
+    const recipes = await SavedRecipe.find({ userId: req.user.id }).sort({ createdAt: -1 });
+    res.json(recipes.map((recipe) => enhanceRecipe(recipe.toObject())));
   } catch (err) {
     res.status(500).json({ msg: "Failed to fetch recipes" });
   }

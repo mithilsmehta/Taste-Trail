@@ -9,6 +9,58 @@
   gap: 8px;
 }
 
+.provider-picker {
+  align-items: center;
+  background: #fff;
+  border: 1px solid #e9ecef;
+  border-radius: 12px;
+  display: flex;
+  gap: 18px;
+  justify-content: space-between;
+  padding: 16px;
+}
+
+.provider-options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
+.provider-option {
+  border: 2px solid #e9ecef;
+  border-radius: 999px;
+  background: #fff;
+  color: #212529;
+  font-weight: 800;
+  padding: 8px 14px;
+  transition: all 0.2s ease;
+}
+
+.provider-option span {
+  margin-right: 6px;
+}
+
+.provider-option.active {
+  background: #ffc107;
+  border-color: #f2b705;
+}
+
+.provider-zepto.active {
+  background: #ead7ff;
+  border-color: #8e44ad;
+}
+
+.provider-bigbasket.active {
+  background: #e8f5e9;
+  border-color: #198754;
+}
+
+.provider-instamart.active {
+  background: #ffe8d6;
+  border-color: #fc8019;
+}
+
 .meal-section {
   background: white;
   padding: 24px;
@@ -211,8 +263,18 @@
     flex-direction: column;
   }
 
-  .filter-buttons .btn {
+  .filter-buttons .btn,
+  .provider-option {
     width: 100%;
+  }
+
+  .provider-picker {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .provider-options {
+    justify-content: stretch;
   }
 
   .empty-state {

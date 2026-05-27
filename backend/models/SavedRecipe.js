@@ -6,6 +6,12 @@ const savedRecipeSchema = new mongoose.Schema({
   ingredients: { type: Array, required: true },
   steps: { type: Array, required: true },
   image: { type: String, default: "" },
+  nutrition: {
+    calories: { type: Number, default: 0 },
+    protein: { type: Number, default: 0 },
+    carbs: { type: Number, default: 0 },
+    fat: { type: Number, default: 0 }
+  },
   createdAt: { type: Date, default: Date.now }
 });
 

@@ -212,6 +212,43 @@
   margin-bottom: 22px;
 }
 
+.generated-recipe-image {
+  border-radius: 8px;
+  max-height: 360px;
+  object-fit: cover;
+  width: 100%;
+  margin-bottom: 20px;
+}
+
+.generated-nutrition-grid {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  margin-bottom: 20px;
+}
+
+.generated-nutrition-grid div {
+  background: #fff9e6;
+  border: 1px solid #ffe082;
+  border-radius: 8px;
+  padding: 12px;
+}
+
+.generated-nutrition-grid strong,
+.generated-nutrition-grid span {
+  display: block;
+}
+
+.generated-nutrition-grid strong {
+  font-size: 1.2rem;
+}
+
+.generated-nutrition-grid span {
+  color: #6c757d;
+  font-weight: 800;
+  text-transform: capitalize;
+}
+
 .recipe-title-row h2 {
   font-weight: 800;
   margin-bottom: 4px;
@@ -372,6 +409,10 @@
   }
 
   .suggestion-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .generated-nutrition-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }

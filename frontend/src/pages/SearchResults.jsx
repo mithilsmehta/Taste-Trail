@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import Navbar from "../components/Navbar";
 import { getMondayDateKey, getWeekFromDateKey } from "../utils/weekPlan";
+import { formatIngredientAmount } from "../utils/recipeFormatting";
 
 const defaultTimes = {
   breakfast: "08:00",
@@ -60,12 +61,41 @@ export default function SearchResults() {
   };
 
   const parseQuantity = (value) => {
-    if (value.includes("/")) {
-      const [numerator, denominator] = value.split("/").map(Number);
-      return denominator ? numerator / denominator : Number(value);
+    const normalized = String(value || "").trim();
+
+    if (/^\d+\s+\d+\/\d+$/.test(normalized)) {
+      const [whole, fraction] = normalized.split(/\s+/);
+      const [numerator, denominator] = fraction.split("/").map(Number);
+      return Number(whole) + (denominator ? numerator / denominator : 0);
     }
 
-    return Number(value);
+    if (normalized.includes("/")) {
+      const [numerator, denominator] = normalized.split("/").map(Number);
+      return denominator ? numerator / denominator : Number(normalized);
+    }
+
+    return Number(normalized);
+  };
+
+  const formatScaledAmount = (amount) => {
+    const rounded = Math.round(amount * 8) / 8;
+    const whole = Math.floor(rounded);
+    const decimal = Number((rounded - whole).toFixed(3));
+
+    const fractionMap = {
+      0.125: "⅛",
+      0.25: "¼",
+      0.375: "⅜",
+      0.5: "½",
+      0.625: "⅝",
+      0.75: "¾",
+      0.875: "⅞"
+    };
+
+    if (decimal === 0) return String(whole);
+    const fraction = fractionMap[decimal];
+    if (!fraction) return Number(amount.toFixed(2)).toString();
+    return whole > 0 ? `${whole}${fraction}` : fraction;
   };
 
   const getSavedRecipeFromDatabase = async () => {
@@ -200,26 +230,14 @@ JAIN DIETARY RESTRICTIONS:
     const scaleFactor = newServings / originalServings;
 
     const scaledIngredients = originalRecipe.ingredients.map(ingredient => {
-      // Extract numbers from ingredient string
-      const numberMatch = ingredient.match(/(\d+(?:\.\d+)?(?:\/\d+)?)/);
+      const numberMatch = ingredient.match(/\b(\d+\s+\d+\/\d+|\d+\/\d+|\d+(?:\.\d+)?)\b/);
       
       if (numberMatch) {
         const originalAmount = parseQuantity(numberMatch[1]);
         if (!Number.isFinite(originalAmount)) return ingredient;
 
         const scaledAmount = originalAmount * scaleFactor;
-        
-        // Format the scaled amount nicely
-        let formattedAmount;
-        if (scaledAmount % 1 === 0) {
-          formattedAmount = scaledAmount.toString();
-        } else if (scaledAmount < 1) {
-          // Convert to fraction for small amounts
-          const fraction = scaledAmount.toFixed(2);
-          formattedAmount = fraction;
-        } else {
-          formattedAmount = scaledAmount.toFixed(1);
-        }
+        const formattedAmount = formatScaledAmount(scaledAmount);
         
         return ingredient.replace(numberMatch[1], formattedAmount);
       }
@@ -432,7 +450,7 @@ JAIN DIETARY RESTRICTIONS:
                     {recipe.ingredients?.map((item, i) => (
                       <li key={i} className="ingredient-item">
                         <span className="ingredient-bullet">•</span>
-                        {item}
+                        {formatIngredientAmount(item)}
                       </li>
                     ))}
                   </ul>

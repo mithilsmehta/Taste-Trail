@@ -69,11 +69,44 @@ const prepWords = new Set([
   "taste"
 ]);
 
+const shoppingProviders = [
+  {
+    id: "blinkit",
+    name: "Blinkit",
+    icon: "⚡",
+    colorClass: "provider-blinkit",
+    getUrl: (query) => `https://blinkit.com/s/?q=${encodeURIComponent(query)}`,
+    getAppUrl: (query) => `blinkit://search?q=${encodeURIComponent(query)}`
+  },
+  {
+    id: "zepto",
+    name: "Zepto",
+    icon: "🛵",
+    colorClass: "provider-zepto",
+    getUrl: (query) => `https://www.zeptonow.com/search?query=${encodeURIComponent(query)}`
+  },
+  {
+    id: "bigbasket",
+    name: "BigBasket",
+    icon: "🧺",
+    colorClass: "provider-bigbasket",
+    getUrl: (query) => `https://www.bigbasket.com/ps/?q=${encodeURIComponent(query)}`
+  },
+  {
+    id: "instamart",
+    name: "Instamart",
+    icon: "🛒",
+    colorClass: "provider-instamart",
+    getUrl: (query) => `https://www.swiggy.com/instamart/search?query=${encodeURIComponent(query)}`
+  }
+];
+
 export default function GroceryList() {
   const navigate = useNavigate();
   const [mealPlans, setMealPlans] = useState([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState("all");
+  const [selectedProvider, setSelectedProvider] = useState("blinkit");
   const [expandedRecipes, setExpandedRecipes] = useState({});
   const [checkedItems, setCheckedItems] = useState({});
   const currentWeekStartDate = getMondayDateKey(toDateKey(new Date()));
@@ -148,22 +181,20 @@ export default function GroceryList() {
       .trim() || ingredient;
   };
 
-  const openBlinkit = (ingredient) => {
+  const openShoppingProvider = (ingredient) => {
     const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
     const searchTerm = getBlinkitSearchTerm(ingredient);
-    const blinkitLink = `https://blinkit.com/s/?q=${encodeURIComponent(searchTerm)}`;
+    const provider = shoppingProviders.find((item) => item.id === selectedProvider) || shoppingProviders[0];
+    const webLink = provider.getUrl(searchTerm);
 
-    if (isMobile) {
-      // Try to open Blinkit app first
-      window.location.href = `blinkit://search?q=${encodeURIComponent(searchTerm)}`;
+    if (isMobile && provider.getAppUrl) {
+      window.location.href = provider.getAppUrl(searchTerm);
 
-      // Fallback to web after 2 seconds if app doesn't open
       setTimeout(() => {
-        window.location.href = blinkitLink;
+        window.location.href = webLink;
       }, 2000);
     } else {
-      // Desktop: open in new tab
-      window.open(blinkitLink, "_blank");
+      window.open(webLink, "_blank");
     }
   };
 
@@ -274,6 +305,26 @@ export default function GroceryList() {
         </div>
 
         {/* Filter Buttons */}
+        <div className="provider-picker mb-4">
+          <div>
+            <h5 className="fw-bold mb-1">Shopping Provider</h5>
+            <p className="text-muted mb-0">Choose where ingredient order buttons should search.</p>
+          </div>
+          <div className="provider-options">
+            {shoppingProviders.map((provider) => (
+              <button
+                key={provider.id}
+                className={`provider-option ${provider.colorClass} ${selectedProvider === provider.id ? "active" : ""}`}
+                onClick={() => setSelectedProvider(provider.id)}
+              >
+                <span>{provider.icon}</span>
+                {provider.name}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Filter Buttons */}
         <div className="filter-buttons mb-4">
           <button
             className={`btn ${filter === "all" ? "btn-warning" : "btn-outline-warning"} me-2`}
@@ -368,14 +419,10 @@ export default function GroceryList() {
 
                                   <button
                                     className="btn btn-blinkit btn-sm"
-                                    onClick={() => openBlinkit(item.name)}
+                                    onClick={() => openShoppingProvider(item.name)}
                                   >
-                                    <img 
-                                      src="https://cdn.grofers.com/cdn-cgi/image/f=auto,fit=scale-down,q=70,metadata=none,w=135/assets/eta-icons/15-mins-filled.png" 
-                                      alt="Blinkit"
-                                      style={{ width: '20px', height: '20px', marginRight: '6px' }}
-                                    />
-                                    Order on Blinkit
+                                    {shoppingProviders.find((provider) => provider.id === selectedProvider)?.icon}
+                                    {" "}Order on {shoppingProviders.find((provider) => provider.id === selectedProvider)?.name}
                                   </button>
                                 </div>
                               ))}

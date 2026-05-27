@@ -14,6 +14,9 @@ import MealPlanner from "./pages/MealPlanner";
 import GroceryList from "./pages/GroceryList";
 import MealSettings from "./pages/MealSettings";
 import DetectIngredients from "./pages/DetectIngredients";
+// Admin dashboard is disabled for now.
+// Uncomment this import and the /admin route below when you want it back.
+// import AdminDashboard from "./pages/AdminDashboard";
 import notificationManager from "./services/NotificationManager";
 
 export default function App() {
@@ -114,6 +117,17 @@ export default function App() {
             </ProtectedRoute>
           }
         />
+
+        {/*
+        <Route
+          path="/admin"
+          element={
+            <ProtectedRoute>
+              <AdminDashboard />
+            </ProtectedRoute>
+          }
+        />
+        */}
 
       </Routes>
     </BrowserRouter>

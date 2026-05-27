@@ -287,7 +287,8 @@ export default function DetectIngredients() {
           title: generatedRecipe.name,
           ingredients: generatedRecipe.ingredients,
           steps: generatedRecipe.steps,
-          image: imagePreview
+          image: imagePreview || generatedRecipe.image,
+          nutrition: generatedRecipe.nutrition
         })
       });
       const data = await res.json();
@@ -331,7 +332,8 @@ export default function DetectIngredients() {
             title: generatedRecipe.name,
             ingredients: generatedRecipe.ingredients || [],
             steps: generatedRecipe.steps || [],
-            image: imagePreview
+            image: imagePreview || generatedRecipe.image,
+            nutrition: generatedRecipe.nutrition
           },
           time: defaultTimes[mealType]
         })
@@ -545,6 +547,10 @@ export default function DetectIngredients() {
 
         {generatedRecipe && (
           <section className="generated-recipe">
+            {generatedRecipe.image && (
+              <img className="generated-recipe-image" src={generatedRecipe.image} alt={generatedRecipe.name} />
+            )}
+
             <div className="recipe-title-row">
               <div>
                 <h2>{generatedRecipe.name}</h2>
@@ -562,6 +568,15 @@ export default function DetectIngredients() {
                 </button>
               </div>
             </div>
+
+            {generatedRecipe.nutrition && (
+              <div className="generated-nutrition-grid">
+                <div><strong>{generatedRecipe.nutrition.calories || 0}</strong><span>calories</span></div>
+                <div><strong>{generatedRecipe.nutrition.protein || 0}g</strong><span>protein</span></div>
+                <div><strong>{generatedRecipe.nutrition.carbs || 0}g</strong><span>carbs</span></div>
+                <div><strong>{generatedRecipe.nutrition.fat || 0}g</strong><span>fat</span></div>
+              </div>
+            )}
 
             <div className="recipe-detail-grid">
               <div>

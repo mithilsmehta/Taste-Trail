@@ -4,6 +4,7 @@ const MealPlan = require("../models/MealPlan");
 const GroceryItem = require("../models/GroceryItem");
 const SavedRecipe = require("../models/SavedRecipe");
 const authMiddleware = require("../middleware/authMiddleware");
+const { enhanceRecipe } = require("../utils/recipeEnhancements");
 
 const saveRecipeForUser = async (userId, recipe) => {
   if (!recipe?.title) return;
@@ -15,12 +16,15 @@ const saveRecipeForUser = async (userId, recipe) => {
 
   if (existingSavedRecipe) return;
 
+  const enhancedRecipe = enhanceRecipe(recipe);
+
   await SavedRecipe.create({
     userId,
-    title: recipe.title,
-    ingredients: recipe.ingredients || [],
-    steps: recipe.steps || [],
-    image: recipe.image || ""
+    title: enhancedRecipe.title,
+    ingredients: enhancedRecipe.ingredients || [],
+    steps: enhancedRecipe.steps || [],
+    image: enhancedRecipe.image || "",
+    nutrition: enhancedRecipe.nutrition
   });
 };
 
@@ -163,7 +167,7 @@ router.post("/create", authMiddleware, async (req, res) => {
       mealPlan.mealType = mealType;
       mealPlan.dayIndex = dayIndex;
       if (planDate) mealPlan.planDate = planDate;
-      mealPlan.recipe = recipe;
+      mealPlan.recipe = enhanceRecipe(recipe);
       mealPlan.time = time;
       mealPlan.updatedAt = Date.now();
       await mealPlan.save();
@@ -174,12 +178,12 @@ router.post("/create", authMiddleware, async (req, res) => {
         mealType,
         dayIndex,
         planDate,
-        recipe,
+        recipe: enhanceRecipe(recipe),
         time
       });
     }
 
-    await removeDuplicateRecipePlans(req.user.id, recipe, mealPlan._id);
+    await removeDuplicateRecipePlans(req.user.id, mealPlan.recipe, mealPlan._id);
     await refreshGroceryItems(req.user.id, mealPlan);
 
     await saveRecipeForUser(req.user.id, recipe);
@@ -235,7 +239,18 @@ router.get("/my", authMiddleware, async (req, res) => {
 // GET RAW MEAL PLANS FOR USER
 router.get("/all", authMiddleware, async (req, res) => {
   try {
-    const mealPlans = await MealPlan.find({ userId: req.user.id }).sort({ planDate: 1, dayIndex: 1, mealType: 1 });
+    const fromDate = typeof req.query.fromDate === "string" ? req.query.fromDate : "";
+
+    if (fromDate && !isValidPlanDate(fromDate)) {
+      return res.status(400).json({ msg: "Invalid from date. Use YYYY-MM-DD" });
+    }
+
+    const query = {
+      userId: req.user.id,
+      ...(fromDate ? { planDate: { $gte: fromDate } } : {})
+    };
+
+    const mealPlans = await MealPlan.find(query).sort({ planDate: 1, dayIndex: 1, mealType: 1 });
     res.json(mealPlans);
   } catch (err) {
     console.error(err);
@@ -269,7 +284,7 @@ router.put("/:id", authMiddleware, async (req, res) => {
 
     // Update fields
     if (mealType) mealPlan.mealType = mealType;
-    if (recipe) mealPlan.recipe = recipe;
+    if (recipe) mealPlan.recipe = enhanceRecipe(recipe);
     if (dayIndex !== undefined) {
       if (dayIndex < 0 || dayIndex > 6) {
         return res.status(400).json({ msg: "Invalid day. Choose day 1 to 7" });
@@ -335,11 +350,15 @@ router.delete("/:id", authMiddleware, async (req, res) => {
       return res.status(403).json({ msg: "Not authorized" });
     }
 
-    // Delete associated grocery items
-    await GroceryItem.deleteMany({ mealPlanId: mealPlan._id });
+    const matchingRecipePlansQuery = getRecipeIdentityQuery(req.user.id, mealPlan.recipe);
+    const matchingRecipePlans = matchingRecipePlansQuery
+      ? await MealPlan.find(matchingRecipePlansQuery)
+      : [mealPlan];
+    const matchingPlanIds = matchingRecipePlans.map((plan) => plan._id);
 
-    // Delete meal plan
-    await MealPlan.findByIdAndDelete(req.params.id);
+    // Delete associated grocery items and duplicate stale meal-plan records for this recipe.
+    await GroceryItem.deleteMany({ mealPlanId: { $in: matchingPlanIds } });
+    await MealPlan.deleteMany({ _id: { $in: matchingPlanIds }, userId: req.user.id });
 
     res.json({ success: true, msg: "Meal plan deleted" });
   } catch (err) {
