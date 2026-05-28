@@ -2,6 +2,10 @@ const express = require("express");
 const router = express.Router();
 const UserSettings = require("../models/UserSettings");
 const authMiddleware = require("../middleware/authMiddleware");
+const {
+  scheduleUpcomingMealReminders,
+  cancelMealRemindersForUser
+} = require("../services/mealReminderService");
 
 const validNotificationOffsets = [30, 60, 90, 120];
 const validReminderModes = ["offset", "time"];
@@ -131,6 +135,12 @@ router.put("/meal-times", authMiddleware, async (req, res) => {
       
       settings.updatedAt = Date.now();
       await settings.save();
+    }
+
+    if (settings.emailNotificationsEnabled) {
+      await scheduleUpcomingMealReminders(req.user.id);
+    } else {
+      await cancelMealRemindersForUser(req.user.id);
     }
 
     res.json({ success: true, settings, msg: "Settings updated successfully!" });

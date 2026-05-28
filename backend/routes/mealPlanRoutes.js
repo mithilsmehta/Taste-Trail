@@ -5,6 +5,10 @@ const GroceryItem = require("../models/GroceryItem");
 const SavedRecipe = require("../models/SavedRecipe");
 const authMiddleware = require("../middleware/authMiddleware");
 const { enhanceRecipe } = require("../utils/recipeEnhancements");
+const {
+  scheduleMealReminderForPlan,
+  cancelMealReminderForPlan
+} = require("../services/mealReminderService");
 
 const saveRecipeForUser = async (userId, recipe) => {
   if (!recipe?.title) return;
@@ -67,26 +71,6 @@ const splitIngredientLines = (ingredients = []) => {
   });
 };
 
-const getRecipeIdentityQuery = (userId, recipe, excludeId) => {
-  const recipeMatches = [];
-
-  if (recipe?.id) {
-    recipeMatches.push({ "recipe.id": recipe.id });
-  }
-
-  if (recipe?.title) {
-    recipeMatches.push({ "recipe.title": recipe.title });
-  }
-
-  if (recipeMatches.length === 0) return null;
-
-  return {
-    userId,
-    ...(excludeId ? { _id: { $ne: excludeId } } : {}),
-    $or: recipeMatches
-  };
-};
-
 const refreshGroceryItems = async (userId, mealPlan) => {
   await GroceryItem.deleteMany({
     userId,
@@ -105,18 +89,6 @@ const refreshGroceryItems = async (userId, mealPlan) => {
   }));
 
   await GroceryItem.insertMany(groceryItems);
-};
-
-const removeDuplicateRecipePlans = async (userId, recipe, keepMealPlanId) => {
-  const duplicateQuery = getRecipeIdentityQuery(userId, recipe, keepMealPlanId);
-  if (!duplicateQuery) return;
-
-  const duplicates = await MealPlan.find(duplicateQuery);
-
-  for (const duplicate of duplicates) {
-    await GroceryItem.deleteMany({ mealPlanId: duplicate._id });
-    await MealPlan.findByIdAndDelete(duplicate._id);
-  }
 };
 
 // CREATE OR UPDATE MEAL PLAN
@@ -155,12 +127,7 @@ router.post("/create", authMiddleware, async (req, res) => {
           : { dayIndex })
     };
 
-    const existingRecipePlanQuery = getRecipeIdentityQuery(req.user.id, recipe);
-    let mealPlan = existingRecipePlanQuery ? await MealPlan.findOne(existingRecipePlanQuery) : null;
-
-    if (!mealPlan) {
-      mealPlan = await MealPlan.findOne(existingMealPlanQuery);
-    }
+    let mealPlan = await MealPlan.findOne(existingMealPlanQuery);
 
     if (mealPlan) {
       // Update existing meal plan
@@ -183,10 +150,12 @@ router.post("/create", authMiddleware, async (req, res) => {
       });
     }
 
-    await removeDuplicateRecipePlans(req.user.id, mealPlan.recipe, mealPlan._id);
     await refreshGroceryItems(req.user.id, mealPlan);
 
     await saveRecipeForUser(req.user.id, recipe);
+    scheduleMealReminderForPlan(mealPlan).catch((scheduleErr) => {
+      console.error("Failed to schedule meal reminder:", scheduleErr);
+    });
 
     res.json({ 
       success: true, 
@@ -314,6 +283,7 @@ router.put("/:id", authMiddleware, async (req, res) => {
       });
 
       if (duplicateMealPlan) {
+        cancelMealReminderForPlan(duplicateMealPlan._id);
         await GroceryItem.deleteMany({ mealPlanId: duplicateMealPlan._id });
         await MealPlan.findByIdAndDelete(duplicateMealPlan._id);
       }
@@ -321,7 +291,6 @@ router.put("/:id", authMiddleware, async (req, res) => {
 
     mealPlan.updatedAt = Date.now();
     await mealPlan.save();
-    await removeDuplicateRecipePlans(req.user.id, mealPlan.recipe, mealPlan._id);
 
     // Update grocery items if recipe or meal type changed
     if (recipeChanged || mealTypeChanged) {
@@ -329,6 +298,10 @@ router.put("/:id", authMiddleware, async (req, res) => {
 
       await saveRecipeForUser(req.user.id, mealPlan.recipe);
     }
+
+    scheduleMealReminderForPlan(mealPlan).catch((scheduleErr) => {
+      console.error("Failed to schedule meal reminder:", scheduleErr);
+    });
 
     res.json({ success: true, mealPlan });
   } catch (err) {
@@ -350,15 +323,11 @@ router.delete("/:id", authMiddleware, async (req, res) => {
       return res.status(403).json({ msg: "Not authorized" });
     }
 
-    const matchingRecipePlansQuery = getRecipeIdentityQuery(req.user.id, mealPlan.recipe);
-    const matchingRecipePlans = matchingRecipePlansQuery
-      ? await MealPlan.find(matchingRecipePlansQuery)
-      : [mealPlan];
-    const matchingPlanIds = matchingRecipePlans.map((plan) => plan._id);
+    cancelMealReminderForPlan(mealPlan._id);
 
-    // Delete associated grocery items and duplicate stale meal-plan records for this recipe.
-    await GroceryItem.deleteMany({ mealPlanId: { $in: matchingPlanIds } });
-    await MealPlan.deleteMany({ _id: { $in: matchingPlanIds }, userId: req.user.id });
+    // Delete only this exact meal-plan slot. The same recipe can be planned again on other dates.
+    await GroceryItem.deleteMany({ mealPlanId: mealPlan._id });
+    await MealPlan.deleteOne({ _id: mealPlan._id, userId: req.user.id });
 
     res.json({ success: true, msg: "Meal plan deleted" });
   } catch (err) {
