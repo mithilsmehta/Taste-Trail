@@ -1,12 +1,11 @@
 const UserSettings = require("../models/UserSettings");
 const MealPlan = require("../models/MealPlan");
+const MealReminder = require("../models/MealReminder");
 const transporter = require("../utils/mailer");
 
-const sentReminderKeys = new Set();
 const scheduledReminderTimers = new Map();
-const mealTypes = ["breakfast", "lunch", "dinner"];
-const reminderCatchUpWindowMinutes = 5;
 const maxTimerDelayMs = 2_147_483_647;
+const sendingLockTimeoutMinutes = 5;
 
 const formatDateKey = (date) => {
   const year = date.getFullYear();
@@ -19,8 +18,6 @@ const minutesFromTime = (time) => {
   const [hours, minutes] = time.split(":").map(Number);
   return hours * 60 + minutes;
 };
-
-const currentMinutes = (date) => date.getHours() * 60 + date.getMinutes();
 
 const parseDateKey = (dateKey) => {
   if (!dateKey || !/^\d{4}-\d{2}-\d{2}$/.test(dateKey)) return null;
@@ -50,23 +47,23 @@ const getReminderMinuteForMeal = (settings, mealType, mealTime) => {
   return getReminderMinutes(mealTime, settings.notificationOffset);
 };
 
-const getPlannedMealForDate = async (userId, mealType, planDate) => {
-  if (!planDate) return null;
+const getReminderScheduleForPlan = (mealPlan, settings) => {
+  const mealType = mealPlan.mealType;
+  const mealTime = settings.mealTimes?.[mealType] || mealPlan.time;
+  if (!mealTime || !mealPlan.planDate) return null;
 
-  return MealPlan.findOne({
-    userId,
-    mealType,
-    planDate,
-    active: { $ne: false }
-  }).sort({ updatedAt: -1 });
-};
+  const reminderMinutes = getReminderMinuteForMeal(settings, mealType, mealTime);
+  const reminderAt = dateWithMinutes(mealPlan.planDate, reminderMinutes);
+  if (!reminderAt) return null;
 
-const buildSentReminderKey = ({ planDate, userId, mealType, settings, mealTime }) => {
-  const reminderTime = settings.reminderTimes?.[mealType] || "";
-  return `${planDate}:${userId}:${mealType}:${settings.reminderMode || "offset"}:${settings.notificationOffset}:${reminderTime}:${mealTime}`;
+  return { mealTime, reminderAt };
 };
 
 const buildTimerKey = (mealPlanId) => String(mealPlanId);
+
+const buildReminderRecordKey = (mealPlanId, reminderAt) => {
+  return `${mealPlanId}:${reminderAt.toISOString()}`;
+};
 
 const escapeHtml = (value) => {
   return String(value)
@@ -77,18 +74,51 @@ const escapeHtml = (value) => {
     .replace(/'/g, "&#039;");
 };
 
-const trimSentReminderCache = (dateKey) => {
-  for (const key of sentReminderKeys) {
-    if (!key.startsWith(`${dateKey}:`)) {
-      sentReminderKeys.delete(key);
-    }
+const acquireReminderRecord = async ({ mealPlan, reminderAt }) => {
+  const reminderKey = buildReminderRecordKey(mealPlan._id, reminderAt);
+  const now = new Date();
+  const staleSendingBefore = new Date(now.getTime() - sendingLockTimeoutMinutes * 60 * 1000);
+
+  try {
+    return await MealReminder.findOneAndUpdate(
+      {
+        reminderKey,
+        $or: [
+          { status: { $exists: false } },
+          { status: "failed" },
+          { status: "sending", updatedAt: { $lte: staleSendingBefore } }
+        ]
+      },
+      {
+        $setOnInsert: {
+          reminderKey,
+          userId: mealPlan.userId,
+          mealPlanId: mealPlan._id,
+          mealType: mealPlan.mealType,
+          planDate: mealPlan.planDate,
+          reminderAt
+        },
+        $set: {
+          status: "sending",
+          lastError: ""
+        },
+        $inc: { attempts: 1 }
+      },
+      {
+        upsert: true,
+        new: true,
+        setDefaultsOnInsert: true
+      }
+    );
+  } catch (err) {
+    if (err?.code === 11000) return null;
+    throw err;
   }
 };
 
 const sendMealReminderEmail = async ({ user, mealType, mealTime, offsetMinutes, reminderMode, reminderTime, mealPlan }) => {
   if (!process.env.EMAIL_USER || !process.env.EMAIL_PASS) {
-    console.warn("Email reminders skipped: EMAIL_USER or EMAIL_PASS is missing.");
-    return;
+    throw new Error("Email reminders cannot be sent because EMAIL_USER or EMAIL_PASS is missing.");
   }
 
   const recipeTitle = mealPlan?.recipe?.title || `${mealType} meal`;
@@ -135,42 +165,45 @@ const sendReminderForMealPlan = async (mealPlanId, options = {}) => {
   const user = settings?.userId;
   if (!settings || !user?.email) return false;
 
-  const mealType = mealPlan.mealType;
-  const mealTime = settings.mealTimes?.[mealType] || mealPlan.time;
-  if (!mealTime) return false;
+  const schedule = getReminderScheduleForPlan(mealPlan, settings);
+  if (!schedule) return false;
 
-  const reminderMinutes = getReminderMinuteForMeal(settings, mealType, mealTime);
-  const reminderAt = dateWithMinutes(mealPlan.planDate, reminderMinutes);
   const now = options.now || new Date();
+  const { mealTime, reminderAt } = schedule;
 
-  if (!reminderAt) return false;
   if (!options.allowEarlySend && reminderAt > now) return false;
 
-  const reminderKey = buildSentReminderKey({
-    planDate: mealPlan.planDate,
-    userId: user._id,
-    mealType,
-    settings,
-    mealTime
-  });
+  const reminderRecord = await acquireReminderRecord({ mealPlan, reminderAt });
+  if (!reminderRecord) return false;
 
-  if (sentReminderKeys.has(reminderKey)) return false;
+  try {
+    await sendMealReminderEmail({
+      user,
+      mealType: mealPlan.mealType,
+      mealTime,
+      offsetMinutes: settings.notificationOffset,
+      reminderMode: settings.reminderMode || "offset",
+      reminderTime: settings.reminderTimes?.[mealPlan.mealType],
+      mealPlan
+    });
 
-  await sendMealReminderEmail({
-    user,
-    mealType,
-    mealTime,
-    offsetMinutes: settings.notificationOffset,
-    reminderMode: settings.reminderMode || "offset",
-    reminderTime: settings.reminderTimes?.[mealType],
-    mealPlan
-  });
+    await MealReminder.findByIdAndUpdate(reminderRecord._id, {
+      status: "sent",
+      sentAt: new Date(),
+      lastError: ""
+    });
+  } catch (err) {
+    await MealReminder.findByIdAndUpdate(reminderRecord._id, {
+      status: "failed",
+      lastError: err.message || "Failed to send reminder email"
+    });
+    throw err;
+  }
 
-  sentReminderKeys.add(reminderKey);
   return true;
 };
 
-const cancelMealReminderForPlan = (mealPlanId) => {
+const cancelScheduledTimerForPlan = (mealPlanId) => {
   const timerKey = buildTimerKey(mealPlanId);
   const timer = scheduledReminderTimers.get(timerKey);
   if (timer) {
@@ -179,16 +212,45 @@ const cancelMealReminderForPlan = (mealPlanId) => {
   }
 };
 
+const cancelReminderRecordsForPlan = (mealPlanId, exceptReminderAt) => {
+  const query = {
+    mealPlanId,
+    status: { $ne: "sent" }
+  };
+
+  if (exceptReminderAt) {
+    query.reminderAt = { $ne: exceptReminderAt };
+  }
+
+  return MealReminder.updateMany(query, { status: "cancelled" });
+};
+
+const cancelMealReminderForPlan = (mealPlanId) => {
+  cancelScheduledTimerForPlan(mealPlanId);
+
+  cancelReminderRecordsForPlan(mealPlanId).catch((err) => {
+    console.error("Failed to cancel meal reminder records:", err);
+  });
+};
+
 const cancelMealRemindersForUser = async (userId) => {
   const mealPlans = await MealPlan.find({ userId }).select("_id");
-  mealPlans.forEach((mealPlan) => cancelMealReminderForPlan(mealPlan._id));
+  mealPlans.forEach((mealPlan) => cancelScheduledTimerForPlan(mealPlan._id));
+
+  await MealReminder.updateMany(
+    {
+      userId,
+      status: { $ne: "sent" }
+    },
+    { status: "cancelled" }
+  );
 };
 
 const scheduleMealReminderForPlan = async (mealPlanOrId) => {
   const mealPlanId = mealPlanOrId?._id || mealPlanOrId;
   if (!mealPlanId) return { scheduled: false, reason: "missing-meal-plan-id" };
 
-  cancelMealReminderForPlan(mealPlanId);
+  cancelScheduledTimerForPlan(mealPlanId);
 
   const mealPlan = mealPlanOrId?._id ? mealPlanOrId : await MealPlan.findById(mealPlanId);
   if (!mealPlan || mealPlan.active === false || !mealPlan.planDate) {
@@ -204,16 +266,18 @@ const scheduleMealReminderForPlan = async (mealPlanOrId) => {
     return { scheduled: false, reason: "email-reminders-disabled" };
   }
 
-  const mealTime = settings.mealTimes?.[mealPlan.mealType] || mealPlan.time;
-  if (!mealTime) {
+  const schedule = getReminderScheduleForPlan(mealPlan, settings);
+  if (!schedule) {
     return { scheduled: false, reason: "missing-meal-time" };
   }
 
-  const reminderMinutes = getReminderMinuteForMeal(settings, mealPlan.mealType, mealTime);
-  const reminderAt = dateWithMinutes(mealPlan.planDate, reminderMinutes);
-  const now = new Date();
+  const { reminderAt } = schedule;
+  cancelReminderRecordsForPlan(mealPlanId, reminderAt).catch((err) => {
+    console.error("Failed to cancel stale meal reminder records:", err);
+  });
 
-  if (!reminderAt || reminderAt <= now) {
+  const now = new Date();
+  if (reminderAt <= now) {
     return { scheduled: false, reason: "reminder-time-passed" };
   }
 
@@ -247,51 +311,28 @@ const scheduleUpcomingMealReminders = async (userId) => {
 
 const checkMealReminders = async () => {
   const now = new Date();
-  const nowMinutes = currentMinutes(now);
-  const dateKey = formatDateKey(now);
+  const todayKey = formatDateKey(now);
 
-  trimSentReminderCache(dateKey);
-
-  const settingsList = await UserSettings.find({ emailNotificationsEnabled: true }).populate("userId");
+  const settingsList = await UserSettings.find({ emailNotificationsEnabled: true }).select(
+    "userId mealTimes reminderMode reminderTimes notificationOffset"
+  );
 
   for (const settings of settingsList) {
-    const user = settings.userId;
-    if (!user?.email) continue;
+    const mealPlans = await MealPlan.find({
+      userId: settings.userId,
+      active: { $ne: false },
+      planDate: { $gte: todayKey }
+    });
 
-    for (const mealType of mealTypes) {
-      const mealTime = settings.mealTimes?.[mealType];
-      if (!mealTime) continue;
+    for (const mealPlan of mealPlans) {
+      const schedule = getReminderScheduleForPlan(mealPlan, settings);
+      if (!schedule || schedule.reminderAt > now) continue;
 
-      const reminderMinutes = getReminderMinuteForMeal(settings, mealType, mealTime);
-      const minutesSinceReminder = nowMinutes - reminderMinutes;
-      if (minutesSinceReminder < 0 || minutesSinceReminder > reminderCatchUpWindowMinutes) continue;
-
-      const reminderTime = settings.reminderTimes?.[mealType];
-      const reminderKey = buildSentReminderKey({
-        planDate: dateKey,
-        userId: user._id,
-        mealType,
-        settings,
-        mealTime
-      });
-      if (sentReminderKeys.has(reminderKey)) continue;
-
-      const mealPlan = await getPlannedMealForDate(user._id, mealType, dateKey);
-      if (!mealPlan) {
-        continue;
+      try {
+        await sendReminderForMealPlan(mealPlan._id, { allowEarlySend: true, now });
+      } catch (err) {
+        console.error("Meal reminder email failed:", err);
       }
-
-      await sendMealReminderEmail({
-        user,
-        mealType,
-        mealTime,
-        offsetMinutes: settings.notificationOffset,
-        reminderMode: settings.reminderMode || "offset",
-        reminderTime,
-        mealPlan
-      });
-
-      sentReminderKeys.add(reminderKey);
     }
   }
 };
