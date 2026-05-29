@@ -1,3 +1,4 @@
+import { apiUrl } from "../utils/api";
 // NotificationManager - Handles browser notifications for meal reminders
 
 class NotificationManager {
@@ -192,7 +193,7 @@ class NotificationManager {
       return;
 
       /*
-      const settingsRes = await fetch("http://localhost:5000/api/settings/meal-times", {
+      const settingsRes = await fetch(apiUrl("/api/settings/meal-times"), {
         headers: { Authorization: `Bearer ${token}` }
       });
       const settings = await settingsRes.json();
@@ -205,7 +206,7 @@ class NotificationManager {
 
       if (!this.isPermitted()) return;
 
-      const mealPlansRes = await fetch("http://localhost:5000/api/meal-plans/my", {
+      const mealPlansRes = await fetch(apiUrl("/api/meal-plans/my"), {
         headers: { Authorization: `Bearer ${token}` }
       });
       const mealPlans = await mealPlansRes.json();

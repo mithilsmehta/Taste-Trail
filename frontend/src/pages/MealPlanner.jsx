@@ -1,3 +1,4 @@
+import { API_BASE_URL, apiUrl } from "../utils/api";
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import Navbar from "../components/Navbar";
@@ -58,7 +59,7 @@ export default function MealPlanner() {
   const loadMealPlans = async () => {
     try {
       const token = localStorage.getItem("token");
-      const res = await fetch(`http://localhost:5000/api/meal-plans/my?startDate=${weekDays[0].dateKey}`, {
+      const res = await fetch(`${API_BASE_URL}/api/meal-plans/my?startDate=${weekDays[0].dateKey}`, {
         headers: { Authorization: `Bearer ${token}` }
       });
 
@@ -74,7 +75,7 @@ export default function MealPlanner() {
   const loadSavedRecipes = async () => {
     try {
       const token = localStorage.getItem("token");
-      const res = await fetch("http://localhost:5000/api/recipes/my-recipes", {
+      const res = await fetch(apiUrl("/api/recipes/my-recipes"), {
         headers: { Authorization: `Bearer ${token}` }
       });
 
@@ -103,7 +104,7 @@ export default function MealPlanner() {
       const token = localStorage.getItem("token");
       const { mealType, dayIndex, planDate } = selectedSlot;
 
-      const res = await fetch("http://localhost:5000/api/meal-plans/create", {
+      const res = await fetch(apiUrl("/api/meal-plans/create"), {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -148,7 +149,7 @@ export default function MealPlanner() {
 
     try {
       const token = localStorage.getItem("token");
-      const res = await fetch(`http://localhost:5000/api/meal-plans/${mealPlan._id}`, {
+      const res = await fetch(`${API_BASE_URL}/api/meal-plans/${mealPlan._id}`, {
         method: "DELETE",
         headers: { Authorization: `Bearer ${token}` }
       });

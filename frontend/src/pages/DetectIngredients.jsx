@@ -1,3 +1,4 @@
+import { apiUrl } from "../utils/api";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import Navbar from "../components/Navbar";
@@ -162,7 +163,7 @@ export default function DetectIngredients() {
     setError("");
 
     try {
-      const res = await fetch("http://localhost:5000/api/vision/detect-ingredients", {
+      const res = await fetch(apiUrl("/api/vision/detect-ingredients"), {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -216,7 +217,7 @@ export default function DetectIngredients() {
     setError("");
 
     try {
-      const res = await fetch("http://localhost:5000/api/vision/suggest-recipes", {
+      const res = await fetch(apiUrl("/api/vision/suggest-recipes"), {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -246,7 +247,7 @@ export default function DetectIngredients() {
     setError("");
 
     try {
-      const res = await fetch("http://localhost:5000/api/vision/generate-recipe", {
+      const res = await fetch(apiUrl("/api/vision/generate-recipe"), {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -277,7 +278,7 @@ export default function DetectIngredients() {
     setSaving(true);
 
     try {
-      const res = await fetch("http://localhost:5000/api/recipes/save", {
+      const res = await fetch(apiUrl("/api/recipes/save"), {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -317,7 +318,7 @@ export default function DetectIngredients() {
     setAddingMealPlan(true);
 
     try {
-      const res = await fetch("http://localhost:5000/api/meal-plans/create", {
+      const res = await fetch(apiUrl("/api/meal-plans/create"), {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

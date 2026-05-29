@@ -1,3 +1,4 @@
+import { apiUrl } from "../utils/api";
 import { useState } from "react";
 import axios from "axios";
 import toast from "react-hot-toast";
@@ -15,7 +16,7 @@ export default function ForgotPassword() {
     setLoading(true);
 
     try {
-      const response = await axios.post("http://localhost:5000/api/auth/forgot-password", {
+      const response = await axios.post(apiUrl("/api/auth/forgot-password"), {
         email
       });
 

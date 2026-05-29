@@ -86,7 +86,8 @@ exports.forgotPassword = async (req, res) => {
 
     await user.save();
 
-    const resetURL = `http://localhost:5173/reset-password/${resetToken}`;
+    const frontendUrl = process.env.FRONTEND_URL || "http://localhost:5173";
+    const resetURL = `${frontendUrl}/reset-password/${resetToken}`;
 
     const mailOptions = {
       from: `"TasteTrail" <${process.env.EMAIL_USER}>`,

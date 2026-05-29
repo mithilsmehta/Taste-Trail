@@ -1,3 +1,4 @@
+import { apiUrl } from "../utils/api";
 import { useState, useContext } from "react";
 import axios from "axios";
 import toast from "react-hot-toast";
@@ -14,7 +15,7 @@ export default function Login() {
     e.preventDefault();
 
     try {
-      const res = await axios.post("http://localhost:5000/api/auth/login", {
+      const res = await axios.post(apiUrl("/api/auth/login"), {
         identifier,
         password,
       });

@@ -1,3 +1,4 @@
+import { apiUrl } from "../utils/api";
 import { useState } from "react";
 import axios from "axios";
 import toast from "react-hot-toast";
@@ -21,7 +22,7 @@ export default function Register() {
     }
 
     try {
-      await axios.post("http://localhost:5000/api/auth/register", {
+      await axios.post(apiUrl("/api/auth/register"), {
         firstName,
         lastName,
         phone,

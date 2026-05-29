@@ -1,3 +1,4 @@
+import { API_BASE_URL } from "../utils/api";
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import Navbar from "../components/Navbar";
@@ -119,11 +120,11 @@ export default function GroceryList() {
   const loadGroceryList = async () => {
     try {
       const token = localStorage.getItem("token");
-      await fetch(`http://localhost:5000/api/grocery/list?startDate=${currentWeekStartDate}`, {
+      await fetch(`${API_BASE_URL}/api/grocery/list?startDate=${currentWeekStartDate}`, {
         headers: { Authorization: `Bearer ${token}` }
       });
 
-      const res = await fetch(`http://localhost:5000/api/meal-plans/my?startDate=${currentWeekStartDate}`, {
+      const res = await fetch(`${API_BASE_URL}/api/meal-plans/my?startDate=${currentWeekStartDate}`, {
         headers: { Authorization: `Bearer ${token}` }
       });
 

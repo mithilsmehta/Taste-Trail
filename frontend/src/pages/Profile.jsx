@@ -1,3 +1,4 @@
+import { API_BASE_URL } from "../utils/api";
 import { useContext, useState, useEffect } from "react";
 import { AuthContext } from "../context/AuthContext";
 import axios from "axios";
@@ -28,7 +29,7 @@ const handleProfileUpdate = async (e) => {
   try {
     const token = localStorage.getItem("token");
 
-    const res = await fetch(`http://localhost:5000/api/auth/update-profile/${user._id}`, {
+    const res = await fetch(`${API_BASE_URL}/api/auth/update-profile/${user._id}`, {
       method: "PUT",
       headers: {
         "Content-Type": "application/json",
@@ -64,7 +65,7 @@ const handleProfileUpdate = async (e) => {
 
     try {
      await axios.put(
-  `http://localhost:5000/api/auth/change-password/${user._id}`,
+  `${API_BASE_URL}/api/auth/change-password/${user._id}`,
   { password, newPassword },
   {
     headers: {

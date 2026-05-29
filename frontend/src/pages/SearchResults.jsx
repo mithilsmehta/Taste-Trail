@@ -1,3 +1,4 @@
+import { apiUrl } from "../utils/api";
 import { useEffect, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import Navbar from "../components/Navbar";
@@ -102,7 +103,7 @@ export default function SearchResults() {
     const token = localStorage.getItem("token");
     if (!token) return null;
 
-    const res = await fetch("http://localhost:5000/api/recipes/my-recipes", {
+    const res = await fetch(apiUrl("/api/recipes/my-recipes"), {
       headers: { Authorization: `Bearer ${token}` }
     });
 
@@ -267,7 +268,7 @@ JAIN DIETARY RESTRICTIONS:
     try {
       const token = localStorage.getItem("token");
 
-      const res = await fetch("http://localhost:5000/api/recipes/save", {
+      const res = await fetch(apiUrl("/api/recipes/save"), {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -322,7 +323,7 @@ JAIN DIETARY RESTRICTIONS:
     try {
       const token = localStorage.getItem("token");
 
-      const res = await fetch("http://localhost:5000/api/meal-plans/create", {
+      const res = await fetch(apiUrl("/api/meal-plans/create"), {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

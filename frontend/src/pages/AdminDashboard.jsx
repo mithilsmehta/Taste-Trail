@@ -1,3 +1,4 @@
+import { apiUrl } from "../utils/api";
 /*
 Admin dashboard page is disabled for now.
 Uncomment this file, its import/route in App.jsx, and the navbar link when needed.
@@ -19,7 +20,7 @@ export default function AdminDashboard() {
     const loadDashboard = async () => {
       try {
         const token = localStorage.getItem("token");
-        const res = await fetch("http://localhost:5000/api/admin/dashboard", {
+        const res = await fetch(apiUrl("/api/admin/dashboard"), {
           headers: { Authorization: `Bearer ${token}` }
         });
         const data = await res.json();

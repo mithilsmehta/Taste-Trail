@@ -1,3 +1,4 @@
+import { API_BASE_URL, apiUrl } from "../utils/api";
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import Navbar from "../components/Navbar";
@@ -126,12 +127,12 @@ export default function SavedRecipes() {
       const todayKey = toDateKey(new Date());
 
       const [recipesRes, mealPlansRes] = await Promise.all([
-        fetch("http://localhost:5000/api/recipes/my-recipes", {
+        fetch(apiUrl("/api/recipes/my-recipes"), {
           headers: {
             Authorization: `Bearer ${token}`,
           },
         }),
-        fetch(`http://localhost:5000/api/meal-plans/all?fromDate=${todayKey}`, {
+        fetch(`${API_BASE_URL}/api/meal-plans/all?fromDate=${todayKey}`, {
           headers: {
             Authorization: `Bearer ${token}`,
           },
@@ -165,7 +166,7 @@ export default function SavedRecipes() {
     try {
       const token = localStorage.getItem("token");
 
-      const res = await fetch(`http://localhost:5000/api/recipes/${id}`, {
+      const res = await fetch(`${API_BASE_URL}/api/recipes/${id}`, {
         method: "DELETE",
         headers: { Authorization: `Bearer ${token}` },
       });
@@ -243,8 +244,8 @@ export default function SavedRecipes() {
       const token = localStorage.getItem("token");
 
       const mealPlanUrl = existingMealPlanId
-        ? `http://localhost:5000/api/meal-plans/${existingMealPlanId}`
-        : "http://localhost:5000/api/meal-plans/create";
+        ? `${API_BASE_URL}/api/meal-plans/${existingMealPlanId}`
+        : apiUrl("/api/meal-plans/create");
 
       const res = await fetch(mealPlanUrl, {
         method: existingMealPlanId ? "PUT" : "POST",
