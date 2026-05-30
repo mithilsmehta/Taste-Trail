@@ -155,6 +155,10 @@ const getClientErrorMessage = (err) => {
     return "Gemini quota is blocked for this API key/project right now. In Google AI Studio, enable billing or use a project/API key with available Gemini quota, then restart the backend.";
   }
 
+  if (message.includes("leaked") || message.includes("403") || message.includes("Forbidden")) {
+    return "This Gemini API key was blocked by Google. Create a new Gemini API key, update GEMINI_API_KEY on Render, and redeploy/restart the backend.";
+  }
+
   if (message.includes("API key")) {
     return message;
   }

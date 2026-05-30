@@ -37,8 +37,6 @@ export default function SearchResults() {
     planDate: ""
   });
 
-  const MODEL = "meta-llama/llama-3.1-8b-instruct";
-
   useEffect(() => {
     if (query) fetchRecipe();
   }, [query]);
@@ -130,38 +128,6 @@ export default function SearchResults() {
     setOriginalRecipe(null);
     setIsSaved(false);
 
-    // Check if query contains "jain" (case insensitive)
-    const isJainRecipe = /jain/i.test(query);
-
-    const systemPrompt = `
-STRICT RULES:
-- Output ONLY pure JSON.
-- No markdown, no commentary.
-- Default to vegetarian recipes for all generic searches and suggestions.
-- Do not add meat, seafood, fish, chicken, eggs, or gelatin unless the user's query explicitly asks for a non-vegetarian recipe.
-- For generic dishes that often have non-veg versions, choose vegetarian versions, for example veg biryani, paneer tikka, vegetable pizza, or veg noodles.
-- Format must be:
-{
-  "name": "",
-  "ingredients": ["", ""],
-  "steps": ["", ""],
-  "servings": 2
-}
-
-${isJainRecipe ? `
-JAIN DIETARY RESTRICTIONS:
-- NEVER use root vegetables: onion, garlic, potato, carrot, radish, beetroot, turnip, ginger
-- Use alternatives: raw banana (kachcha kela) for potato when appropriate, ginger powder instead of fresh ginger
-- Use asafoetida (hing) for flavor instead of onion/garlic
-- Only suggest raw banana when it makes sense for the dish (not in every recipe)
-- For Chinese/Indo-Chinese dishes, hakka noodles, use capsicum, cabbage, spring onion greens (only green part), mushrooms
-- For bhel/chaat, use puffed rice, sev, tomatoes, cucumber, raw mango, coriander
-- Be creative with Jain-friendly vegetables: cauliflower, peas, beans, capsicum, tomatoes, cucumber, cabbage, spinach, etc.
-` : ''}
-`;
-
-    const userPrompt = `Generate a detailed recipe for ${servings} servings: ${query}`;
-
     try {
       const cachedRecipe = localStorage.getItem(getRecipeCacheKey());
       if (cachedRecipe) {
@@ -182,33 +148,26 @@ JAIN DIETARY RESTRICTIONS:
         return;
       }
 
-      const res = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+      const token = localStorage.getItem("token");
+      const res = await fetch(apiUrl("/api/recipes/generate"), {
         method: "POST",
         headers: {
-          Authorization: `Bearer ${import.meta.env.VITE_OPENROUTER_KEY}`,
           "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`
         },
         body: JSON.stringify({
-          model: MODEL,
-          messages: [
-            { role: "system", content: systemPrompt },
-            { role: "user", content: userPrompt }
-          ],
-          temperature: 0.3,
-          max_tokens: 1200,
-        }),
+          query,
+          servings
+        })
       });
 
       const data = await res.json();
 
-      let raw = data?.choices?.[0]?.message?.content || "";
+      if (!res.ok) {
+        throw new Error(data.msg || "Failed to generate recipe");
+      }
 
-      raw = raw.replace(/```json|```/g, "").trim();
-
-      const match = raw.match(/\{[\s\S]*\}/);
-      if (!match) throw new Error("AI returned invalid JSON");
-
-      const parsed = JSON.parse(match[0]);
+      const parsed = data.recipe;
       
       // Store original recipe for scaling
       setOriginalRecipe(parsed);
@@ -217,7 +176,7 @@ JAIN DIETARY RESTRICTIONS:
 
     } catch (err) {
       console.error(err);
-      setError("Failed to generate recipe. Please try again.");
+      setError(err.message || "Failed to generate recipe. Please try again.");
     }
 
     setLoading(false);

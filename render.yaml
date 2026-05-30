@@ -20,6 +20,14 @@ services:
         sync: false
       - key: GEMINI_MODEL
         value: gemini-2.0-flash-lite
+      - key: OPENROUTER_API_KEY
+        sync: false
+      - key: OPENROUTER_MODEL
+        value: meta-llama/llama-3.1-8b-instruct
+      - key: OPENROUTER_SITE_URL
+        sync: false
+      - key: OPENROUTER_APP_NAME
+        value: TasteTrail
       - key: EMAIL_USER
         sync: false
       - key: EMAIL_PASS
