@@ -109,6 +109,12 @@ export default function SearchResults() {
     return getDietMode() !== "jain" || isJainSafeRecipe(value);
   };
 
+  const getModeBlockedText = () => {
+    return getDietMode() === "jain"
+      ? "Jain mode blocks onion, garlic, ginger, potato, carrot, and root vegetables."
+      : "Veg mode blocks non-vegetarian ingredients.";
+  };
+
   const getRecipeCacheKey = () => `tastewiseRecipe:${getDietMode()}:${normalizeTitle(query)}:${servings}`;
 
   const getRecipeText = () => {
@@ -284,6 +290,11 @@ export default function SearchResults() {
       }
 
       const parsed = data.recipe;
+
+      if (!isRecipeSafeForDietMode(parsed)) {
+        localStorage.removeItem(getRecipeCacheKey());
+        throw new Error(`Generated recipe did not match ${getDietMode() === "jain" ? "Jain" : "Veg"} mode. ${getModeBlockedText()} Please generate again.`);
+      }
       
       // Store original recipe for scaling
       setOriginalRecipe(parsed);

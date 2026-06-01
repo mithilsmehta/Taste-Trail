@@ -61,6 +61,20 @@ export default function DetectIngredients() {
     return nonVegetarianPattern.test(value) || (getDietMode() === "jain" && jainRestrictedPattern.test(value));
   };
 
+  const filterIngredientsForCurrentMode = (items = []) => {
+    return items.filter((item) => !isIngredientBlockedByMode(item?.name || item));
+  };
+
+  const sanitizeNotesForCurrentMode = (value = "") => {
+    if (getDietMode() === "jain" && jainRestrictedPattern.test(value)) {
+      return "Jain mode removed restricted ingredients from this scan.";
+    }
+    if (nonVegetarianPattern.test(value)) {
+      return "Veg mode removed non-vegetarian items from this scan.";
+    }
+    return value;
+  };
+
   useEffect(() => {
     try {
       setScanHistory(JSON.parse(localStorage.getItem(scanHistoryKey) || "[]"));
@@ -191,11 +205,15 @@ export default function DetectIngredients() {
         throw new Error(data.msg || "Failed to detect ingredients");
       }
 
-      setIngredients(data.ingredients || []);
-      setRejectedItems(data.rejectedItems || []);
-      setUncertainItems(data.uncertainItems || []);
-      setNotes(data.notes || "");
-      addScanHistory(data.ingredients || []);
+      const safeIngredients = filterIngredientsForCurrentMode(data.ingredients || []);
+      const blockedFromResponse = (data.ingredients || [])
+        .filter((item) => isIngredientBlockedByMode(item?.name || item))
+        .map((item) => item?.name || item);
+      setIngredients(safeIngredients);
+      setRejectedItems([...(data.rejectedItems || []), ...blockedFromResponse]);
+      setUncertainItems((data.uncertainItems || []).filter((item) => !isIngredientBlockedByMode(item?.name || item)));
+      setNotes(sanitizeNotesForCurrentMode(data.notes || ""));
+      addScanHistory(safeIngredients);
     } catch (err) {
       console.error(err);
       setError(err.message || "Failed to detect ingredients");

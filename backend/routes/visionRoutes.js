@@ -207,6 +207,26 @@ const cleanIngredients = (ingredients = [], dietMode = "veg") => {
     });
 };
 
+const getBlockedNames = (items = [], dietMode = "veg") => {
+  return items
+    .map((item) => typeof item === "string" ? item : item?.name)
+    .map(normalizeIngredient)
+    .filter((name) => name && isBlockedByDiet(name, dietMode));
+};
+
+const uniqueNames = (items = []) => {
+  const seen = new Set();
+  return items
+    .map(normalizeIngredient)
+    .filter(Boolean)
+    .filter((name) => {
+      const key = name.toLowerCase();
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+};
+
 const cleanSuggestions = (suggestions = [], dietMode = "veg") => {
   return suggestions
     .filter((suggestion) => {
@@ -309,8 +329,14 @@ Format exactly:
     );
     const parsed = extractJson(result.response.text());
 
-    const detectedIngredients = cleanIngredients(parsed.ingredients, dietMode);
-    const rejectedItems = Array.isArray(parsed.rejectedItems) ? parsed.rejectedItems.filter(Boolean) : [];
+    const rawIngredients = Array.isArray(parsed.ingredients) ? parsed.ingredients : [];
+    const rawUncertainItems = Array.isArray(parsed.uncertainItems) ? parsed.uncertainItems : [];
+    const detectedIngredients = cleanIngredients(rawIngredients, dietMode);
+    const rejectedItems = uniqueNames([
+      ...(Array.isArray(parsed.rejectedItems) ? parsed.rejectedItems : []),
+      ...getBlockedNames(rawIngredients, dietMode),
+      ...getBlockedNames(rawUncertainItems, dietMode)
+    ]);
     const uncertainItems = Array.isArray(parsed.uncertainItems)
       ? parsed.uncertainItems
         .filter((item) => item?.name)
@@ -321,6 +347,9 @@ Format exactly:
         }))
         .filter((item) => item.name && !isBlockedByDiet(item.name, dietMode))
       : [];
+    const notes = dietMode === "jain" && isJainRestricted(parsed.notes)
+      ? "Jain mode removed restricted ingredients from this scan."
+      : (parsed.notes || "");
 
     await VisionScan.create({
       userId: req.user.id,
@@ -332,7 +361,7 @@ Format exactly:
       ingredients: detectedIngredients,
       uncertainItems,
       rejectedItems,
-      notes: parsed.notes || "",
+      notes,
       dietMode
     });
   } catch (err) {

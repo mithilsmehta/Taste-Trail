@@ -146,6 +146,15 @@ const isJainRestricted = (value) => {
   });
 };
 
+const getRecipeSafetyText = (recipe = {}) => {
+  return [
+    recipe.name,
+    recipe.title,
+    ...(Array.isArray(recipe.ingredients) ? recipe.ingredients : []),
+    ...(Array.isArray(recipe.steps) ? recipe.steps : [])
+  ].join(" ");
+};
+
 // GENERATE RECIPE WITH BACKEND AI
 router.post("/generate", authMiddleware, async (req, res) => {
   try {
@@ -176,16 +185,19 @@ STRICT VEG MODE ACTIVE:
 - If the requested dish is non-vegetarian, convert it into a vegetarian version using paneer, tofu, vegetables, mushrooms, lentils, or beans and name it clearly.
 `;
 
-    const prompt = `
+    const buildPrompt = (retryNote = "") => `
 Output ONLY pure JSON. No markdown, no commentary.
 ${dietRules}
+${retryNote}
 
 Generate a detailed recipe for ${servings} servings: ${query}
 Ingredient rules:
+- Every ingredient must include an amount, for example "1 cup basmati rice" or "2 tablespoons oil".
 - Keep each ingredient as one complete grocery item.
 - Do not create separate ingredients like "chopped", "sliced", "to taste", "for garnish", "for serving", or "peeled and grated".
 - Attach preparation words to the grocery item, for example "2 tomatoes, chopped".
 - Put serving/garnish instructions in cooking steps, not as separate ingredients.
+- Do not mention blocked ingredients in cooking steps either.
 
 Format:
 {
@@ -196,25 +208,39 @@ Format:
 }
 `;
 
-    const result = await generateRecipeText(prompt);
-    const recipe = extractJson(result);
-    const recipeText = [
-      recipe.name,
-      ...(Array.isArray(recipe.ingredients) ? recipe.ingredients : []),
-      ...(Array.isArray(recipe.steps) ? recipe.steps : [])
-    ].join(" ");
+    let recipe = null;
+    let blockedReason = "";
 
-    if (isNonVegetarian(recipeText)) {
-      return res.status(422).json({ msg: "Generated recipe was blocked because it included non-vegetarian content." });
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+      const retryNote = attempt === 0
+        ? ""
+        : `
+The previous recipe was rejected because it contained "${blockedReason}".
+Rewrite from scratch and remove every restricted item from ingredients and steps.`;
+      const result = await generateRecipeText(buildPrompt(retryNote));
+      const candidate = extractJson(result);
+      const recipeText = getRecipeSafetyText(candidate);
+
+      if (isNonVegetarian(recipeText)) {
+        blockedReason = "non-vegetarian content";
+        continue;
+      }
+
+      if (dietMode === "jain" && isJainRestricted(recipeText)) {
+        blockedReason = "onion, garlic, ginger, potato, carrot, or another Jain-restricted root vegetable";
+        continue;
+      }
+
+      recipe = candidate;
+      break;
     }
 
-    const groceryText = [
-      recipe.name,
-      ...(Array.isArray(recipe.ingredients) ? recipe.ingredients : [])
-    ].join(" ");
-
-    if (dietMode === "jain" && isJainRestricted(groceryText)) {
-      return res.status(422).json({ msg: "Generated recipe was blocked because it included ingredients that are not allowed in Jain mode." });
+    if (!recipe) {
+      return res.status(422).json({
+        msg: dietMode === "jain"
+          ? "Could not generate a Jain-safe recipe. Please try again; Jain mode blocks onion, garlic, ginger, potato, carrot, and root vegetables."
+          : "Generated recipe was blocked because it included non-vegetarian content."
+      });
     }
 
     res.json({
@@ -238,17 +264,13 @@ router.post("/save", authMiddleware, async (req, res) => {
     const { title, ingredients, steps, image, nutrition } = req.body;
     const dietMode = normalizeDietMode(req.body.dietMode);
     const enhancedRecipe = enhanceRecipe({ title, ingredients, steps, image, nutrition });
-    const recipeText = [
-      title,
-      ...(Array.isArray(ingredients) ? ingredients : []),
-      ...(Array.isArray(steps) ? steps : [])
-    ].join(" ");
+    const recipeText = getRecipeSafetyText({ title, ingredients, steps });
 
     if (isNonVegetarian(recipeText)) {
       return res.status(422).json({ msg: "Recipe was blocked because Veg mode does not allow non-vegetarian content." });
     }
 
-    if (dietMode === "jain" && isJainRestricted([title, ...(Array.isArray(ingredients) ? ingredients : [])].join(" "))) {
+    if (dietMode === "jain" && isJainRestricted(recipeText)) {
       return res.status(422).json({ msg: "Recipe was blocked because Jain mode does not allow root vegetables, onion, or garlic." });
     }
 

@@ -1,6 +1,5 @@
 import { apiUrl } from "../utils/api";
-import { useEffect, useState, useContext } from "react";
-import { useNavigate } from "react-router-dom";
+import { useState, useContext } from "react";
 import axios from "axios";
 import toast from "react-hot-toast";
 import { AuthContext } from "../context/AuthContext";
@@ -8,16 +7,9 @@ import AuthLayout from "../components/AuthLayout";
 import "../styles/auth.css";
 
 export default function Login() {
-  const { login, user, token } = useContext(AuthContext);
-  const navigate = useNavigate();
+  const { login } = useContext(AuthContext);
   const [identifier, setIdentifier] = useState("");
   const [password, setPassword] = useState("");
-
-  useEffect(() => {
-    if (user && token) {
-      navigate("/home", { replace: true });
-    }
-  }, [navigate, user, token]);
 
   const handleLogin = async (e) => {
     e.preventDefault();
@@ -31,7 +23,7 @@ export default function Login() {
       login(res.data.user, res.data.token);
 
       toast.success("Login successful!");
-      navigate("/home", { replace: true });
+      window.location.href = "/home";
     } catch (err) {
       toast.error(err.response?.data?.msg || "Login failed");
     }
@@ -39,7 +31,7 @@ export default function Login() {
 
   return (
     <AuthLayout>
-      <h2 className="auth-title text-center">Welcome to Tastewise</h2>
+      <h2 className="auth-title text-center">Welcome to TasteWise</h2>
       <p className="auth-subtitle text-center">Discover recipes tailored for you</p>
 
       <form onSubmit={handleLogin}>
