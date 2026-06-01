@@ -34,8 +34,8 @@ export default function App() {
     <BrowserRouter>
       <Routes>
 
-        {/* Redirect to Login */}
-        <Route path="/" element={<Navigate to="/login" />} />
+        {/* Redirect based on saved login */}
+        <Route path="/" element={<Navigate to={user && token ? "/home" : "/login"} replace />} />
 
         {/* Public Routes */}
         <Route path="/login" element={<Login />} />

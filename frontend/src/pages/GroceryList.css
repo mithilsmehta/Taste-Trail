@@ -212,6 +212,16 @@
   box-shadow: 0 1px 0 #c28600;
 }
 
+.not-orderable-note {
+  color: #6c757d;
+  font-size: 0.9rem;
+  font-weight: 700;
+  padding: 8px 12px;
+  border-radius: 999px;
+  background: #eef0f2;
+  white-space: nowrap;
+}
+
 .empty-state {
   background: #f8f9fa;
   border-radius: 16px;
@@ -257,6 +267,11 @@
   .btn-blinkit {
     width: 100%;
     justify-content: center;
+  }
+
+  .not-orderable-note {
+    width: 100%;
+    text-align: center;
   }
 
   .filter-buttons {

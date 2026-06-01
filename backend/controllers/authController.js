@@ -58,7 +58,7 @@ exports.login = async (req, res) => {
     const token = jwt.sign(
       { id: user._id, role: user.role },
       process.env.JWT_SECRET,
-      { expiresIn: "7d" }
+      { expiresIn: "365d" }
     );
 
     res.json({ msg: "Login successful", token, user });
@@ -90,9 +90,9 @@ exports.forgotPassword = async (req, res) => {
     const resetURL = `${frontendUrl}/reset-password/${resetToken}`;
 
     const mailOptions = {
-      from: `"TasteTrail" <${process.env.EMAIL_USER}>`,
+      from: `"Tastewise" <${process.env.EMAIL_USER}>`,
       to: user.email,
-      subject: "Reset Your Password - TasteTrail",
+      subject: "Reset Your Password - Tastewise",
       html: `
         <!DOCTYPE html>
         <html>
@@ -110,7 +110,7 @@ exports.forgotPassword = async (req, res) => {
         <body>
           <div class="container">
             <div class="header">
-              <h1>🍽️ TasteTrail</h1>
+              <h1>🍽️ Tastewise</h1>
             </div>
             <div class="content">
               <h2>Password Reset Request</h2>
@@ -123,10 +123,10 @@ exports.forgotPassword = async (req, res) => {
               <p style="word-break: break-all; color: #666;">${resetURL}</p>
               <p><strong>This link will expire in 15 minutes.</strong></p>
               <p>If you didn't request a password reset, please ignore this email or contact support if you have concerns.</p>
-              <p>Best regards,<br>The TasteTrail Team</p>
+              <p>Best regards,<br>The Tastewise Team</p>
             </div>
             <div class="footer">
-              <p>© 2024 TasteTrail. All rights reserved.</p>
+              <p>© 2024 Tastewise. All rights reserved.</p>
             </div>
           </div>
         </body>

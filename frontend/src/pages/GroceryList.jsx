@@ -2,9 +2,12 @@ import { API_BASE_URL } from "../utils/api";
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import Navbar from "../components/Navbar";
-import { formatIngredientAmount, splitIngredientLine } from "../utils/recipeFormatting";
-import { getMondayDateKey, getWeekFromDateKey, toDateKey } from "../utils/weekPlan";
+import { formatIngredientAmount, mergeIngredientParts, splitIngredientLine } from "../utils/recipeFormatting";
+import { parseDateKey } from "../utils/weekPlan";
 import "./GroceryList.css";
+
+const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+const validPlanDatePattern = /^\d{4}-\d{2}-\d{2}$/;
 
 const quantityWords = new Set([
   "a",
@@ -41,6 +44,9 @@ const units = new Set([
   "liters",
   "litre",
   "litres",
+  "oz",
+  "ounce",
+  "ounces",
   "pinch",
   "pinches",
   "piece",
@@ -51,6 +57,7 @@ const units = new Set([
   "slices",
   "small",
   "medium",
+  "sized",
   "large"
 ]);
 
@@ -65,10 +72,44 @@ const prepWords = new Set([
   "roughly",
   "thinly",
   "fresh",
+  "peeled",
   "optional",
+  "and",
+  "of",
+  "brewed",
+  "strong",
+  "ground",
+  "powdered",
+  "for",
+  "serving",
+  "serve",
+  "served",
+  "servings",
+  "garnish",
   "to",
   "taste"
 ]);
+
+const nonOrderableWords = new Set([
+  "chopped",
+  "sliced",
+  "diced",
+  "minced",
+  "grated",
+  "crushed",
+  "peeled",
+  "serving",
+  "serve",
+  "served",
+  "servings",
+  "garnish",
+  "optional",
+  "taste",
+  "water",
+  "salt"
+]);
+
+const standaloneInstructionPattern = /^(?:to taste|for garnish|for serving|garnish|serving|optional|chopped|sliced|diced|minced|grated|crushed|peeled|peeled and diced|peeled and chopped|peeled and cubed|peeled and grated|thinly sliced|finely chopped|roughly chopped)$/i;
 
 const shoppingProviders = [
   {
@@ -110,8 +151,6 @@ export default function GroceryList() {
   const [selectedProvider, setSelectedProvider] = useState("blinkit");
   const [expandedRecipes, setExpandedRecipes] = useState({});
   const [checkedItems, setCheckedItems] = useState({});
-  const currentWeekStartDate = getMondayDateKey(toDateKey(new Date()));
-  const currentWeekDays = getWeekFromDateKey(currentWeekStartDate);
 
   useEffect(() => {
     loadGroceryList();
@@ -120,24 +159,18 @@ export default function GroceryList() {
   const loadGroceryList = async () => {
     try {
       const token = localStorage.getItem("token");
-      await fetch(`${API_BASE_URL}/api/grocery/list?startDate=${currentWeekStartDate}`, {
+      await fetch(`${API_BASE_URL}/api/grocery/list`, {
         headers: { Authorization: `Bearer ${token}` }
       });
 
-      const res = await fetch(`${API_BASE_URL}/api/meal-plans/my?startDate=${currentWeekStartDate}`, {
+      const res = await fetch(`${API_BASE_URL}/api/meal-plans/all`, {
         headers: { Authorization: `Bearer ${token}` }
       });
 
       const data = await res.json();
-      const plans = ["breakfast", "lunch", "dinner"].flatMap((mealType) => {
-        return Array.isArray(data?.[mealType])
-          ? data[mealType].filter(Boolean).map((plan, dayIndex) => ({
-              ...plan,
-              mealType,
-              displayDayIndex: dayIndex
-            }))
-          : [];
-      });
+      const plans = Array.isArray(data)
+        ? data.filter((plan) => plan?.recipe?.title && validPlanDatePattern.test(plan.planDate || ""))
+        : [];
 
       setMealPlans(plans);
     } catch (err) {
@@ -154,11 +187,13 @@ export default function GroceryList() {
     }));
   };
 
-  const getBlinkitSearchTerm = (ingredient) => {
+  const getShoppingSearchTerm = (ingredient) => {
     const withoutParentheses = ingredient.replace(/\([^)]*\)/g, " ");
     const normalized = withoutParentheses
       .replace(/[¼½¾⅓⅔]/g, " ")
+      .replace(/\b\d+\s*-\s*\d+\b/g, " ")
       .replace(/\b\d+(?:\.\d+)?(?:\/\d+)?\b/g, " ")
+      .replace(/[-]+/g, " ")
       .replace(/[,+]/g, " ")
       .toLowerCase()
       .trim();
@@ -178,13 +213,34 @@ export default function GroceryList() {
       .replace(/\bonions\b/g, "onion")
       .replace(/\bchilies\b/g, "chilli")
       .replace(/\bchillies\b/g, "chilli")
-      .replace(/\bleaves\b/g, "leaf")
-      .trim() || ingredient;
+      .replace(/\bleaves\b/g, "leaves")
+      .trim();
+  };
+
+  const isOrderableIngredient = (ingredient) => {
+    const searchTerm = getShoppingSearchTerm(ingredient);
+    const normalizedIngredient = String(ingredient || "").toLowerCase();
+    const normalizedSearch = searchTerm.toLowerCase();
+
+    if (!normalizedSearch || normalizedSearch.length < 3) return false;
+    if (/\b(to taste|for garnish|for serving|garnish|serving|optional)\b/i.test(normalizedIngredient)) return false;
+    if (nonOrderableWords.has(normalizedSearch)) return false;
+    if (normalizedSearch.split(/\s+/).every((word) => nonOrderableWords.has(word))) return false;
+
+    return true;
+  };
+
+  const shouldDisplayIngredient = (ingredient) => {
+    const normalizedIngredient = String(ingredient || "").trim();
+    if (!normalizedIngredient) return false;
+    return !standaloneInstructionPattern.test(normalizedIngredient);
   };
 
   const openShoppingProvider = (ingredient) => {
+    if (!isOrderableIngredient(ingredient)) return;
+
     const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
-    const searchTerm = getBlinkitSearchTerm(ingredient);
+    const searchTerm = getShoppingSearchTerm(ingredient);
     const provider = shoppingProviders.find((item) => item.id === selectedProvider) || shoppingProviders[0];
     const webLink = provider.getUrl(searchTerm);
 
@@ -202,19 +258,18 @@ export default function GroceryList() {
   const getDisplayItems = () => {
     return mealPlans.flatMap((mealPlan) => {
       const ingredients = mealPlan.recipe?.ingredients || [];
+      const parts = mergeIngredientParts(ingredients.flatMap(splitIngredientLine));
 
-      return ingredients.flatMap((ingredient, ingredientIndex) => {
-        return splitIngredientLine(ingredient).map((part, partIndex) => ({
-          _displayId: `${mealPlan._id}-${ingredientIndex}-${partIndex}`,
-          _sourceId: `${mealPlan._id}-${ingredientIndex}-${partIndex}`,
+      return parts.filter(shouldDisplayIngredient).map((part, partIndex) => ({
+          _displayId: `${mealPlan._id}-${partIndex}`,
+          _sourceId: `${mealPlan._id}-${partIndex}`,
           _recipeId: String(mealPlan._id),
           _recipeTitle: mealPlan.recipe?.title || "Recipe",
-          _planDate: mealPlan.planDate || currentWeekDays[mealPlan.displayDayIndex]?.dateKey,
+          _planDate: mealPlan.planDate || "",
           mealType: mealPlan.mealType,
           marked: false,
           name: part
         }));
-      });
     });
   };
 
@@ -237,6 +292,12 @@ export default function GroceryList() {
     return icons[mealType];
   };
 
+  const formatPlanDate = (dateKey) => {
+    if (!dateKey) return "";
+    const date = parseDateKey(dateKey);
+    return `${date.getDate()} ${monthNames[date.getMonth()]} ${date.getFullYear()}`;
+  };
+
   const groupByMealAndRecipe = (items) => {
     const grouped = {
       breakfast: {},
@@ -252,6 +313,7 @@ export default function GroceryList() {
           id: item._recipeId,
           title: item._recipeTitle,
           mealType: item.mealType,
+          planDate: item._planDate,
           items: []
         };
       }
@@ -397,6 +459,7 @@ export default function GroceryList() {
                               <span className="recipe-grocery-title">{recipeGroup.title}</span>
                               <span className="recipe-grocery-meta">
                                 {recipeGroup.items.length} ingredient{recipeGroup.items.length !== 1 ? "s" : ""}
+                                {recipeGroup.planDate ? ` • ${formatPlanDate(recipeGroup.planDate)}` : ""}
                               </span>
                             </div>
                             <span className={`recipe-chevron ${expanded ? "expanded" : ""}`}>⌄</span>
@@ -404,29 +467,39 @@ export default function GroceryList() {
 
                           {expanded && (
                             <div className="grocery-items">
-                              {recipeGroup.items.map((item) => (
-                                <div key={item._displayId} className={`grocery-item ${checkedItems[item._sourceId] ? 'marked' : ''}`}>
-                                  <div className="item-left">
-                                    <input
-                                      type="checkbox"
-                                      className="form-check-input me-3"
-                                      checked={Boolean(checkedItems[item._sourceId])}
-                                      onChange={() => toggleMark(item._sourceId)}
-                                    />
-                                    <span className={checkedItems[item._sourceId] ? 'text-decoration-line-through text-muted' : ''}>
-                                      {formatIngredientAmount(item.name)}
-                                    </span>
-                                  </div>
+                              {recipeGroup.items.map((item) => {
+                                const orderable = isOrderableIngredient(item.name);
+                                const provider = shoppingProviders.find((provider) => provider.id === selectedProvider);
 
-                                  <button
-                                    className="btn btn-blinkit btn-sm"
-                                    onClick={() => openShoppingProvider(item.name)}
-                                  >
-                                    {shoppingProviders.find((provider) => provider.id === selectedProvider)?.icon}
-                                    {" "}Order on {shoppingProviders.find((provider) => provider.id === selectedProvider)?.name}
-                                  </button>
-                                </div>
-                              ))}
+                                return (
+                                  <div key={item._displayId} className={`grocery-item ${checkedItems[item._sourceId] ? 'marked' : ''}`}>
+                                    <div className="item-left">
+                                      <input
+                                        type="checkbox"
+                                        className="form-check-input me-3"
+                                        checked={Boolean(checkedItems[item._sourceId])}
+                                        onChange={() => toggleMark(item._sourceId)}
+                                      />
+                                      <span className={checkedItems[item._sourceId] ? 'text-decoration-line-through text-muted' : ''}>
+                                        {formatIngredientAmount(item.name)}
+                                      </span>
+                                    </div>
+
+                                    {orderable ? (
+                                      <button
+                                        className="btn btn-blinkit btn-sm"
+                                        onClick={() => openShoppingProvider(item.name)}
+                                        title={`Search ${getShoppingSearchTerm(item.name)} on ${provider?.name}`}
+                                      >
+                                        {provider?.icon}
+                                        {" "}Order on {provider?.name}
+                                      </button>
+                                    ) : (
+                                      <span className="not-orderable-note">No order needed</span>
+                                    )}
+                                  </div>
+                                );
+                              })}
                             </div>
                           )}
                         </div>
@@ -451,6 +524,7 @@ export default function GroceryList() {
           </div>
         )}
       </div>
+
     </>
   );
 }

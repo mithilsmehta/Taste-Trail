@@ -22,6 +22,38 @@ const nonVegetarianWords = [
   "lamb"
 ];
 
+const jainRestrictedWords = [
+  "onion",
+  "onions",
+  "garlic",
+  "potato",
+  "potatoes",
+  "aloo",
+  "carrot",
+  "carrots",
+  "radish",
+  "beetroot",
+  "beet",
+  "turnip",
+  "ginger",
+  "sweet potato",
+  "yam",
+  "tapioca",
+  "cassava",
+  "arbi",
+  "colocasia",
+  "surti papdi root",
+  "spring onion",
+  "green onion",
+  "scallion",
+  "leek",
+  "shallot"
+];
+
+const normalizeDietMode = (value) => {
+  return String(value || "").toLowerCase() === "jain" ? "jain" : "veg";
+};
+
 const getOpenRouterApiKey = () => {
   const key = process.env.OPENROUTER_API_KEY || "";
   return key && key !== "YOUR_OPENROUTER_API_KEY" ? key : "";
@@ -64,7 +96,7 @@ const generateRecipeText = async (prompt) => {
       Authorization: `Bearer ${apiKey}`,
       "Content-Type": "application/json",
       "HTTP-Referer": process.env.OPENROUTER_SITE_URL || process.env.FRONTEND_URL || "http://localhost:5173",
-      "X-Title": process.env.OPENROUTER_APP_NAME || "TasteTrail"
+      "X-Title": process.env.OPENROUTER_APP_NAME || "Tastewise"
     },
     body: JSON.stringify({
       model: getOpenRouterModel(),
@@ -106,32 +138,54 @@ const isNonVegetarian = (value) => {
   return nonVegetarianWords.some((word) => new RegExp(`\\b${word}\\b`, "i").test(normalized));
 };
 
+const isJainRestricted = (value) => {
+  const normalized = String(value || "").toLowerCase();
+  return jainRestrictedWords.some((word) => {
+    const escaped = word.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    return new RegExp(`\\b${escaped}\\b`, "i").test(normalized);
+  });
+};
+
 // GENERATE RECIPE WITH BACKEND AI
 router.post("/generate", authMiddleware, async (req, res) => {
   try {
     const query = String(req.body.query || "").trim();
     const servings = Number(req.body.servings) || 2;
+    const requestedDietMode = normalizeDietMode(req.body.dietMode);
 
     if (!query) {
       return res.status(400).json({ msg: "Recipe query is required" });
     }
 
-    const isJainRecipe = /jain/i.test(query);
+    const dietMode = requestedDietMode === "jain" || /jain/i.test(query) ? "jain" : "veg";
+    const dietRules = dietMode === "jain"
+      ? `
+STRICT JAIN MODE ACTIVE:
+- Generate ONLY Jain vegetarian recipes, even if the user did not type "Jain".
+- NEVER use onion, garlic, potato, carrot, radish, beetroot, turnip, ginger, sweet potato, yam, tapioca, cassava, arbi, colocasia, spring onion, leek, shallot, or any root vegetable.
+- NEVER use meat, seafood, fish, chicken, eggs, gelatin, animal stock, lard, bacon, ham, or any non-vegetarian ingredient.
+- For searches like "diet recipe", "healthy recipe", or any generic recipe request, still make the recipe strictly Jain by default.
+- If the requested dish normally uses restricted ingredients, create a Jain-friendly version and name it clearly.
+- Use Jain-safe alternatives such as raw banana, cauliflower, cabbage, capsicum, peas, beans, tomato, cucumber, spinach, paneer, tofu, lentils, grains, spices, and asafoetida (hing).
+`
+      : `
+STRICT VEG MODE ACTIVE:
+- Generate ONLY vegetarian recipes.
+- NEVER use meat, seafood, fish, chicken, eggs, gelatin, animal stock, lard, bacon, ham, or any non-vegetarian ingredient.
+- Normal vegetarian ingredients such as onion, garlic, potato, carrot, ginger, beetroot, and other root vegetables are allowed in Veg mode when they belong in the recipe.
+- If the requested dish is non-vegetarian, convert it into a vegetarian version using paneer, tofu, vegetables, mushrooms, lentils, or beans and name it clearly.
+`;
+
     const prompt = `
 Output ONLY pure JSON. No markdown, no commentary.
-Default to vegetarian recipes for all generic searches and suggestions.
-Do not add meat, seafood, fish, chicken, eggs, or gelatin unless the user's query explicitly asks for a non-vegetarian recipe.
-For generic dishes that often have non-veg versions, choose vegetarian versions.
-
-${isJainRecipe ? `
-JAIN DIETARY RESTRICTIONS:
-- NEVER use root vegetables: onion, garlic, potato, carrot, radish, beetroot, turnip, ginger
-- Use alternatives only when they make sense.
-- Use asafoetida (hing) for flavor instead of onion/garlic.
-- Use Jain-friendly vegetables like cauliflower, peas, beans, capsicum, tomatoes, cucumber, cabbage, spinach.
-` : ""}
+${dietRules}
 
 Generate a detailed recipe for ${servings} servings: ${query}
+Ingredient rules:
+- Keep each ingredient as one complete grocery item.
+- Do not create separate ingredients like "chopped", "sliced", "to taste", "for garnish", "for serving", or "peeled and grated".
+- Attach preparation words to the grocery item, for example "2 tomatoes, chopped".
+- Put serving/garnish instructions in cooking steps, not as separate ingredients.
 
 Format:
 {
@@ -150,8 +204,17 @@ Format:
       ...(Array.isArray(recipe.steps) ? recipe.steps : [])
     ].join(" ");
 
-    if (!/non[-\s]?veg|chicken|mutton|fish|egg|seafood|prawn|shrimp/i.test(query) && isNonVegetarian(recipeText)) {
+    if (isNonVegetarian(recipeText)) {
       return res.status(422).json({ msg: "Generated recipe was blocked because it included non-vegetarian content." });
+    }
+
+    const groceryText = [
+      recipe.name,
+      ...(Array.isArray(recipe.ingredients) ? recipe.ingredients : [])
+    ].join(" ");
+
+    if (dietMode === "jain" && isJainRestricted(groceryText)) {
+      return res.status(422).json({ msg: "Generated recipe was blocked because it included ingredients that are not allowed in Jain mode." });
     }
 
     res.json({
@@ -159,7 +222,8 @@ Format:
         name: recipe.name || query,
         ingredients: Array.isArray(recipe.ingredients) ? recipe.ingredients : [],
         steps: Array.isArray(recipe.steps) ? recipe.steps : [],
-        servings: recipe.servings || servings
+        servings: recipe.servings || servings,
+        dietMode
       }
     });
   } catch (err) {
@@ -172,7 +236,21 @@ Format:
 router.post("/save", authMiddleware, async (req, res) => {
   try {
     const { title, ingredients, steps, image, nutrition } = req.body;
+    const dietMode = normalizeDietMode(req.body.dietMode);
     const enhancedRecipe = enhanceRecipe({ title, ingredients, steps, image, nutrition });
+    const recipeText = [
+      title,
+      ...(Array.isArray(ingredients) ? ingredients : []),
+      ...(Array.isArray(steps) ? steps : [])
+    ].join(" ");
+
+    if (isNonVegetarian(recipeText)) {
+      return res.status(422).json({ msg: "Recipe was blocked because Veg mode does not allow non-vegetarian content." });
+    }
+
+    if (dietMode === "jain" && isJainRestricted([title, ...(Array.isArray(ingredients) ? ingredients : [])].join(" "))) {
+      return res.status(422).json({ msg: "Recipe was blocked because Jain mode does not allow root vegetables, onion, or garlic." });
+    }
 
     // Check if recipe already exists for this user
     const existing = await SavedRecipe.findOne({ 
@@ -181,7 +259,14 @@ router.post("/save", authMiddleware, async (req, res) => {
     });
 
     if (existing) {
-      return res.status(400).json({ msg: "Recipe already saved!" });
+      existing.ingredients = Array.isArray(ingredients) ? ingredients : [];
+      existing.steps = Array.isArray(steps) ? steps : [];
+      existing.image = enhancedRecipe.image;
+      existing.nutrition = enhancedRecipe.nutrition;
+      existing.updatedAt = Date.now();
+      await existing.save();
+
+      return res.json({ msg: "Recipe updated!", recipe: existing });
     }
 
     const saved = await SavedRecipe.create({

@@ -1,52 +1,58 @@
-import { useContext } from "react";
+import { useContext, useState } from "react";
 import { AuthContext } from "../context/AuthContext";
 import { Link, useNavigate } from "react-router-dom";
 
 export default function Navbar() {
   const { user, logout } = useContext(AuthContext);
   const navigate = useNavigate();
+  const [menuOpen, setMenuOpen] = useState(false);
 
   const handleLogout = () => {
+    setMenuOpen(false);
     logout();
     navigate("/login");
   };
+
+  const closeMenu = () => setMenuOpen(false);
 
   return (
     <nav className="navbar navbar-expand-lg bg-white shadow-sm px-3 py-2 taste-navbar">
       <div className="container-fluid">
 
         {/* LEFT SIDE - BRAND NAME */}
-        <Link className="navbar-brand fw-bold fs-3" to="/home">
+        <Link className="navbar-brand fw-bold fs-3" to="/home" onClick={closeMenu}>
           <span style={{ color: "#FF6A00" }}>Taste</span>
-          <span style={{ color: "#333" }}>Trail</span>
+          <span style={{ color: "#333" }}>wise</span>
         </Link>
 
         {/* MOBILE TOGGLE */}
         <button
           className="navbar-toggler"
           type="button"
-          data-bs-toggle="collapse"
-          data-bs-target="#navbarNav"
+          aria-controls="navbarNav"
+          aria-expanded={menuOpen}
+          aria-label={menuOpen ? "Close navigation" : "Open navigation"}
+          onClick={() => setMenuOpen((open) => !open)}
         >
           <span className="navbar-toggler-icon"></span>
         </button>
 
-     <div className="collapse navbar-collapse justify-content-end" id="navbarNav">
+     <div className={`collapse navbar-collapse justify-content-end ${menuOpen ? "show" : ""}`} id="navbarNav">
   {user && (
     <div className="navbar-actions">
-      <Link to="/meal-planner" className="btn btn-outline-success">
+      <Link to="/meal-planner" className="btn btn-outline-success" onClick={closeMenu}>
         📅 Meal Planner
       </Link>
 
-      <Link to="/grocery-list" className="btn btn-outline-info">
+      <Link to="/grocery-list" className="btn btn-outline-info" onClick={closeMenu}>
         🛒 Grocery List
       </Link>
 
-      <Link to="/saved" className="btn btn-outline-warning">
+      <Link to="/saved" className="btn btn-outline-warning" onClick={closeMenu}>
         ❤️ Saved Recipes
       </Link>
 
-      <Link to="/profile" className="btn btn-outline-dark">
+      <Link to="/profile" className="btn btn-outline-dark" onClick={closeMenu}>
         👤 Profile
       </Link>
 

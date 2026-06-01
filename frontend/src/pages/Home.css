@@ -6,6 +6,81 @@
   font-size: 2.6rem;
 }
 
+.welcome-mode-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  width: 96%;
+}
+
+.diet-mode-toggle {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  flex: 0 0 auto;
+  gap: 3px;
+  border: 1px solid #f4c542;
+  background: #fff9e8;
+  border-radius: 12px;
+  padding: 4px 6px;
+  font-weight: 700;
+  color: #6c757d;
+  white-space: nowrap;
+  min-width: 48px;
+}
+
+.diet-mode-label {
+  font-size: 0.84rem;
+  color: #1f2328;
+  line-height: 1;
+}
+
+.diet-switch {
+  position: relative;
+  display: inline-block;
+  width: 36px;
+  height: 19px;
+  margin: 0;
+}
+
+.diet-switch input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.diet-slider {
+  position: absolute;
+  cursor: pointer;
+  inset: 0;
+  background: #2f8f55;
+  border-radius: 999px;
+  transition: 0.2s ease;
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.08);
+}
+
+.diet-slider::before {
+  content: "";
+  position: absolute;
+  width: 13px;
+  height: 13px;
+  left: 3px;
+  top: 3px;
+  background: #fff;
+  border-radius: 50%;
+  transition: 0.2s ease;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
+}
+
+.diet-switch input:checked + .diet-slider {
+  background: #ffc107;
+}
+
+.diet-switch input:checked + .diet-slider::before {
+  transform: translateX(17px);
+}
+
 .subtitle {
   font-size: 1.1rem;
   color: #555;
@@ -156,7 +231,17 @@
   }
 
   .title {
-    font-size: 1.9rem;
+    flex: 1 1 auto;
+    font-size: 1.78rem;
+  }
+
+  .welcome-mode-row {
+    align-items: flex-start;
+    gap: 8px;
+  }
+
+  .diet-mode-toggle {
+    margin-top: 2px;
   }
 
   .subtitle {

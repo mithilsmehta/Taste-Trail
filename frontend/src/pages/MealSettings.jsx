@@ -150,7 +150,7 @@ export default function MealSettings() {
       setNotificationPermission(permission);
       
       if (permission === "granted") {
-        alert("✅ App notifications enabled! You'll receive meal reminders while TasteTrail is open.");
+        alert("✅ App notifications enabled! You'll receive meal reminders while Tastewise is open.");
         setSettings(prev => ({ ...prev, appNotificationsEnabled: true }));
       } else {
         alert("❌ Notifications denied. App reminders are turned off.");
@@ -368,7 +368,7 @@ export default function MealSettings() {
               <div className="notification-toggle mb-3">
                 <div>
                   <strong>App Notifications</strong>
-                  <p className="text-muted small mb-0">Browser reminders on this device while TasteTrail is open.</p>
+                  <p className="text-muted small mb-0">Browser reminders on this device while Tastewise is open.</p>
                 </div>
                 <div className="form-check form-switch">
                   <input

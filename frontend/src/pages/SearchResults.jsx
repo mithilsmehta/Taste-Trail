@@ -1,5 +1,5 @@
 import { apiUrl } from "../utils/api";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import Navbar from "../components/Navbar";
 import { getMondayDateKey, getWeekFromDateKey } from "../utils/weekPlan";
@@ -17,6 +17,9 @@ const mealOptions = [
   { type: "dinner", icon: "🍽️", name: "Dinner" }
 ];
 
+const nonVegetarianPattern = /\b(chicken|mutton|beef|pork|fish|seafood|prawn|shrimp|eggs?|gelatin|bacon|ham|turkey|lamb|keema)\b/i;
+const jainRestrictedPattern = /\b(onions?|garlic|potatoes?|aloo|carrots?|radish|beetroot|beet|turnip|ginger|sweet potato|yam|tapioca|cassava|arbi|colocasia|spring onion|green onion|scallion|leek|shallot)\b/i;
+
 export default function SearchResults() {
   const location = useLocation();
   const navigate = useNavigate();
@@ -27,6 +30,10 @@ export default function SearchResults() {
   const [error, setError] = useState("");
   const [isSaved, setIsSaved] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [customIngredient, setCustomIngredient] = useState("");
+  const [hasIngredientChanges, setHasIngredientChanges] = useState(false);
+  const [showUnsavedModal, setShowUnsavedModal] = useState(false);
+  const [pendingNavigation, setPendingNavigation] = useState(null);
   const [servings, setServings] = useState(2);
   const [originalRecipe, setOriginalRecipe] = useState(null);
   const [showMealModal, setShowMealModal] = useState(false);
@@ -36,16 +43,115 @@ export default function SearchResults() {
     dayIndex: null,
     planDate: ""
   });
+  const historyGuardActiveRef = useRef(false);
 
   useEffect(() => {
     if (query) fetchRecipe();
   }, [query]);
 
+  useEffect(() => {
+    if (!hasIngredientChanges) return undefined;
+
+    const handleBeforeUnload = (event) => {
+      event.preventDefault();
+      event.returnValue = "";
+    };
+
+    window.addEventListener("beforeunload", handleBeforeUnload);
+    return () => window.removeEventListener("beforeunload", handleBeforeUnload);
+  }, [hasIngredientChanges]);
+
+  useEffect(() => {
+    if (!hasIngredientChanges || historyGuardActiveRef.current) return undefined;
+
+    historyGuardActiveRef.current = true;
+    window.history.pushState({ recipeUnsavedGuard: true }, "");
+
+    const handlePopState = () => {
+      if (!hasIngredientChanges) return;
+      setPendingNavigation("/home");
+      setShowUnsavedModal(true);
+      window.history.pushState({ recipeUnsavedGuard: true }, "");
+    };
+
+    window.addEventListener("popstate", handlePopState);
+    return () => {
+      window.removeEventListener("popstate", handlePopState);
+      historyGuardActiveRef.current = false;
+    };
+  }, [hasIngredientChanges]);
+
   const normalizeTitle = (value) => {
     return String(value || "").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
   };
 
-  const getRecipeCacheKey = () => `tasteTrailRecipe:${normalizeTitle(query)}:${servings}`;
+  const getDietMode = () => {
+    return localStorage.getItem("tastewiseDietMode") === "jain" ? "jain" : "veg";
+  };
+
+  const isJainSafeRecipe = (value) => {
+    const text = [
+      value?.name,
+      value?.title,
+      ...(Array.isArray(value?.ingredients) ? value.ingredients : [])
+    ].join(" ");
+    return !jainRestrictedPattern.test(text);
+  };
+
+  const isRecipeSafeForDietMode = (value) => {
+    const text = [
+      value?.name,
+      value?.title,
+      ...(Array.isArray(value?.ingredients) ? value.ingredients : []),
+      ...(Array.isArray(value?.steps) ? value.steps : [])
+    ].join(" ");
+    if (nonVegetarianPattern.test(text)) return false;
+    return getDietMode() !== "jain" || isJainSafeRecipe(value);
+  };
+
+  const getRecipeCacheKey = () => `tastewiseRecipe:${getDietMode()}:${normalizeTitle(query)}:${servings}`;
+
+  const getRecipeText = () => {
+    if (!recipe) return "";
+
+    const ingredients = getCleanIngredients(recipe.ingredients)
+      .map((item, index) => `${index + 1}. ${formatIngredientAmount(item)}`)
+      .join("\n");
+    const steps = (recipe.steps || [])
+      .map((step, index) => `${index + 1}. ${step}`)
+      .join("\n");
+
+    return `${recipe.name}\n\nIngredients:\n${ingredients}\n\nCooking Steps:\n${steps}`;
+  };
+
+  const getCleanIngredients = (ingredients = []) => {
+    return ingredients
+      .map((ingredient) => String(ingredient || "").trim())
+      .filter(Boolean);
+  };
+
+  const getRecipeForSaving = () => {
+    if (!recipe) return null;
+    return {
+      ...recipe,
+      ingredients: getCleanIngredients(recipe.ingredients)
+    };
+  };
+
+  const markRecipeCustomized = () => {
+    setHasIngredientChanges(true);
+    setIsSaved(false);
+  };
+
+  const requestNavigation = (target) => {
+    if (!hasIngredientChanges) {
+      navigate(target);
+      return;
+    }
+
+    setPendingNavigation(target);
+    setShowUnsavedModal(true);
+  };
 
   const getRecipeLabelForDate = (dateKey) => {
     if (!dateKey) return "";
@@ -112,6 +218,7 @@ export default function SearchResults() {
     const savedRecipe = recipes.find((item) => normalizeTitle(item.title) === queryTitle);
 
     if (!savedRecipe) return null;
+    if (!isRecipeSafeForDietMode(savedRecipe)) return null;
 
     return {
       name: savedRecipe.title,
@@ -127,15 +234,22 @@ export default function SearchResults() {
     setRecipe(null);
     setOriginalRecipe(null);
     setIsSaved(false);
+    setHasIngredientChanges(false);
+    setCustomIngredient("");
 
     try {
       const cachedRecipe = localStorage.getItem(getRecipeCacheKey());
       if (cachedRecipe) {
         const parsedCachedRecipe = JSON.parse(cachedRecipe);
-        setOriginalRecipe(parsedCachedRecipe);
-        setRecipe(parsedCachedRecipe);
-        setLoading(false);
-        return;
+        if (!isRecipeSafeForDietMode(parsedCachedRecipe)) {
+          localStorage.removeItem(getRecipeCacheKey());
+        } else {
+          setOriginalRecipe(parsedCachedRecipe);
+          setRecipe(parsedCachedRecipe);
+          setHasIngredientChanges(false);
+          setLoading(false);
+          return;
+        }
       }
 
       const savedRecipe = await getSavedRecipeFromDatabase();
@@ -143,6 +257,7 @@ export default function SearchResults() {
         setOriginalRecipe(savedRecipe);
         setRecipe(savedRecipe);
         setIsSaved(true);
+        setHasIngredientChanges(false);
         localStorage.setItem(getRecipeCacheKey(), JSON.stringify(savedRecipe));
         setLoading(false);
         return;
@@ -157,7 +272,8 @@ export default function SearchResults() {
         },
         body: JSON.stringify({
           query,
-          servings
+          servings,
+          dietMode: getDietMode()
         })
       });
 
@@ -172,6 +288,7 @@ export default function SearchResults() {
       // Store original recipe for scaling
       setOriginalRecipe(parsed);
       setRecipe(parsed);
+      setHasIngredientChanges(false);
       localStorage.setItem(getRecipeCacheKey(), JSON.stringify(parsed));
 
     } catch (err) {
@@ -218,14 +335,62 @@ export default function SearchResults() {
     scaleIngredients(newServings);
   };
 
+  const updateIngredient = (index, value) => {
+    setRecipe((prev) => {
+      if (!prev) return prev;
+      const nextIngredients = [...(prev.ingredients || [])];
+      nextIngredients[index] = value;
+      return { ...prev, ingredients: nextIngredients };
+    });
+    markRecipeCustomized();
+  };
+
+  const removeIngredient = (index) => {
+    setRecipe((prev) => {
+      if (!prev) return prev;
+      const nextIngredients = (prev.ingredients || []).filter((_, itemIndex) => itemIndex !== index);
+      return { ...prev, ingredients: nextIngredients };
+    });
+    markRecipeCustomized();
+  };
+
+  const addCustomIngredient = () => {
+    const ingredient = customIngredient.trim();
+    if (!ingredient) return;
+    if (nonVegetarianPattern.test(ingredient)) {
+      alert("Veg mode is strict, so non-veg ingredients cannot be added.");
+      return;
+    }
+    if (getDietMode() === "jain" && jainRestrictedPattern.test(ingredient)) {
+      alert("Jain mode is on, so this ingredient cannot be added.");
+      return;
+    }
+
+    setRecipe((prev) => {
+      if (!prev) return prev;
+      return {
+        ...prev,
+        ingredients: [...(prev.ingredients || []), ingredient]
+      };
+    });
+    setCustomIngredient("");
+    markRecipeCustomized();
+  };
+
   // ⭐ SAVE TO BACKEND DATABASE
-  const saveRecipe = async () => {
-    if (!recipe || saving) return;
+  const saveRecipe = async ({ silent = false } = {}) => {
+    if (!recipe || saving) return false;
+    if (!isRecipeSafeForDietMode(recipe)) {
+      if (!silent) alert(`${getDietMode() === "jain" ? "Jain" : "Veg"} mode is on, so remove blocked ingredients before saving.`);
+      return false;
+    }
 
     setSaving(true);
 
     try {
       const token = localStorage.getItem("token");
+
+      const recipeForSaving = getRecipeForSaving();
 
       const res = await fetch(apiUrl("/api/recipes/save"), {
         method: "POST",
@@ -234,30 +399,61 @@ export default function SearchResults() {
           Authorization: `Bearer ${token}`,
         },
         body: JSON.stringify({
-          title: recipe.name,
-          ingredients: recipe.ingredients,
-          steps: recipe.steps,
+          title: recipeForSaving.name,
+          ingredients: recipeForSaving.ingredients,
+          steps: recipeForSaving.steps,
           image: "",
+          dietMode: getDietMode()
         }),
       });
 
       const data = await res.json();
 
       if (!res.ok) {
-        alert(data.msg || "Failed to save recipe");
+        if (!silent) alert(data.msg || "Failed to save recipe");
         setSaving(false);
-        return;
+        return false;
       }
 
       setIsSaved(true);
-      alert("✅ Recipe saved successfully! View it in your Saved Recipes.");
+      setHasIngredientChanges(false);
+      const savedRecipe = {
+        ...recipeForSaving,
+        steps: recipeForSaving.steps || []
+      };
+      setRecipe(savedRecipe);
+      setOriginalRecipe(savedRecipe);
+      localStorage.setItem(getRecipeCacheKey(), JSON.stringify(savedRecipe));
+      if (!silent) alert("✅ Recipe saved successfully! View it in your Saved Recipes.");
+      setSaving(false);
+      return true;
 
     } catch (err) {
       console.error(err);
-      alert("❌ Could not save recipe. Please try again.");
+      if (!silent) alert("❌ Could not save recipe. Please try again.");
     }
 
     setSaving(false);
+    return false;
+  };
+
+  const continueAfterUnsavedChoice = (target = pendingNavigation) => {
+    setShowUnsavedModal(false);
+    setPendingNavigation(null);
+    setHasIngredientChanges(false);
+    if (target) navigate(target);
+  };
+
+  const saveAndContinue = async () => {
+    const target = pendingNavigation;
+    const saved = await saveRecipe({ silent: true });
+    if (!saved) {
+      alert("❌ Could not save recipe. Please try again.");
+      return;
+    }
+    setShowUnsavedModal(false);
+    setPendingNavigation(null);
+    if (target) navigate(target);
   };
 
   const openMealPlanModal = () => {
@@ -282,6 +478,12 @@ export default function SearchResults() {
     try {
       const token = localStorage.getItem("token");
 
+      const recipeForSaving = getRecipeForSaving();
+      if (!isRecipeSafeForDietMode(recipeForSaving)) {
+        alert(`${getDietMode() === "jain" ? "Jain" : "Veg"} mode is on, so remove blocked ingredients before adding this recipe.`);
+        return;
+      }
+
       const res = await fetch(apiUrl("/api/meal-plans/create"), {
         method: "POST",
         headers: {
@@ -294,9 +496,9 @@ export default function SearchResults() {
           planDate,
           recipe: {
             id: "",
-            title: recipe.name,
-            ingredients: recipe.ingredients || [],
-            steps: recipe.steps || [],
+            title: recipeForSaving.name,
+            ingredients: recipeForSaving.ingredients || [],
+            steps: recipeForSaving.steps || [],
             image: ""
           },
           time: defaultTimes[mealType]
@@ -321,6 +523,32 @@ export default function SearchResults() {
     }
   };
 
+  const copyRecipe = async () => {
+    const recipeText = getRecipeText();
+    if (!recipeText) return;
+
+    try {
+      if (navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(recipeText);
+      } else {
+        const textArea = document.createElement("textarea");
+        textArea.value = recipeText;
+        textArea.style.position = "fixed";
+        textArea.style.opacity = "0";
+        document.body.appendChild(textArea);
+        textArea.focus();
+        textArea.select();
+        document.execCommand("copy");
+        document.body.removeChild(textArea);
+      }
+
+      alert("✅ Recipe copied!");
+    } catch (err) {
+      console.error(err);
+      alert("❌ Could not copy recipe. Please try again.");
+    }
+  };
+
   return (
     <>
       <Navbar />
@@ -328,7 +556,7 @@ export default function SearchResults() {
         {/* Back Button */}
         <button 
           className="btn btn-outline-secondary mb-4"
-          onClick={() => navigate("/home")}
+          onClick={() => requestNavigation("/home")}
         >
           ← Back to Home
         </button>
@@ -388,13 +616,21 @@ export default function SearchResults() {
                   </div>
                 </div>
 
-                <button 
-                  className={`btn ${isSaved ? 'btn-secondary' : 'btn-success'}`}
-                  onClick={saveRecipe}
-                  disabled={saving || isSaved}
-                >
-                  {saving ? '⏳ Saving...' : isSaved ? '✅ Saved!' : '❤️ Save Recipe'}
-                </button>
+                <div className="d-flex flex-column gap-2">
+                  <button 
+                    className={`btn ${isSaved ? 'btn-secondary' : 'btn-success'}`}
+                    onClick={saveRecipe}
+                    disabled={saving || isSaved}
+                  >
+                    {saving ? '⏳ Saving...' : isSaved ? '✅ Saved!' : '❤️ Save Recipe'}
+                  </button>
+                  <button 
+                    className="btn btn-success"
+                    onClick={openMealPlanModal}
+                  >
+                    📅 Add to Meal Planner
+                  </button>
+                </div>
               </div>
             </div>
 
@@ -408,12 +644,53 @@ export default function SearchResults() {
                   </h5>
                   <ul className="ingredients-list">
                     {recipe.ingredients?.map((item, i) => (
-                      <li key={i} className="ingredient-item">
+                      <li key={i} className="ingredient-item editable-ingredient-item">
                         <span className="ingredient-bullet">•</span>
-                        {formatIngredientAmount(item)}
+                        <input
+                          type="text"
+                          className="ingredient-edit-input"
+                          value={item}
+                          onChange={(event) => updateIngredient(i, event.target.value)}
+                          aria-label={`Edit ingredient ${i + 1}`}
+                        />
+                        <button
+                          type="button"
+                          className="ingredient-remove-btn"
+                          onClick={() => removeIngredient(i)}
+                          aria-label={`Remove ${item}`}
+                        >
+                          ×
+                        </button>
                       </li>
                     ))}
                   </ul>
+                  <div className="add-ingredient-row mt-3">
+                    <input
+                      type="text"
+                      className="form-control"
+                      value={customIngredient}
+                      onChange={(event) => setCustomIngredient(event.target.value)}
+                      onKeyDown={(event) => {
+                        if (event.key === "Enter") {
+                          event.preventDefault();
+                          addCustomIngredient();
+                        }
+                      }}
+                      placeholder="Add ingredient manually"
+                    />
+                    <button
+                      type="button"
+                      className="btn btn-outline-warning"
+                      onClick={addCustomIngredient}
+                    >
+                      Add
+                    </button>
+                  </div>
+                  {hasIngredientChanges && (
+                    <p className="customized-recipe-note mt-3 mb-0">
+                      Custom changes will be saved with this recipe.
+                    </p>
+                  )}
                 </div>
               </div>
 
@@ -444,14 +721,14 @@ export default function SearchResults() {
                 🖨️ Print Recipe
               </button>
               <button 
-                className="btn btn-success flex-fill"
-                onClick={openMealPlanModal}
+                className="btn btn-outline-success flex-fill"
+                onClick={copyRecipe}
               >
-                📅 Add to Meal Planner
+                📋 Copy Recipe
               </button>
               <button 
                 className="btn btn-outline-dark flex-fill"
-                onClick={() => navigate("/saved")}
+                onClick={() => requestNavigation("/saved")}
               >
                 📚 View Saved Recipes
               </button>
@@ -519,6 +796,38 @@ export default function SearchResults() {
         </div>
       )}
 
+      {showUnsavedModal && (
+        <div className="meal-modal-overlay" onClick={() => setShowUnsavedModal(false)}>
+          <div className="unsaved-recipe-modal" onClick={(event) => event.stopPropagation()}>
+            <div className="meal-modal-header">
+              <div>
+                <h4 className="fw-bold mb-1">Save Your Customized Recipe?</h4>
+                <p className="text-muted mb-0">
+                  You changed the ingredients but have not saved them yet.
+                </p>
+              </div>
+              <button className="btn-close" onClick={() => setShowUnsavedModal(false)}></button>
+            </div>
+            <div className="meal-modal-body">
+              <p className="mb-4">
+                Save this customized recipe to your Saved Recipes before leaving?
+              </p>
+              <div className="unsaved-actions">
+                <button className="btn btn-success" onClick={saveAndContinue} disabled={saving}>
+                  {saving ? "Saving..." : "Yes, Save"}
+                </button>
+                <button className="btn btn-outline-danger" onClick={() => continueAfterUnsavedChoice()}>
+                  Leave Without Saving
+                </button>
+                <button className="btn btn-outline-secondary" onClick={() => setShowUnsavedModal(false)}>
+                  Keep Editing
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       <style>{`
         .search-header {
           border-bottom: 3px solid #ffc107;
@@ -578,6 +887,11 @@ export default function SearchResults() {
           align-items: flex-start;
         }
 
+        .editable-ingredient-item {
+          align-items: center;
+          gap: 10px;
+        }
+
         .ingredient-item:last-child {
           border-bottom: none;
         }
@@ -587,6 +901,56 @@ export default function SearchResults() {
           font-size: 1.5rem;
           margin-right: 12px;
           line-height: 1;
+        }
+
+        .ingredient-edit-input {
+          flex: 1;
+          min-width: 0;
+          border: 1px solid #e9ecef;
+          border-radius: 8px;
+          padding: 9px 10px;
+          font: inherit;
+          background: #fff;
+        }
+
+        .ingredient-edit-input:focus {
+          outline: none;
+          border-color: #ffc107;
+          box-shadow: 0 0 0 3px rgba(255, 193, 7, 0.16);
+        }
+
+        .ingredient-remove-btn {
+          width: 34px;
+          height: 34px;
+          border: 1px solid #dc3545;
+          border-radius: 8px;
+          background: #fff;
+          color: #dc3545;
+          font-size: 1.3rem;
+          line-height: 1;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+        }
+
+        .ingredient-remove-btn:hover {
+          background: #dc3545;
+          color: #fff;
+        }
+
+        .add-ingredient-row {
+          display: grid;
+          grid-template-columns: 1fr auto;
+          gap: 10px;
+        }
+
+        .customized-recipe-note {
+          color: #146c43;
+          font-weight: 700;
+          background: #eaf7ef;
+          border: 1px solid #badbcc;
+          border-radius: 10px;
+          padding: 10px 12px;
         }
 
         .steps-list {
@@ -621,6 +985,20 @@ export default function SearchResults() {
           box-shadow: 0 12px 40px rgba(0, 0, 0, 0.28);
           display: flex;
           flex-direction: column;
+        }
+
+        .unsaved-recipe-modal {
+          width: min(560px, 100%);
+          background: #fff;
+          border-radius: 16px;
+          box-shadow: 0 12px 40px rgba(0, 0, 0, 0.28);
+          overflow: hidden;
+        }
+
+        .unsaved-actions {
+          display: grid;
+          grid-template-columns: repeat(3, 1fr);
+          gap: 10px;
         }
 
         .meal-modal-header {
@@ -742,6 +1120,11 @@ export default function SearchResults() {
           .ingredients-card,
           .steps-card {
             padding: 18px !important;
+          }
+
+          .add-ingredient-row,
+          .unsaved-actions {
+            grid-template-columns: 1fr;
           }
 
           .action-buttons {

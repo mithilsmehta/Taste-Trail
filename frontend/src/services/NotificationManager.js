@@ -236,7 +236,7 @@ class NotificationManager {
   testNotification() {
     this.sendNotification(
       "Test Notification 🔔",
-      "This is a test notification from TasteTrail!",
+      "This is a test notification from Tastewise!",
       { tag: "test" }
     );
   }

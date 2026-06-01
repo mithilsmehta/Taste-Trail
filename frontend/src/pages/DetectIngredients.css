@@ -152,6 +152,54 @@
   margin-top: 18px;
 }
 
+.uncertain-items-box {
+  background: #fff9e6;
+  border: 1px solid #ffe082;
+  border-radius: 8px;
+  margin-top: 18px;
+  padding: 14px;
+}
+
+.uncertain-items-box h5 {
+  font-size: 1rem;
+  font-weight: 800;
+  margin: 0 0 4px;
+}
+
+.uncertain-items-box p {
+  color: #6c757d;
+  margin: 0 0 12px;
+}
+
+.uncertain-item-list {
+  display: grid;
+  gap: 8px;
+}
+
+.uncertain-item-list button {
+  align-items: flex-start;
+  background: #fff;
+  border: 1px solid #ffc107;
+  border-radius: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 10px 12px;
+  text-align: left;
+}
+
+.uncertain-item-list button:hover {
+  background: #fff4cc;
+}
+
+.uncertain-item-list span {
+  font-weight: 800;
+}
+
+.uncertain-item-list small {
+  color: #6c757d;
+}
+
 .suggestions-section,
 .generated-recipe {
   margin-top: 24px;

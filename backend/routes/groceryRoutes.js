@@ -5,6 +5,7 @@ const MealPlan = require("../models/MealPlan");
 const authMiddleware = require("../middleware/authMiddleware");
 
 const isValidPlanDate = (planDate) => /^\d{4}-\d{2}-\d{2}$/.test(planDate);
+const validPlanDateQuery = { $regex: /^\d{4}-\d{2}-\d{2}$/ };
 
 const toDateKey = (date) => {
   const year = date.getFullYear();
@@ -31,25 +32,14 @@ const getUpcomingDateKeys = (startDateKey) => {
   });
 };
 
-const getRecipeKey = (mealPlan) => {
-  return mealPlan?.recipe?.id || mealPlan?.recipe?.title || String(mealPlan?._id);
-};
-
 const cleanupGroceryData = async (userId) => {
-  const mealPlans = await MealPlan.find({ userId }).sort({ updatedAt: -1 });
-  const seenRecipeKeys = new Set();
+  const mealPlans = await MealPlan.find({
+    userId,
+    planDate: validPlanDateQuery
+  }).select("_id");
   const validMealPlanIds = [];
 
   for (const mealPlan of mealPlans) {
-    const recipeKey = getRecipeKey(mealPlan);
-
-    if (seenRecipeKeys.has(recipeKey)) {
-      await GroceryItem.deleteMany({ mealPlanId: mealPlan._id });
-      await MealPlan.findByIdAndDelete(mealPlan._id);
-      continue;
-    }
-
-    seenRecipeKeys.add(recipeKey);
     validMealPlanIds.push(mealPlan._id);
   }
 
@@ -70,7 +60,10 @@ router.get("/list", authMiddleware, async (req, res) => {
 
     await cleanupGroceryData(req.user.id);
 
-    const mealPlanQuery = { userId: req.user.id };
+    const mealPlanQuery = {
+      userId: req.user.id,
+      planDate: validPlanDateQuery
+    };
     if (startDate) {
       mealPlanQuery.planDate = { $in: getUpcomingDateKeys(startDate) };
     }

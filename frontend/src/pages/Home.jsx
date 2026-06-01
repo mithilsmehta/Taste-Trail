@@ -121,12 +121,28 @@ const categories = [
   },
 ];
 
+const jainRestrictedPattern = /\b(onions?|garlic|potatoes?|aloo|carrots?|radish|beetroot|beet|turnip|ginger|sweet potato|yam|tapioca|cassava|arbi|colocasia|spring onion|green onion|scallion|leek|shallot)\b/i;
+
 export default function Home() {
   const { user } = useContext(AuthContext);
   const navigate = useNavigate();
   const [showSearchModal, setShowSearchModal] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCategory, setSelectedCategory] = useState(null);
+  const [dietMode, setDietMode] = useState(() => {
+    return localStorage.getItem("tastewiseDietMode") === "jain" ? "jain" : "veg";
+  });
+
+  const updateDietMode = (nextMode) => {
+    const normalizedMode = nextMode === "jain" ? "jain" : "veg";
+    setDietMode(normalizedMode);
+    localStorage.setItem("tastewiseDietMode", normalizedMode);
+  };
+
+  const getModeSafeDishes = (dishes = []) => {
+    if (dietMode !== "jain") return dishes;
+    return dishes.filter((dish) => !jainRestrictedPattern.test(dish));
+  };
 
   const openRecipe = (recipeName) => {
     navigate(`/search?q=${encodeURIComponent(recipeName)}`);
@@ -143,7 +159,20 @@ export default function Home() {
       <div className="row align-items-center hero-section">
         {/* LEFT SIDE */}
         <div className="col-md-6 text-section">
-          <h1 className="fw-bold title">Welcome, {user?.firstName} </h1>
+          <div className="welcome-mode-row">
+            <h1 className="fw-bold title mb-0">Welcome, {user?.firstName} </h1>
+            <div className="diet-mode-toggle" aria-label="Diet mode selector">
+              <span className="diet-mode-label">{dietMode === "jain" ? "Jain" : "Veg"}</span>
+              <label className="diet-switch">
+                <input
+                  type="checkbox"
+                  checked={dietMode === "veg"}
+                  onChange={(event) => updateDietMode(event.target.checked ? "veg" : "jain")}
+                />
+                <span className="diet-slider"></span>
+              </label>
+            </div>
+          </div>
           <p className="subtitle">
             Discover delicious recipes, detect ingredients from photos, and instantly generate meals with AI.
           </p>
@@ -209,7 +238,7 @@ export default function Home() {
       </div>
 
       {/* ---------------- TRENDING RECIPES ---------------- */}
-      <h3 className="fw-bold mt-5">Trending Recipes</h3>
+      {/* <h3 className="fw-bold mt-5">Trending Recipes</h3>
       <div className="row mt-3 g-4">
         {[
           "Butter Pav Bhaji",
@@ -234,7 +263,7 @@ export default function Home() {
             </div>
           </div>
         ))}
-      </div>
+      </div> */}
 
       {/* ---------------- UPLOAD SECTION ---------------- */}
       <div className="upload-box mt-5 p-5 text-center shadow rounded">
@@ -266,7 +295,7 @@ export default function Home() {
                 onChange={(e) => setSearchQuery(e.target.value)}
                 onKeyDown={(e) => {
                   if (e.key === "Enter" && searchQuery.trim()) {
-                    navigate(`/search?q=${searchQuery}`);
+                    navigate(`/search?q=${encodeURIComponent(searchQuery.trim())}`);
                     setShowSearchModal(false);
                   }
                 }}
@@ -276,7 +305,7 @@ export default function Home() {
               <div className="search-suggestions mt-4">
                 <p className="text-muted mb-2">Popular Searches:</p>
                 <div className="d-flex flex-wrap gap-2">
-                  {["Paneer Tikka", "Masala Dosa", "Veg Biryani", "Margherita Pizza", "Rajma Chawal", "Veg Hakka Noodles"].map((suggestion) => (
+                  {getModeSafeDishes(["Paneer Tikka", "Masala Dosa", "Veg Biryani", "Margherita Pizza", "Rajma Chawal", "Veg Hakka Noodles"]).map((suggestion) => (
                     <button
                       key={suggestion}
                       className="btn btn-outline-secondary btn-sm"
@@ -292,7 +321,7 @@ export default function Home() {
                 className="btn btn-warning w-100 mt-4 p-3 fw-semibold"
                 onClick={() => {
                   if (searchQuery.trim()) {
-                    navigate(`/search?q=${searchQuery}`);
+                    navigate(`/search?q=${encodeURIComponent(searchQuery.trim())}`);
                     setShowSearchModal(false);
                   }
                 }}
@@ -321,7 +350,7 @@ export default function Home() {
 
             <div className="search-modal-body">
               <div className="category-dish-grid">
-                {selectedCategory.dishes.map((dish) => (
+                {getModeSafeDishes(selectedCategory.dishes).map((dish) => (
                   <button
                     key={dish}
                     className="category-dish-btn"
@@ -330,6 +359,11 @@ export default function Home() {
                     {dish}
                   </button>
                 ))}
+                {getModeSafeDishes(selectedCategory.dishes).length === 0 && (
+                  <p className="text-muted mb-0">
+                    No Jain-safe suggestions are available in this category yet.
+                  </p>
+                )}
               </div>
             </div>
           </div>

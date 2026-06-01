@@ -27,7 +27,7 @@ services:
       - key: OPENROUTER_SITE_URL
         sync: false
       - key: OPENROUTER_APP_NAME
-        value: TasteTrail
+        value: Tastewise
       - key: EMAIL_USER
         sync: false
       - key: EMAIL_PASS

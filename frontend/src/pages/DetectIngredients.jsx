@@ -17,7 +17,9 @@ const mealOptions = [
   { type: "dinner", icon: "🍽️", name: "Dinner" }
 ];
 
-const scanHistoryKey = "tasteTrailIngredientScans";
+const scanHistoryKey = "tastewiseIngredientScans";
+const nonVegetarianPattern = /\b(chicken|mutton|beef|pork|fish|seafood|prawn|shrimp|eggs?|gelatin|bacon|ham|turkey|lamb|keema)\b/i;
+const jainRestrictedPattern = /\b(onions?|garlic|potatoes?|aloo|carrots?|radish|beetroot|beet|turnip|ginger|sweet potato|yam|tapioca|cassava|arbi|colocasia|spring onion|green onion|scallion|leek|shallot)\b/i;
 
 export default function DetectIngredients() {
   const navigate = useNavigate();
@@ -32,6 +34,7 @@ export default function DetectIngredients() {
   const [generatedRecipe, setGeneratedRecipe] = useState(null);
   const [scanHistory, setScanHistory] = useState([]);
   const [rejectedItems, setRejectedItems] = useState([]);
+  const [uncertainItems, setUncertainItems] = useState([]);
   const [notes, setNotes] = useState("");
   const [loadingDetect, setLoadingDetect] = useState(false);
   const [loadingSuggestions, setLoadingSuggestions] = useState(false);
@@ -48,6 +51,15 @@ export default function DetectIngredients() {
 
   const token = localStorage.getItem("token");
   const ingredientNames = useMemo(() => ingredients.map((item) => item.name), [ingredients]);
+
+  const getDietMode = () => {
+    return localStorage.getItem("tastewiseDietMode") === "jain" ? "jain" : "veg";
+  };
+
+  const isIngredientBlockedByMode = (name) => {
+    const value = String(name || "");
+    return nonVegetarianPattern.test(value) || (getDietMode() === "jain" && jainRestrictedPattern.test(value));
+  };
 
   useEffect(() => {
     try {
@@ -113,6 +125,7 @@ export default function DetectIngredients() {
       setSelectedSuggestion(null);
       setGeneratedRecipe(null);
       setRejectedItems([]);
+      setUncertainItems([]);
       setNotes("");
       setError("");
     } catch (err) {
@@ -141,6 +154,7 @@ export default function DetectIngredients() {
     setSelectedSuggestion(null);
     setGeneratedRecipe(null);
     setRejectedItems([]);
+    setUncertainItems([]);
     setNotes("");
     setError("");
     if (fileInputRef.current) fileInputRef.current.value = "";
@@ -169,7 +183,7 @@ export default function DetectIngredients() {
           "Content-Type": "application/json",
           Authorization: `Bearer ${token}`
         },
-        body: JSON.stringify({ image: imagePayload })
+        body: JSON.stringify({ image: imagePayload, dietMode: getDietMode() })
       });
       const data = await res.json();
 
@@ -179,6 +193,7 @@ export default function DetectIngredients() {
 
       setIngredients(data.ingredients || []);
       setRejectedItems(data.rejectedItems || []);
+      setUncertainItems(data.uncertainItems || []);
       setNotes(data.notes || "");
       addScanHistory(data.ingredients || []);
     } catch (err) {
@@ -193,12 +208,24 @@ export default function DetectIngredients() {
     const name = manualIngredient.trim();
     if (!name) return;
 
-    setIngredients((prev) => {
-      const exists = prev.some((item) => item.name.toLowerCase() === name.toLowerCase());
-      if (exists) return prev;
-      return [...prev, { name, confidence: "Manual" }];
-    });
+    addIngredientByName(name);
     setManualIngredient("");
+  };
+
+  const addIngredientByName = (name) => {
+    const normalizedName = String(name || "").trim();
+    if (!normalizedName) return;
+    if (isIngredientBlockedByMode(normalizedName)) {
+      setError(`${getDietMode() === "jain" ? "Jain" : "Veg"} mode is on, so "${normalizedName}" cannot be added.`);
+      return;
+    }
+
+    setIngredients((prev) => {
+      const exists = prev.some((item) => item.name.toLowerCase() === normalizedName.toLowerCase());
+      if (exists) return prev;
+      return [...prev, { name: normalizedName, confidence: "Manual" }];
+    });
+    setUncertainItems((prev) => prev.filter((item) => item.name.toLowerCase() !== normalizedName.toLowerCase()));
   };
 
   const removeIngredient = (name) => {
@@ -223,7 +250,7 @@ export default function DetectIngredients() {
           "Content-Type": "application/json",
           Authorization: `Bearer ${token}`
         },
-        body: JSON.stringify({ ingredients })
+        body: JSON.stringify({ ingredients, dietMode: getDietMode() })
       });
       const data = await res.json();
 
@@ -255,7 +282,8 @@ export default function DetectIngredients() {
         },
         body: JSON.stringify({
           recipeName: suggestion.name,
-          ingredients
+          ingredients,
+          dietMode: getDietMode()
         })
       });
       const data = await res.json();
@@ -275,6 +303,10 @@ export default function DetectIngredients() {
 
   const saveRecipe = async () => {
     if (!generatedRecipe || saving) return;
+    if (getDietMode() === "jain" && (generatedRecipe.ingredients || []).some(isIngredientBlockedByMode)) {
+      alert("Jain mode is on, so remove Jain-restricted ingredients before saving.");
+      return;
+    }
     setSaving(true);
 
     try {
@@ -289,7 +321,8 @@ export default function DetectIngredients() {
           ingredients: generatedRecipe.ingredients,
           steps: generatedRecipe.steps,
           image: imagePreview || generatedRecipe.image,
-          nutrition: generatedRecipe.nutrition
+          nutrition: generatedRecipe.nutrition,
+          dietMode: getDietMode()
         })
       });
       const data = await res.json();
@@ -312,6 +345,10 @@ export default function DetectIngredients() {
 
     if (!generatedRecipe || !mealType || dayIndex === null || !planDate) {
       alert("Choose meal and date first.");
+      return;
+    }
+    if (getDietMode() === "jain" && (generatedRecipe.ingredients || []).some(isIngredientBlockedByMode)) {
+      alert("Jain mode is on, so remove Jain-restricted ingredients before adding this recipe.");
       return;
     }
 
@@ -359,6 +396,9 @@ export default function DetectIngredients() {
     setImagePreview(entry.imagePreview || "");
     setImagePayload(entry.imagePreview || "");
     setIngredients(entry.ingredients || []);
+    setUncertainItems([]);
+    setRejectedItems([]);
+    setNotes("");
     setSuggestions([]);
     setSelectedSuggestion(null);
     setGeneratedRecipe(null);
@@ -468,11 +508,11 @@ export default function DetectIngredients() {
               <span>{ingredients.length} items</span>
             </div>
 
-            {rejectedItems.length > 0 && (
+            {/* {rejectedItems.length > 0 && (
               <div className="veg-warning">
                 Non-veg items were ignored: {rejectedItems.join(", ")}
               </div>
-            )}
+            )} */}
 
             {notes && <p className="text-muted small">{notes}</p>}
 
@@ -488,6 +528,25 @@ export default function DetectIngredients() {
                 <p className="empty-copy">Detected ingredients will appear here. You can also add them manually.</p>
               )}
             </div>
+
+            {uncertainItems.length > 0 && (
+              <div className="uncertain-items-box">
+                <h5>Review Possible Ingredients</h5>
+                <p>These were not clear enough to add automatically.</p>
+                <div className="uncertain-item-list">
+                  {uncertainItems.map((item) => (
+                    <button
+                      key={`${item.name}-${item.reason}`}
+                      type="button"
+                      onClick={() => addIngredientByName(item.name)}
+                    >
+                      <span>{item.name}</span>
+                      <small>{item.reason}</small>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
 
             <div className="manual-ingredient-row">
               <input

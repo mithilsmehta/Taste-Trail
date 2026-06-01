@@ -27,6 +27,7 @@ const slashFractions = {
 
 export const formatIngredientAmount = (ingredient) => {
   return String(ingredient)
+    .replace(/\boz\b/gi, "ounces")
     .replace(/\b(\d+)\s+([1-7])\/([2-8])\b/g, (match, whole, numerator, denominator) => {
       const fraction = slashFractions[`${numerator}/${denominator}`];
       return fraction ? `${whole}${fraction}` : match;
@@ -43,18 +44,35 @@ export const formatIngredientAmount = (ingredient) => {
     });
 };
 
+const trailingInstructionPattern = /^(?:to taste|for garnish|for serving|garnish|serving|optional|chopped|sliced|diced|minced|grated|crushed|peeled|peeled and diced|peeled and chopped|peeled and cubed|peeled and grated|thinly sliced|finely chopped|roughly chopped)$/i;
+
+export const mergeIngredientParts = (parts = []) => {
+  return parts
+    .map((part) => String(part || "").trim())
+    .filter(Boolean)
+    .reduce((merged, part) => {
+      if (trailingInstructionPattern.test(part) && merged.length > 0) {
+        merged[merged.length - 1] = `${merged[merged.length - 1]}, ${part}`;
+        return merged;
+      }
+
+      merged.push(part);
+      return merged;
+    }, []);
+};
+
 export const splitIngredientLine = (ingredient) => {
   const withoutRecipeLabel = String(ingredient).replace(/^for\s+[^:]+:\s*/i, "");
-  const parts = withoutRecipeLabel
+  const rawParts = withoutRecipeLabel
     .split(",")
     .map((part) => part.trim())
     .filter(Boolean);
 
-  return parts.length > 1 ? parts : [String(ingredient).trim()].filter(Boolean);
+  if (rawParts.length <= 1) return [withoutRecipeLabel.trim()].filter(Boolean);
+
+  return mergeIngredientParts(rawParts);
 };
 
 export const getDisplayIngredients = (ingredients = []) => {
-  return ingredients.flatMap((ingredient) =>
-    splitIngredientLine(ingredient).map(formatIngredientAmount)
-  );
+  return mergeIngredientParts(ingredients.flatMap(splitIngredientLine)).map(formatIngredientAmount);
 };

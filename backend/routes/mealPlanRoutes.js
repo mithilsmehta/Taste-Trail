@@ -33,6 +33,7 @@ const saveRecipeForUser = async (userId, recipe) => {
 };
 
 const isValidPlanDate = (planDate) => /^\d{4}-\d{2}-\d{2}$/.test(planDate);
+const validPlanDateQuery = { $regex: /^\d{4}-\d{2}-\d{2}$/ };
 
 const toDateKey = (date) => {
   const year = date.getFullYear();
@@ -62,13 +63,27 @@ const getUpcomingDateKeys = (startDateKey) => {
 const splitIngredientLines = (ingredients = []) => {
   return ingredients.flatMap((ingredient) => {
     const withoutRecipeLabel = String(ingredient).replace(/^for\s+[^:]+:\s*/i, "");
-    const parts = withoutRecipeLabel
+    const rawParts = withoutRecipeLabel
       .split(",")
       .map((part) => part.trim())
       .filter(Boolean);
 
-    return parts.length > 1 ? parts : [String(ingredient).trim()].filter(Boolean);
+    if (rawParts.length <= 1) return [withoutRecipeLabel.trim()].filter(Boolean);
+
+    return rawParts.reduce((parts, part) => {
+      if (/^(?:to taste|for garnish|for serving|garnish|serving|optional|chopped|sliced|diced|minced|grated|crushed|peeled|peeled and diced|peeled and chopped|peeled and cubed|peeled and grated|thinly sliced|finely chopped|roughly chopped)$/i.test(part) && parts.length > 0) {
+        parts[parts.length - 1] = `${parts[parts.length - 1]}, ${part}`;
+        return parts;
+      }
+
+      parts.push(part);
+      return parts;
+    }, []);
   });
+};
+
+const isStandaloneInstruction = (ingredient) => {
+  return /^(?:to taste|for garnish|for serving|garnish|serving|optional|chopped|sliced|diced|minced|grated|crushed|peeled|peeled and diced|peeled and chopped|peeled and cubed|peeled and grated|thinly sliced|finely chopped|roughly chopped)$/i.test(String(ingredient || "").trim());
 };
 
 const refreshGroceryItems = async (userId, mealPlan) => {
@@ -77,7 +92,7 @@ const refreshGroceryItems = async (userId, mealPlan) => {
     mealPlanId: mealPlan._id
   });
 
-  const ingredients = splitIngredientLines(mealPlan.recipe?.ingredients);
+  const ingredients = splitIngredientLines(mealPlan.recipe?.ingredients).filter((ingredient) => !isStandaloneInstruction(ingredient));
   if (ingredients.length === 0) return;
 
   const groceryItems = ingredients.map(ingredient => ({
@@ -106,7 +121,7 @@ router.post("/create", authMiddleware, async (req, res) => {
       return res.status(400).json({ msg: "Invalid day. Choose day 1 to 7" });
     }
 
-    if (planDate && !isValidPlanDate(planDate)) {
+    if (!planDate || !isValidPlanDate(planDate)) {
       return res.status(400).json({ msg: "Invalid plan date. Use YYYY-MM-DD" });
     }
 
@@ -216,7 +231,10 @@ router.get("/all", authMiddleware, async (req, res) => {
 
     const query = {
       userId: req.user.id,
-      ...(fromDate ? { planDate: { $gte: fromDate } } : {})
+      planDate: {
+        ...validPlanDateQuery,
+        ...(fromDate ? { $gte: fromDate } : {})
+      }
     };
 
     const mealPlans = await MealPlan.find(query).sort({ planDate: 1, dayIndex: 1, mealType: 1 });

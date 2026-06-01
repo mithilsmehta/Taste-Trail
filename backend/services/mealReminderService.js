@@ -125,16 +125,16 @@ const sendMealReminderEmail = async ({ user, mealType, mealTime, offsetMinutes, 
   const ingredients = mealPlan?.recipe?.ingredients || [];
   const ingredientPreview = ingredients.length
     ? ingredients.slice(0, 5).map((item) => `<li>${escapeHtml(item)}</li>`).join("")
-    : "<li>Open TasteTrail to check your saved meal plan.</li>";
+    : "<li>Open Tastewise to check your saved meal plan.</li>";
 
   await transporter.sendMail({
-    from: `"TasteTrail" <${process.env.EMAIL_USER}>`,
+    from: `"Tastewise" <${process.env.EMAIL_USER}>`,
     to: user.email,
     subject: `Meal Reminder: ${recipeTitle}`,
     html: `
       <div style="font-family: Arial, sans-serif; color: #222; line-height: 1.5; max-width: 620px; margin: 0 auto;">
         <div style="background: #ffc107; padding: 22px; border-radius: 12px 12px 0 0;">
-          <h1 style="margin: 0;">TasteTrail Meal Reminder</h1>
+          <h1 style="margin: 0;">Tastewise Meal Reminder</h1>
         </div>
         <div style="border: 1px solid #eee; border-top: 0; padding: 24px; border-radius: 0 0 12px 12px;">
           <p>Hello ${escapeHtml(user.firstName || "there")},</p>
@@ -146,7 +146,7 @@ const sendMealReminderEmail = async ({ user, mealType, mealTime, offsetMinutes, 
           }</p>
           <h2 style="font-size: 20px;">${escapeHtml(recipeTitle)}</h2>
           <ul>${ingredientPreview}</ul>
-          <p>Open TasteTrail to view your full meal plan and recipe steps.</p>
+          <p>Open Tastewise to view your full meal plan and recipe steps.</p>
         </div>
       </div>
     `

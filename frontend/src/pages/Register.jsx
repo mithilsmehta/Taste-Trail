@@ -40,7 +40,7 @@ export default function Register() {
   return (
     <AuthLayout>
       <h2 className="auth-title text-center">Create Your Account</h2>
-      <p className="auth-subtitle text-center">Join TasteTrail today!</p>
+      <p className="auth-subtitle text-center">Join Tastewise today!</p>
 
       <form onSubmit={handleRegister}>
         <div className="row">

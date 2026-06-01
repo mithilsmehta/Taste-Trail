@@ -1,6 +1,6 @@
 {
-  "name": "Taste Trail",
-  "short_name": "TasteTrail",
+  "name": "Tastewise",
+  "short_name": "Tastewise",
   "description": "Food discovery and restaurant app",
   "start_url": "/",
   "display": "standalone",

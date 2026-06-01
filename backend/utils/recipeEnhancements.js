@@ -54,15 +54,11 @@ const safeVegetarianImages = [
   { pattern: /paneer\s*tikka/i, image: commonsImage("Paneer_Tikka.jpg") }
 ];
 
-const isExplicitNonVegRecipe = (title = "") =>
-  /\b(chicken|mutton|lamb|fish|prawn|shrimp|egg|beef|pork|bacon|ham|seafood|keema)\b/i.test(String(title));
-
 const getRecipeImage = (title = "") => {
   const safeImage = safeVegetarianImages.find((item) => item.pattern.test(String(title)))?.image;
-  if (safeImage && !isExplicitNonVegRecipe(title)) return safeImage;
+  if (safeImage) return safeImage;
 
-  const vegetarianPrefix = isExplicitNonVegRecipe(title) ? "" : "strictly vegetarian, no meat, no chicken, no fish, no eggs, ";
-  const prompt = encodeURIComponent(`professional appetizing ${vegetarianPrefix}${title || "recipe"} food photography, natural light, plated dish`);
+  const prompt = encodeURIComponent(`professional appetizing strictly vegetarian, no meat, no chicken, no fish, no eggs, ${title || "recipe"} food photography, natural light, plated dish`);
   return `https://image.pollinations.ai/prompt/${prompt}?width=900&height=650&nologo=true&enhance=true&seed=${getImageSeed(title || "recipe")}`;
 };
 

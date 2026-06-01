@@ -14,6 +14,30 @@
   gap: 10px;
 }
 
+.planner-view-switch {
+  background: #f8f9fa;
+  border: 1px solid #e9ecef;
+  border-radius: 10px;
+  display: flex;
+  gap: 4px;
+  padding: 4px;
+}
+
+.planner-view-switch button {
+  background: transparent;
+  border: 0;
+  border-radius: 8px;
+  color: #495057;
+  font-weight: 800;
+  min-height: 38px;
+  padding: 8px 14px;
+}
+
+.planner-view-switch button.active {
+  background: #ffc107;
+  color: #212529;
+}
+
 .week-range {
   min-width: 220px;
   padding: 10px 14px;
@@ -177,6 +201,204 @@
   margin-top: 40px;
 }
 
+.calendar-planner {
+  background: #fff;
+  border: 1px solid #e9ecef;
+  border-radius: 14px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.06);
+  overflow: hidden;
+}
+
+.calendar-toolbar {
+  align-items: center;
+  border-bottom: 1px solid #e9ecef;
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 18px 20px;
+}
+
+.calendar-toolbar h3 {
+  font-weight: 900;
+  margin: 0 0 4px;
+}
+
+.calendar-toolbar p {
+  color: #6c757d;
+  margin: 0;
+}
+
+.calendar-toolbar-actions {
+  align-items: center;
+  display: flex;
+  gap: 10px;
+}
+
+.calendar-grid {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+}
+
+.calendar-weekday {
+  background: #fff8e1;
+  border-bottom: 1px solid #ffe082;
+  color: #495057;
+  font-weight: 900;
+  padding: 12px;
+  text-align: center;
+}
+
+.calendar-day {
+  background: #fff;
+  border: 0;
+  border-bottom: 1px solid #e9ecef;
+  border-right: 1px solid #e9ecef;
+  color: #212529;
+  display: flex;
+  flex-direction: column;
+  min-height: 138px;
+  padding: 10px;
+  text-align: left;
+}
+
+.calendar-day:nth-child(7n + 7) {
+  border-right: 0;
+}
+
+.calendar-day:hover {
+  background: #fffdf2;
+  box-shadow: inset 0 0 0 2px #ffc107;
+}
+
+.calendar-day.muted {
+  background: #fafafa;
+  color: #adb5bd;
+}
+
+.calendar-day.today .calendar-day-number {
+  background: #ffc107;
+  border-radius: 999px;
+  color: #212529;
+  display: inline-grid;
+  font-weight: 900;
+  height: 30px;
+  place-items: center;
+  width: 30px;
+}
+
+.calendar-day-number {
+  font-weight: 900;
+  margin-bottom: 8px;
+}
+
+.calendar-meal-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.calendar-meal-pill {
+  align-items: center;
+  border-radius: 8px;
+  color: #212529;
+  display: flex;
+  font-size: 0.78rem;
+  font-weight: 800;
+  gap: 4px;
+  overflow: hidden;
+  padding: 5px 7px;
+  white-space: nowrap;
+}
+
+.calendar-meal-pill-title {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.calendar-meal-pill.breakfast {
+  background: #e7f5ff;
+}
+
+.calendar-meal-pill.lunch {
+  background: #eaf7ef;
+}
+
+.calendar-meal-pill.dinner {
+  background: #fff3bf;
+}
+
+.calendar-day-modal {
+  max-width: 920px;
+}
+
+.calendar-meal-tabs {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  margin-bottom: 18px;
+}
+
+.calendar-meal-tabs button {
+  background: #fff;
+  border: 2px solid #e9ecef;
+  border-radius: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-height: 92px;
+  padding: 12px;
+  text-align: left;
+}
+
+.calendar-meal-tabs button.active {
+  background: #fff8e1;
+  border-color: #ffc107;
+}
+
+.calendar-meal-tabs span {
+  font-size: 1.5rem;
+}
+
+.calendar-meal-tabs strong {
+  text-transform: capitalize;
+}
+
+.calendar-meal-tabs small {
+  color: #198754;
+  display: -webkit-box;
+  font-weight: 800;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 1;
+}
+
+.calendar-selected-plan {
+  align-items: center;
+  background: #f8f9fa;
+  border: 1px solid #e9ecef;
+  border-radius: 12px;
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 18px;
+  padding: 14px;
+}
+
+.calendar-selected-plan strong,
+.calendar-selected-plan span {
+  display: block;
+}
+
+.calendar-selected-plan span {
+  color: #6c757d;
+}
+
+.calendar-selected-actions {
+  display: flex;
+  gap: 8px;
+}
+
 /* Modal Styles */
 .modal-overlay {
   position: fixed;
@@ -196,7 +418,7 @@
   background: white;
   border-radius: 16px;
   width: 90%;
-  max-width: 680px;
+  max-width: 760px;
   max-height: 80vh;
   display: flex;
   flex-direction: column;
@@ -223,24 +445,97 @@
   flex: 1;
 }
 
+.recipe-search-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) clamp(96px, 24%, 170px);
+  gap: clamp(8px, 3vw, 20px);
+  margin-bottom: clamp(18px, 4vw, 28px);
+}
+
+.recipe-search-input {
+  min-width: 0;
+  min-height: clamp(44px, 8vw, 58px);
+  border-radius: 0;
+  border: 2px solid #212529;
+  font-weight: 600;
+  font-size: clamp(0.85rem, 2vw, 1.05rem);
+  padding: 10px 12px;
+}
+
+.recipe-search-input:focus {
+  border-color: #ffc107;
+  box-shadow: 0 0 0 0.2rem rgba(255, 193, 7, 0.18);
+}
+
+.recipe-search-action {
+  min-width: 0;
+  min-height: clamp(44px, 8vw, 58px);
+  border-radius: 0;
+  border: 0;
+  font-weight: 700;
+  font-size: clamp(0.82rem, 2vw, 1.05rem);
+  padding-left: 8px;
+  padding-right: 8px;
+}
+
+.recipe-empty-state {
+  padding: 18px;
+  border: 1px dashed #ffc107;
+  border-radius: 12px;
+  background: #fff8e1;
+  text-align: center;
+}
+
 .recipe-list {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: clamp(10px, 4vw, 34px);
 }
 
 .recipe-item {
-  padding: 16px;
-  border: 2px solid #e0e0e0;
-  border-radius: 12px;
+  min-height: clamp(72px, 15vw, 110px);
+  padding: clamp(8px, 2vw, 12px);
+  border: 1px solid #e2e2e2;
+  border-radius: 2px;
   cursor: pointer;
   transition: all 0.2s ease;
+  background: #d9d9d9;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  overflow: hidden;
 }
 
 .recipe-item:hover {
   border-color: #ffc107;
   background: #fff9e6;
-  transform: translateX(5px);
+  transform: translateY(-3px);
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.08);
+}
+
+.recipe-card-icon {
+  width: clamp(24px, 5vw, 34px);
+  height: clamp(24px, 5vw, 34px);
+  border-radius: 4px;
+  background: white;
+  display: grid;
+  place-items: center;
+  font-size: clamp(0.9rem, 2.5vw, 1.15rem);
+  margin-bottom: 8px;
+}
+
+.recipe-item h5 {
+  font-size: clamp(0.78rem, 2.2vw, 1rem);
+  line-height: 1.2;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.recipe-item p {
+  font-size: clamp(0.68rem, 1.9vw, 0.82rem);
+  line-height: 1.25;
 }
 
 .recipe-detail-list {
@@ -354,6 +649,119 @@
     justify-content: space-between;
   }
 
+  .planner-view-switch {
+    width: 100%;
+  }
+
+  .planner-view-switch button {
+    flex: 1;
+  }
+
+  .calendar-toolbar {
+    align-items: center;
+    border-bottom: 1px solid #e9ecef;
+    gap: 10px;
+    padding: 16px 12px 10px;
+  }
+
+  .calendar-toolbar h3 {
+    font-size: clamp(2rem, 10vw, 3.2rem);
+    line-height: 1;
+    margin: 0;
+  }
+
+  .calendar-toolbar p {
+    display: none;
+  }
+
+  .calendar-year-number {
+    display: none;
+  }
+
+  .calendar-planner {
+    border: 0;
+    border-radius: 0;
+    box-shadow: none;
+    margin-left: -14px;
+    margin-right: -14px;
+    overflow: hidden;
+  }
+
+  .calendar-grid {
+    grid-template-columns: repeat(7, minmax(0, 1fr));
+    min-width: 0;
+  }
+
+  .calendar-weekday {
+    background: #fff;
+    border-bottom: 1px solid #e9ecef;
+    color: #212529;
+    font-size: 0;
+    padding: 10px 0;
+  }
+
+  .calendar-weekday::first-letter {
+    color: inherit;
+    font-size: 0.86rem;
+    font-weight: 900;
+  }
+
+  .calendar-day {
+    align-items: center;
+    border-right: 0;
+    min-height: clamp(86px, 22vw, 120px);
+    padding: 6px 2px;
+    text-align: center;
+  }
+
+  .calendar-day:hover {
+    box-shadow: none;
+  }
+
+  .calendar-day-number {
+    font-size: clamp(0.92rem, 4.7vw, 1.24rem);
+    font-weight: 700;
+    line-height: 1;
+    margin-bottom: 6px;
+  }
+
+  .calendar-day.today .calendar-day-number {
+    height: clamp(28px, 8vw, 36px);
+    width: clamp(28px, 8vw, 36px);
+  }
+
+  .calendar-meal-stack {
+    align-items: center;
+    gap: 4px;
+    width: 100%;
+  }
+
+  .calendar-meal-pill {
+    align-items: flex-start;
+    border-radius: 6px;
+    font-size: clamp(0.52rem, 2vw, 0.64rem);
+    justify-content: center;
+    max-width: 100%;
+    padding: 2px 4px;
+    white-space: normal;
+  }
+
+  .calendar-meal-pill-icon {
+    display: none;
+  }
+
+  .calendar-meal-pill-title {
+    display: -webkit-box;
+    line-height: 1.08;
+    max-width: 100%;
+    overflow: hidden;
+    text-align: center;
+    text-overflow: clip;
+    white-space: normal;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+  }
+
   .week-range {
     flex: 1;
     min-width: 0;
@@ -373,6 +781,25 @@
   .modal-header-custom,
   .modal-body-custom {
     padding: 16px;
+  }
+
+  .recipe-search-row {
+    grid-template-columns: minmax(0, 1fr) clamp(92px, 26%, 130px);
+  }
+
+  .calendar-meal-tabs {
+    grid-template-columns: 1fr;
+  }
+
+  .calendar-selected-plan {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .calendar-selected-actions {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    width: 100%;
   }
 }
 
