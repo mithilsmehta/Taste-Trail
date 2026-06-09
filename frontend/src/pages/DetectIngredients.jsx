@@ -1,6 +1,7 @@
 import { apiUrl } from "../utils/api";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useContext, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { AuthContext } from "../context/AuthContext";
 import Navbar from "../components/Navbar";
 import { getMondayDateKey, getWeekFromDateKey } from "../utils/weekPlan";
 import "./DetectIngredients.css";
@@ -21,8 +22,15 @@ const scanHistoryKey = "tastewiseIngredientScans";
 const nonVegetarianPattern = /\b(chicken|mutton|beef|pork|fish|seafood|prawn|shrimp|eggs?|gelatin|bacon|ham|turkey|lamb|keema)\b/i;
 const jainRestrictedPattern = /\b(onions?|garlic|potatoes?|aloo|carrots?|radish|beetroot|beet|turnip|ginger|sweet potato|yam|tapioca|cassava|arbi|colocasia|spring onion|green onion|scallion|leek|shallot)\b/i;
 
+const getPreferredServings = (user) => {
+  const servings = Number(user?.onboarding?.usualServings);
+  if (!Number.isFinite(servings)) return 2;
+  return Math.min(10, Math.max(1, Math.round(servings)));
+};
+
 export default function DetectIngredients() {
   const navigate = useNavigate();
+  const { user } = useContext(AuthContext);
   const fileInputRef = useRef(null);
   const cameraInputRef = useRef(null);
   const [imagePreview, setImagePreview] = useState("");
@@ -301,6 +309,7 @@ export default function DetectIngredients() {
         body: JSON.stringify({
           recipeName: suggestion.name,
           ingredients,
+          servings: getPreferredServings(user),
           dietMode: getDietMode()
         })
       });

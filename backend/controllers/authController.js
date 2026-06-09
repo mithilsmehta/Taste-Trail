@@ -13,25 +13,52 @@ const transporter = nodemailer.createTransport({
   }
 });
 
+const normalizeUsualServings = (value) => {
+  const servings = Number(value);
+  if (!Number.isFinite(servings)) return 2;
+  return Math.min(10, Math.max(1, Math.round(servings)));
+};
+
 // REGISTER
 exports.register = async (req, res) => {
   try {
-    const { firstName, lastName, email, phone, password } = req.body;
+    const { firstName, lastName, email, phone, password, onboarding } = req.body;
 
     const emailExists = await User.findOne({ email });
     if (emailExists) return res.status(400).json({ msg: "Email already exists" });
 
-    const phoneExists = await User.findOne({ phone });
+    const cleanPhone = String(phone || "").trim();
+    if (!cleanPhone) return res.status(400).json({ msg: "Phone number is required" });
+
+    const phoneExists = await User.findOne({ phone: cleanPhone });
     if (phoneExists) return res.status(400).json({ msg: "Phone already registered" });
 
     const hashed = await bcrypt.hash(password, 10);
+    const cleanOnboarding = onboarding || {};
 
     const newUser = new User({
       firstName,
       lastName,
       email,
-      phone,
-      password: hashed
+      phone: cleanPhone,
+      password: hashed,
+      preferences: {
+        diet: cleanOnboarding.dietaryPreference || "",
+        allergies: [],
+        cuisines: []
+      },
+      onboarding: {
+        displayName: cleanOnboarding.displayName || "",
+        gender: cleanOnboarding.gender || "",
+        ethnicity: cleanOnboarding.ethnicity || "",
+        currentBase: cleanOnboarding.currentBase || "",
+        dietaryPreference: cleanOnboarding.dietaryPreference || "",
+        usualServings: normalizeUsualServings(cleanOnboarding.usualServings),
+        healthyGoal: Number(cleanOnboarding.healthyGoal) || 50,
+        heightCm: cleanOnboarding.heightCm ? Number(cleanOnboarding.heightCm) : null,
+        weightKg: cleanOnboarding.weightKg ? Number(cleanOnboarding.weightKg) : null,
+        bmi: cleanOnboarding.bmi ? Number(cleanOnboarding.bmi) : null
+      }
     });
 
     await newUser.save();
@@ -45,10 +72,11 @@ exports.register = async (req, res) => {
 exports.login = async (req, res) => {
   try {
     const { identifier, password } = req.body;
+    const cleanIdentifier = String(identifier || "").trim();
 
     const user =
-      (await User.findOne({ email: identifier })) ||
-      (await User.findOne({ phone: identifier }));
+      (await User.findOne({ email: cleanIdentifier })) ||
+      (await User.findOne({ phone: cleanIdentifier }));
 
     if (!user) return res.status(400).json({ msg: "User not found" });
 
@@ -61,7 +89,10 @@ exports.login = async (req, res) => {
       { expiresIn: "365d" }
     );
 
-    res.json({ msg: "Login successful", token, user });
+    const safeUser = user.toObject();
+    delete safeUser.password;
+
+    res.json({ msg: "Login successful", token, user: safeUser });
   } catch (error) {
     res.status(500).json({ msg: "Server error", error });
   }
@@ -195,18 +226,52 @@ exports.getProfile = async (req, res) => {
 exports.updateProfile = async (req, res) => {
   try {
     const userId = req.params.id;
+    const cleanPhone = String(req.body.phone || "").trim();
+    const cleanOnboarding = req.body.onboarding || {};
+    const existingUser = await User.findById(userId);
+
+    if (!existingUser) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    if (cleanPhone) {
+      const phoneOwner = await User.findOne({ phone: cleanPhone, _id: { $ne: userId } });
+      if (phoneOwner) {
+        return res.status(400).json({ message: "Phone already registered" });
+      }
+    }
 
     const updated = await User.findByIdAndUpdate(
       userId,
       {
         firstName: req.body.firstName,
         lastName: req.body.lastName,
-        phone: req.body.phone
+        ...(cleanPhone ? { phone: cleanPhone } : {}),
+        preferences: {
+          diet: cleanOnboarding.dietaryPreference || req.body.preferences?.diet || existingUser.preferences?.diet || "",
+          allergies: req.body.preferences?.allergies || existingUser.preferences?.allergies || [],
+          cuisines: req.body.preferences?.cuisines || existingUser.preferences?.cuisines || []
+        },
+        onboarding: {
+          displayName: cleanOnboarding.displayName || "",
+          gender: cleanOnboarding.gender || "",
+          ethnicity: cleanOnboarding.ethnicity || "",
+          currentBase: cleanOnboarding.currentBase || "",
+          dietaryPreference: cleanOnboarding.dietaryPreference || "",
+          usualServings: normalizeUsualServings(cleanOnboarding.usualServings || existingUser.onboarding?.usualServings),
+          healthyGoal: Number(cleanOnboarding.healthyGoal) || 50,
+          heightCm: cleanOnboarding.heightCm ? Number(cleanOnboarding.heightCm) : null,
+          weightKg: cleanOnboarding.weightKg ? Number(cleanOnboarding.weightKg) : null,
+          bmi: cleanOnboarding.bmi ? Number(cleanOnboarding.bmi) : null
+        }
       },
       { new: true }
     );
 
-    return res.json({ user: updated });
+    const safeUser = updated.toObject();
+    delete safeUser.password;
+
+    return res.json({ user: safeUser });
   } catch (error) {
     return res.status(500).json({ message: "Failed to update profile" });
   }

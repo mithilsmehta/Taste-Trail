@@ -1,6 +1,7 @@
 import { apiUrl } from "../utils/api";
-import { useEffect, useRef, useState } from "react";
+import { useContext, useEffect, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
+import { AuthContext } from "../context/AuthContext";
 import Navbar from "../components/Navbar";
 import { getMondayDateKey, getWeekFromDateKey } from "../utils/weekPlan";
 import { formatIngredientAmount } from "../utils/recipeFormatting";
@@ -19,14 +20,77 @@ const mealOptions = [
 
 const nonVegetarianPattern = /\b(chicken|mutton|beef|pork|fish|seafood|prawn|shrimp|eggs?|gelatin|bacon|ham|turkey|lamb|keema)\b/i;
 const jainRestrictedPattern = /\b(onions?|garlic|potatoes?|aloo|carrots?|radish|beetroot|beet|turnip|ginger|sweet potato|yam|tapioca|cassava|arbi|colocasia|spring onion|green onion|scallion|leek|shallot)\b/i;
+const recipeCacheVersion = "v3";
+
+const getPreferredServings = (user) => {
+  const servings = Number(user?.onboarding?.usualServings);
+  if (!Number.isFinite(servings)) return 2;
+  return Math.min(10, Math.max(1, Math.round(servings)));
+};
+
+const getRegionalStyle = (user) => {
+  return String(user?.onboarding?.ethnicity || user?.onboarding?.currentBase || "")
+    .trim()
+    .replace(/\s+/g, " ");
+};
+
+const clampHealthScore = (value) => Math.min(100, Math.max(0, Math.round(value)));
+
+const estimateRecipeHealth = (recipe = {}) => {
+  const title = String(recipe.name || recipe.title || "").toLowerCase();
+  const ingredients = Array.isArray(recipe.ingredients) ? recipe.ingredients : [];
+  const steps = Array.isArray(recipe.steps) ? recipe.steps : [];
+  const text = [title, ...ingredients, ...steps].join(" ").toLowerCase();
+  let score = 55;
+
+  const addIf = (pattern, points) => {
+    if (pattern.test(text)) score += points;
+  };
+
+  const titleAddIf = (pattern, points) => {
+    if (pattern.test(title)) score += points;
+  };
+
+  titleAddIf(/\b(bhakri|jowar|bajra|ragi|millet|sprout|salad|soup|steamed|idli|dhokla|khaman|dal|sabji|shaak)\b/i, 16);
+  titleAddIf(/\b(bhakri\s*pizza|millet\s*pizza|jowar\s*pizza|bajra\s*pizza)\b/i, 24);
+  titleAddIf(/\bpaneer\s+(tikka|sabji|subji|sabzi|curry|masala|bhurji)\b/i, 18);
+  titleAddIf(/\b(pizza|pav\s*bhaji|burger|fries|bhature|puri|pakora|tiramisu|cake|dessert|ice\s*cream)\b/i, -26);
+
+  addIf(/\b(vegetable|vegetables|spinach|palak|methi|cabbage|cauliflower|capsicum|tomato|cucumber|beans|peas|lauki|bottle gourd|pumpkin|sprouts?|lentils?|dal|chana|chickpeas?|rajma|tofu|paneer|curd|yogurt|dahi|besan|gram flour)\b/i, 10);
+  addIf(/\b(whole wheat|atta|jowar|bajra|ragi|millet|oats|brown rice|quinoa|steamed|boiled|baked|grilled|roasted|tikka|saute|sauté)\b/i, 12);
+  addIf(/\b(deep[-\s]?fried|fried|butter|ghee|cream|cheese|mayonnaise|maida|all[-\s]?purpose flour|refined flour|sugar|syrup|condensed milk|whipping cream)\b/i, -16);
+
+  const isPaneerTikka = /\bpaneer\s+tikka\b/i.test(title);
+  const isPaneerDish = /\bpaneer\s+(sabji|subji|sabzi|curry|masala|bhurji)\b/i.test(title);
+  const highFatCount = ingredients.filter((ingredient) => /\b(butter|ghee|oil|cream|cheese|mayonnaise)\b/i.test(String(ingredient))).length;
+  const vegetableCount = ingredients.filter((ingredient) => /\b(vegetable|spinach|palak|methi|cabbage|cauliflower|capsicum|tomato|cucumber|beans|peas|lauki|pumpkin|sprouts?|dal|lentil|chana|chickpea|tofu)\b/i.test(String(ingredient))).length;
+
+  score -= Math.min(isPaneerTikka ? 8 : 18, highFatCount * (isPaneerTikka ? 2 : 4));
+  score += Math.min(16, vegetableCount * 3);
+
+  if (isPaneerTikka) score = Math.min(88, Math.max(score, 78));
+  if (isPaneerDish) score = Math.max(score, 70);
+
+  return clampHealthScore(score);
+};
+
+const getHealthLabel = (score) => {
+  if (score >= 70) return "Healthy";
+  if (score <= 40) return "Unhealthy";
+  return "Moderate";
+};
 
 export default function SearchResults() {
   const location = useLocation();
   const navigate = useNavigate();
+  const { user } = useContext(AuthContext);
   const query = new URLSearchParams(location.search).get("q");
+  const preferredServings = getPreferredServings(user);
+  const regionalStyle = getRegionalStyle(user);
 
   const [loading, setLoading] = useState(false);
   const [recipe, setRecipe] = useState(null);
+  const [recipeSource, setRecipeSource] = useState("");
   const [error, setError] = useState("");
   const [isSaved, setIsSaved] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -34,7 +98,7 @@ export default function SearchResults() {
   const [hasIngredientChanges, setHasIngredientChanges] = useState(false);
   const [showUnsavedModal, setShowUnsavedModal] = useState(false);
   const [pendingNavigation, setPendingNavigation] = useState(null);
-  const [servings, setServings] = useState(2);
+  const [servings, setServings] = useState(preferredServings);
   const [originalRecipe, setOriginalRecipe] = useState(null);
   const [showMealModal, setShowMealModal] = useState(false);
   const [addingMealPlan, setAddingMealPlan] = useState(false);
@@ -46,8 +110,10 @@ export default function SearchResults() {
   const historyGuardActiveRef = useRef(false);
 
   useEffect(() => {
-    if (query) fetchRecipe();
-  }, [query]);
+    if (!query) return;
+    setServings(preferredServings);
+    fetchRecipe(preferredServings);
+  }, [query, preferredServings, regionalStyle]);
 
   useEffect(() => {
     if (!hasIngredientChanges) return undefined;
@@ -85,6 +151,10 @@ export default function SearchResults() {
     return String(value || "").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
   };
 
+  const normalizeBaseRecipeTitle = (value) => {
+    return normalizeTitle(String(value || "").replace(/\([^)]*\)/g, " "));
+  };
+
   const getDietMode = () => {
     return localStorage.getItem("tastewiseDietMode") === "jain" ? "jain" : "veg";
   };
@@ -115,7 +185,7 @@ export default function SearchResults() {
       : "Veg mode blocks non-vegetarian ingredients.";
   };
 
-  const getRecipeCacheKey = () => `tastewiseRecipe:${getDietMode()}:${normalizeTitle(query)}:${servings}`;
+  const getRecipeCacheKey = (servingCount = servings) => `tastewiseRecipe:${recipeCacheVersion}:${getDietMode()}:${normalizeTitle(regionalStyle) || "default"}:${normalizeTitle(query)}:${servingCount}`;
 
   const getRecipeText = () => {
     if (!recipe) return "";
@@ -140,8 +210,22 @@ export default function SearchResults() {
     if (!recipe) return null;
     return {
       ...recipe,
+      healthScore: getCurrentHealthScore(),
+      healthLabel: getCurrentHealthLabel(),
       ingredients: getCleanIngredients(recipe.ingredients)
     };
+  };
+
+  const getCurrentHealthScore = () => {
+    if (!recipe) return 50;
+    const score = Number(recipe.healthScore);
+    if (hasIngredientChanges) return estimateRecipeHealth(recipe);
+    return Number.isFinite(score) ? clampHealthScore(score) : estimateRecipeHealth(recipe);
+  };
+
+  const getCurrentHealthLabel = () => {
+    if (!recipe) return "Moderate";
+    return recipe.healthLabel || getHealthLabel(getCurrentHealthScore());
   };
 
   const markRecipeCustomized = () => {
@@ -209,7 +293,21 @@ export default function SearchResults() {
     return whole > 0 ? `${whole}${fraction}` : fraction;
   };
 
-  const getSavedRecipeFromDatabase = async () => {
+  const scaleIngredientText = (ingredient, scaleFactor) => {
+    const numberMatch = ingredient.match(/\b(\d+\s+\d+\/\d+|\d+\/\d+|\d+(?:\.\d+)?)\b/);
+
+    if (!numberMatch) return ingredient;
+
+    const originalAmount = parseQuantity(numberMatch[1]);
+    if (!Number.isFinite(originalAmount)) return ingredient;
+
+    const scaledAmount = originalAmount * scaleFactor;
+    const formattedAmount = formatScaledAmount(scaledAmount);
+
+    return ingredient.replace(numberMatch[1], formattedAmount);
+  };
+
+  const getSavedRecipeFromDatabase = async (servingCount = servings) => {
     const token = localStorage.getItem("token");
     if (!token) return null;
 
@@ -220,51 +318,68 @@ export default function SearchResults() {
     if (!res.ok) return null;
 
     const recipes = await res.json();
-    const queryTitle = normalizeTitle(query);
-    const savedRecipe = recipes.find((item) => normalizeTitle(item.title) === queryTitle);
+    const queryTitle = normalizeBaseRecipeTitle(query);
+    const savedRecipe = recipes.find((item) => normalizeBaseRecipeTitle(item.title) === queryTitle);
 
     if (!savedRecipe) return null;
+    if (regionalStyle && normalizeTitle(savedRecipe.regionalStyle) !== normalizeTitle(regionalStyle)) return null;
     if (!isRecipeSafeForDietMode(savedRecipe)) return null;
+
+    const savedServings = Number(savedRecipe.servings) || 2;
+    const scaleFactor = servingCount / savedServings;
 
     return {
       name: savedRecipe.title,
-      ingredients: savedRecipe.ingredients || [],
+      ingredients: (savedRecipe.ingredients || []).map((ingredient) => scaleIngredientText(ingredient, scaleFactor)),
       steps: savedRecipe.steps || [],
-      servings
+      healthScore: savedRecipe.healthScore,
+      healthLabel: savedRecipe.healthLabel,
+      regionalStyle: savedRecipe.regionalStyle,
+      servings: servingCount
     };
   };
 
-  async function fetchRecipe() {
+  async function fetchRecipe(activeServings = servings, options = {}) {
+    const forceRegenerate = Boolean(options.forceRegenerate);
     setLoading(true);
     setError("");
     setRecipe(null);
+    setRecipeSource("");
     setOriginalRecipe(null);
     setIsSaved(false);
     setHasIngredientChanges(false);
     setCustomIngredient("");
 
     try {
-      const cachedRecipe = localStorage.getItem(getRecipeCacheKey());
+      const cacheKey = getRecipeCacheKey(activeServings);
+      if (forceRegenerate) {
+        localStorage.removeItem(cacheKey);
+      }
+
+      const cachedRecipe = !forceRegenerate ? localStorage.getItem(cacheKey) : null;
       if (cachedRecipe) {
         const parsedCachedRecipe = JSON.parse(cachedRecipe);
         if (!isRecipeSafeForDietMode(parsedCachedRecipe)) {
-          localStorage.removeItem(getRecipeCacheKey());
+          localStorage.removeItem(cacheKey);
         } else {
           setOriginalRecipe(parsedCachedRecipe);
           setRecipe(parsedCachedRecipe);
+          setRecipeSource(parsedCachedRecipe.source || "cached");
           setHasIngredientChanges(false);
           setLoading(false);
           return;
         }
       }
 
-      const savedRecipe = await getSavedRecipeFromDatabase();
+      const savedRecipe = forceRegenerate ? null : await getSavedRecipeFromDatabase(activeServings);
       if (savedRecipe) {
         setOriginalRecipe(savedRecipe);
-        setRecipe(savedRecipe);
+        const recipeFromSaved = { ...savedRecipe, source: "saved" };
+        setRecipe(recipeFromSaved);
+        setRecipeSource("saved");
         setIsSaved(true);
         setHasIngredientChanges(false);
-        localStorage.setItem(getRecipeCacheKey(), JSON.stringify(savedRecipe));
+        localStorage.setItem(cacheKey, JSON.stringify(recipeFromSaved));
         setLoading(false);
         return;
       }
@@ -278,8 +393,10 @@ export default function SearchResults() {
         },
         body: JSON.stringify({
           query,
-          servings,
-          dietMode: getDietMode()
+          servings: activeServings,
+          dietMode: getDietMode(),
+          regionalStyle,
+          forceRegenerate
         })
       });
 
@@ -292,15 +409,16 @@ export default function SearchResults() {
       const parsed = data.recipe;
 
       if (!isRecipeSafeForDietMode(parsed)) {
-        localStorage.removeItem(getRecipeCacheKey());
+        localStorage.removeItem(cacheKey);
         throw new Error(`Generated recipe did not match ${getDietMode() === "jain" ? "Jain" : "Veg"} mode. ${getModeBlockedText()} Please generate again.`);
       }
       
       // Store original recipe for scaling
       setOriginalRecipe(parsed);
       setRecipe(parsed);
+      setRecipeSource(parsed.source || "aiGenerated");
       setHasIngredientChanges(false);
-      localStorage.setItem(getRecipeCacheKey(), JSON.stringify(parsed));
+      localStorage.setItem(cacheKey, JSON.stringify(parsed));
 
     } catch (err) {
       console.error(err);
@@ -310,6 +428,11 @@ export default function SearchResults() {
     setLoading(false);
   }
 
+  const regenerateRecipe = () => {
+    if (!query || loading) return;
+    fetchRecipe(servings, { forceRegenerate: true });
+  };
+
   // Scale ingredients based on servings
   const scaleIngredients = (newServings) => {
     if (!originalRecipe) return;
@@ -317,21 +440,7 @@ export default function SearchResults() {
     const originalServings = originalRecipe.servings || 2;
     const scaleFactor = newServings / originalServings;
 
-    const scaledIngredients = originalRecipe.ingredients.map(ingredient => {
-      const numberMatch = ingredient.match(/\b(\d+\s+\d+\/\d+|\d+\/\d+|\d+(?:\.\d+)?)\b/);
-      
-      if (numberMatch) {
-        const originalAmount = parseQuantity(numberMatch[1]);
-        if (!Number.isFinite(originalAmount)) return ingredient;
-
-        const scaledAmount = originalAmount * scaleFactor;
-        const formattedAmount = formatScaledAmount(scaledAmount);
-        
-        return ingredient.replace(numberMatch[1], formattedAmount);
-      }
-      
-      return ingredient;
-    });
+    const scaledIngredients = originalRecipe.ingredients.map((ingredient) => scaleIngredientText(ingredient, scaleFactor));
 
     setRecipe({
       ...originalRecipe,
@@ -414,6 +523,8 @@ export default function SearchResults() {
           ingredients: recipeForSaving.ingredients,
           steps: recipeForSaving.steps,
           image: "",
+          healthScore: recipeForSaving.healthScore,
+          healthLabel: recipeForSaving.healthLabel,
           dietMode: getDietMode()
         }),
       });
@@ -429,7 +540,7 @@ export default function SearchResults() {
       setIsSaved(true);
       setHasIngredientChanges(false);
       const savedRecipe = {
-        ...recipeForSaving,
+        ...(data.recipe || recipeForSaving),
         steps: recipeForSaving.steps || []
       };
       setRecipe(savedRecipe);
@@ -601,7 +712,44 @@ export default function SearchResults() {
             <div className="recipe-header-card shadow-sm p-4 mb-4 rounded">
               <div className="d-flex justify-content-between align-items-start flex-wrap gap-3">
                 <div>
-                  <h3 className="fw-bold mb-3">{recipe.name}</h3>
+                  <h3 className="fw-bold mb-2">{recipe.name}</h3>
+                  {(recipe.regionalStyle || regionalStyle) && (
+                    <div className="regional-style-pill mb-3">
+                      {recipe.regionalStyle || regionalStyle}
+                    </div>
+                  )}
+                  <div className="recipe-health-meter-wrap">
+                    <div className="recipe-health-title">
+                      Health Meter
+                      <span>{getCurrentHealthLabel()}</span>
+                    </div>
+                    <div className="recipe-health-meter-labels recipe-health-meter-icons">
+                      <span
+                        className={`recipe-health-heart recipe-health-heart-broken ${getCurrentHealthScore() < 30 ? "active" : ""}`}
+                        aria-label="Unhealthy"
+                        title="Unhealthy"
+                      >
+                        💔
+                      </span>
+                      <strong>{getCurrentHealthScore()}%</strong>
+                      <span
+                        className={`recipe-health-heart recipe-health-heart-full ${getCurrentHealthScore() > 70 ? "active" : ""}`}
+                        aria-label="Healthy"
+                        title="Healthy"
+                      >
+                        ❤️
+                      </span>
+                    </div>
+                    <input
+                      type="range"
+                      min="0"
+                      max="100"
+                      value={getCurrentHealthScore()}
+                      readOnly
+                      className="recipe-health-meter"
+                      aria-label={`Health score ${getCurrentHealthScore()} percent`}
+                    />
+                  </div>
                   
                   {/* Servings Selector */}
                   <div className="servings-selector">
@@ -641,8 +789,20 @@ export default function SearchResults() {
                   >
                     📅 Add to Meal Planner
                   </button>
+                  <button
+                    className="btn btn-outline-warning"
+                    onClick={regenerateRecipe}
+                    disabled={loading}
+                  >
+                    🔄 Regenerate
+                  </button>
                 </div>
               </div>
+              {recipeSource === "sharedRegional" && (
+                <div className="shared-recipe-note mt-3">
+                  Showing a recipe already generated by another {regionalStyle || "same-region"} Tastewise user. Regenerate if you want a fresh version.
+                </div>
+              )}
             </div>
 
             <div className="row g-4">
@@ -852,6 +1012,101 @@ export default function SearchResults() {
         .recipe-header-card {
           background: linear-gradient(135deg, #fff9e6 0%, #ffffff 100%);
           border: 2px solid #ffc107;
+        }
+
+        .shared-recipe-note {
+          background: #fff8df;
+          border: 1px solid #f4c542;
+          border-radius: 8px;
+          color: #735300;
+          font-weight: 600;
+          padding: 10px 12px;
+        }
+
+        .regional-style-pill {
+          display: inline-flex;
+          align-items: center;
+          border: 1px solid #f4c542;
+          border-radius: 999px;
+          background: #fff8df;
+          color: #735300;
+          font-size: 0.9rem;
+          font-weight: 700;
+          line-height: 1;
+          padding: 7px 12px;
+        }
+
+        .recipe-health-meter-wrap {
+          max-width: 360px;
+          margin: 0 0 18px;
+          background: #fff8e1;
+          border: 1px solid #ffd166;
+          border-radius: 12px;
+          padding: 14px 16px;
+        }
+
+        .recipe-health-title {
+          align-items: center;
+          color: #212529;
+          display: flex;
+          font-size: 0.92rem;
+          font-weight: 800;
+          justify-content: space-between;
+          margin-bottom: 8px;
+        }
+
+        .recipe-health-title span {
+          color: #198754;
+          font-size: 0.86rem;
+        }
+
+        .recipe-health-meter-labels {
+          align-items: center;
+          display: flex;
+          justify-content: space-between;
+          gap: 12px;
+          font-size: 0.9rem;
+          font-weight: 700;
+          margin-bottom: 10px;
+        }
+
+        .recipe-health-meter-labels strong {
+          color: #198754;
+          font-size: 1.05rem;
+        }
+
+        .recipe-health-meter-icons {
+          margin-bottom: 12px;
+        }
+
+        .recipe-health-heart {
+          filter: grayscale(1);
+          font-size: 1.75rem;
+          line-height: 1;
+          opacity: 0.35;
+          transform: scale(0.94);
+          transition: filter 0.2s ease, opacity 0.2s ease, transform 0.2s ease;
+        }
+
+        .recipe-health-heart.active {
+          filter: saturate(1.6) drop-shadow(0 0 9px rgba(255, 71, 87, 0.58));
+          opacity: 1;
+          transform: scale(1.14);
+        }
+
+        .recipe-health-heart-full.active {
+          filter: saturate(1.7) drop-shadow(0 0 10px rgba(220, 53, 69, 0.62));
+        }
+
+        .recipe-health-heart-broken.active {
+          filter: saturate(1.7) drop-shadow(0 0 10px rgba(255, 54, 54, 0.62));
+        }
+
+        .recipe-health-meter {
+          accent-color: #198754;
+          display: block;
+          pointer-events: none;
+          width: 100%;
         }
 
         .servings-selector {

@@ -5,24 +5,92 @@ import axios from "axios";
 import toast from "react-hot-toast";
 import Navbar from "../components/Navbar";
 
+const indianStates = [
+  "Andhra Pradesh",
+  "Arunachal Pradesh",
+  "Assam",
+  "Bihar",
+  "Chhattisgarh",
+  "Goa",
+  "Gujarat",
+  "Haryana",
+  "Himachal Pradesh",
+  "Jharkhand",
+  "Karnataka",
+  "Kerala",
+  "Madhya Pradesh",
+  "Maharashtra",
+  "Manipur",
+  "Meghalaya",
+  "Mizoram",
+  "Nagaland",
+  "Odisha",
+  "Punjab",
+  "Rajasthan",
+  "Sikkim",
+  "Tamil Nadu",
+  "Telangana",
+  "Tripura",
+  "Uttar Pradesh",
+  "Uttarakhand",
+  "West Bengal"
+];
+
+const genderOptions = ["Female", "Male"];
+const dietaryOptions = ["Diet", "Veg", "Vegan"];
+const servingOptions = Array.from({ length: 10 }, (_, index) => index + 1);
+
+const calculateBmi = (heightCm, weightKg) => {
+  const height = Number(heightCm);
+  const weight = Number(weightKg);
+  if (!height || !weight) return "";
+  return Number((weight / ((height / 100) ** 2)).toFixed(1));
+};
+
 export default function Profile() {
   const { user, setUser } = useContext(AuthContext);
   const plannerViewPreferenceKey = "tastewisePlannerView";
+  const userOnboarding = user?.onboarding || {};
 
   const [firstName, setFirstName] = useState(user?.firstName || "");
   const [lastName, setLastName] = useState(user?.lastName || "");
   const [phone, setPhone] = useState(user?.phone || "");
   const [email] = useState(user?.email || "");
   const [plannerView, setPlannerView] = useState(() => localStorage.getItem(plannerViewPreferenceKey) || "week");
+  const [isEditingInfo, setIsEditingInfo] = useState(false);
+  const [onboarding, setOnboarding] = useState({
+    gender: userOnboarding.gender || "",
+    ethnicity: userOnboarding.ethnicity || "",
+    currentBase: userOnboarding.currentBase || "",
+    dietaryPreference: userOnboarding.dietaryPreference || user?.preferences?.diet || "",
+    usualServings: userOnboarding.usualServings || 2,
+    healthyGoal: userOnboarding.healthyGoal ?? 50,
+    heightCm: userOnboarding.heightCm || "",
+    weightKg: userOnboarding.weightKg || ""
+  });
 
   const [password, setPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
 
+  const syncProfileFields = (profileUser = user) => {
+    setFirstName(profileUser?.firstName || "");
+    setLastName(profileUser?.lastName || "");
+    setPhone(profileUser?.phone || "");
+    setOnboarding({
+      gender: profileUser?.onboarding?.gender || "",
+      ethnicity: profileUser?.onboarding?.ethnicity || "",
+      currentBase: profileUser?.onboarding?.currentBase || "",
+      dietaryPreference: profileUser?.onboarding?.dietaryPreference || profileUser?.preferences?.diet || "",
+      usualServings: profileUser?.onboarding?.usualServings || 2,
+      healthyGoal: profileUser?.onboarding?.healthyGoal ?? 50,
+      heightCm: profileUser?.onboarding?.heightCm || "",
+      weightKg: profileUser?.onboarding?.weightKg || ""
+    });
+  };
+
   // ⭐⭐⭐ Sync UI whenever user updates ⭐⭐⭐
   useEffect(() => {
-    setFirstName(user?.firstName || "");
-    setLastName(user?.lastName || "");
-    setPhone(user?.phone || "");
+    syncProfileFields(user);
   }, [user]);
 
   useEffect(() => {
@@ -31,6 +99,7 @@ export default function Profile() {
 
 const handleProfileUpdate = async (e) => {
   e.preventDefault();
+  const bmi = calculateBmi(onboarding.heightCm, onboarding.weightKg);
 
   try {
     const token = localStorage.getItem("token");
@@ -45,6 +114,14 @@ const handleProfileUpdate = async (e) => {
         firstName,
         lastName,
         phone,
+        onboarding: {
+          ...onboarding,
+          usualServings: Number(onboarding.usualServings) || 2,
+          healthyGoal: Number(onboarding.healthyGoal),
+          heightCm: onboarding.heightCm ? Number(onboarding.heightCm) : null,
+          weightKg: onboarding.weightKg ? Number(onboarding.weightKg) : null,
+          bmi
+        }
       }),
     });
 
@@ -58,6 +135,7 @@ const handleProfileUpdate = async (e) => {
     // ⭐⭐⭐ UPDATE FRONTEND USER STATE ⭐⭐⭐
     setUser(data.user);                       // <-- Update React state
     localStorage.setItem("user", JSON.stringify(data.user));  // <-- Update localStorage
+    setIsEditingInfo(false);
 
     alert("Profile updated!");
   } catch (err) {
@@ -65,6 +143,20 @@ const handleProfileUpdate = async (e) => {
     alert("Something went wrong");
   }
 };
+
+  const updateOnboarding = (field, value) => {
+    setOnboarding((prev) => ({ ...prev, [field]: value }));
+  };
+
+  const handleEditToggle = () => {
+    if (isEditingInfo) {
+      syncProfileFields(user);
+    }
+
+    setIsEditingInfo((current) => !current);
+  };
+
+  const bmi = calculateBmi(onboarding.heightCm, onboarding.weightKg);
 
   const handlePasswordChange = async (e) => {
     e.preventDefault();
@@ -108,7 +200,16 @@ const handleProfileUpdate = async (e) => {
         {/* LEFT CARD — PROFILE DETAILS */}
         <div className="col-md-6">
           <div className="card shadow p-4">
-            <h4 className="fw-semibold mb-3 text-center">Update Info</h4>
+            <div className="profile-card-title-row mb-3">
+              <h4 className="fw-semibold mb-0">Update Info</h4>
+              <button
+                type="button"
+                className={`btn btn-sm ${isEditingInfo ? "btn-outline-secondary" : "btn-outline-warning"}`}
+                onClick={handleEditToggle}
+              >
+                {isEditingInfo ? "Cancel" : "Edit"}
+              </button>
+            </div>
 
             <form onSubmit={handleProfileUpdate}>
               <div className="mb-3">
@@ -117,6 +218,7 @@ const handleProfileUpdate = async (e) => {
                   className="form-control p-2"
                   value={firstName}
                   onChange={(e) => setFirstName(e.target.value)}
+                  disabled={!isEditingInfo}
                   required
                 />
               </div>
@@ -127,6 +229,7 @@ const handleProfileUpdate = async (e) => {
                   className="form-control p-2"
                   value={lastName}
                   onChange={(e) => setLastName(e.target.value)}
+                  disabled={!isEditingInfo}
                   required
                 />
               </div>
@@ -137,6 +240,7 @@ const handleProfileUpdate = async (e) => {
                   className="form-control p-2"
                   value={phone}
                   onChange={(e) => setPhone(e.target.value)}
+                  disabled={!isEditingInfo}
                   required
                 />
               </div>
@@ -146,9 +250,145 @@ const handleProfileUpdate = async (e) => {
                 <input className="form-control p-2" value={email} disabled />
               </div>
 
-              <button className="btn btn-warning w-100 fw-semibold">
-                Save Changes
-              </button>
+              <div className="row">
+                <div className="col-12 col-sm-6 mb-3">
+                  <label className="form-label fw-semibold">Gender</label>
+                  <select
+                    className="form-select p-2"
+                    value={onboarding.gender}
+                    onChange={(e) => updateOnboarding("gender", e.target.value)}
+                    disabled={!isEditingInfo}
+                  >
+                    <option value="">Select gender</option>
+                    {genderOptions.map((option) => (
+                      <option key={option} value={option}>{option}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="col-12 col-sm-6 mb-3">
+                  <label className="form-label fw-semibold">Dietary Preference</label>
+                  <select
+                    className="form-select p-2"
+                    value={onboarding.dietaryPreference}
+                    onChange={(e) => updateOnboarding("dietaryPreference", e.target.value)}
+                    disabled={!isEditingInfo}
+                  >
+                    <option value="">Select preference</option>
+                    {dietaryOptions.map((option) => (
+                      <option key={option} value={option}>{option}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              <div className="mb-3">
+                <label className="form-label fw-semibold">How many people do you usually cook for?</label>
+                <select
+                  className="form-select p-2"
+                  value={onboarding.usualServings}
+                  onChange={(e) => updateOnboarding("usualServings", e.target.value)}
+                  disabled={!isEditingInfo}
+                >
+                  {servingOptions.map((option) => (
+                    <option key={option} value={option}>{option}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="row">
+                <div className="col-12 col-sm-6 mb-3">
+                  <label className="form-label fw-semibold">Ethnicity</label>
+                  <select
+                    className="form-select p-2"
+                    value={onboarding.ethnicity}
+                    onChange={(e) => updateOnboarding("ethnicity", e.target.value)}
+                    disabled={!isEditingInfo}
+                  >
+                    <option value="">Select state</option>
+                    {indianStates.map((state) => (
+                      <option key={state} value={state}>{state}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="col-12 col-sm-6 mb-3">
+                  <label className="form-label fw-semibold">Current Base</label>
+                  <select
+                    className="form-select p-2"
+                    value={onboarding.currentBase}
+                    onChange={(e) => updateOnboarding("currentBase", e.target.value)}
+                    disabled={!isEditingInfo}
+                  >
+                    <option value="">Select state</option>
+                    {indianStates.map((state) => (
+                      <option key={state} value={state}>{state}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              <div className="profile-health-box mb-3">
+                <div className="profile-health-labels profile-health-icons">
+                  <span
+                    className={`profile-health-heart profile-health-heart-broken ${Number(onboarding.healthyGoal) < 30 ? "active" : ""}`}
+                    aria-label="Unhealthy"
+                    title="Unhealthy"
+                  >
+                    💔
+                  </span>
+                  <strong>{onboarding.healthyGoal}%</strong>
+                  <span
+                    className={`profile-health-heart profile-health-heart-full ${Number(onboarding.healthyGoal) > 70 ? "active" : ""}`}
+                    aria-label="Healthy"
+                    title="Healthy"
+                  >
+                    ❤️
+                  </span>
+                </div>
+                <input
+                  type="range"
+                  min="0"
+                  max="100"
+                  value={onboarding.healthyGoal}
+                  onChange={(e) => updateOnboarding("healthyGoal", e.target.value)}
+                  className="w-100"
+                  disabled={!isEditingInfo}
+                />
+              </div>
+
+              <div className="row">
+                <div className="col-12 col-sm-4 mb-3">
+                  <label className="form-label fw-semibold">Height (cm)</label>
+                  <input
+                    type="number"
+                    className="form-control p-2"
+                    value={onboarding.heightCm}
+                    onChange={(e) => updateOnboarding("heightCm", e.target.value)}
+                    disabled={!isEditingInfo}
+                  />
+                </div>
+                <div className="col-12 col-sm-4 mb-3">
+                  <label className="form-label fw-semibold">Weight (kg)</label>
+                  <input
+                    type="number"
+                    className="form-control p-2"
+                    value={onboarding.weightKg}
+                    onChange={(e) => updateOnboarding("weightKg", e.target.value)}
+                    disabled={!isEditingInfo}
+                  />
+                </div>
+                <div className="col-12 col-sm-4 mb-3">
+                  <label className="form-label fw-semibold">BMI</label>
+                  <input className="form-control p-2 fw-bold" value={bmi || "--"} disabled />
+                </div>
+              </div>
+
+              {isEditingInfo && (
+                <button className="btn btn-warning w-100 fw-semibold">
+                  Save Changes
+                </button>
+              )}
             </form>
           </div>
         </div>
@@ -224,6 +464,59 @@ const handleProfileUpdate = async (e) => {
           display: grid;
           grid-template-columns: repeat(2, minmax(0, 1fr));
           gap: 12px;
+        }
+
+        .profile-card-title-row {
+          align-items: center;
+          display: flex;
+          justify-content: space-between;
+          gap: 12px;
+        }
+
+        .profile-health-box {
+          background: #fff8e1;
+          border: 1px solid #ffd166;
+          border-radius: 12px;
+          padding: 14px;
+        }
+
+        .profile-health-labels {
+          align-items: center;
+          display: flex;
+          justify-content: space-between;
+          font-weight: 700;
+          margin-bottom: 8px;
+        }
+
+        .profile-health-labels strong {
+          color: #198754;
+        }
+
+        .profile-health-icons {
+          margin-bottom: 10px;
+        }
+
+        .profile-health-heart {
+          filter: grayscale(1);
+          font-size: 1.75rem;
+          line-height: 1;
+          opacity: 0.35;
+          transform: scale(0.94);
+          transition: filter 0.2s ease, opacity 0.2s ease, transform 0.2s ease;
+        }
+
+        .profile-health-heart.active {
+          filter: saturate(1.6) drop-shadow(0 0 9px rgba(255, 71, 87, 0.58));
+          opacity: 1;
+          transform: scale(1.14);
+        }
+
+        .profile-health-heart-full.active {
+          filter: saturate(1.7) drop-shadow(0 0 10px rgba(220, 53, 69, 0.62));
+        }
+
+        .profile-health-heart-broken.active {
+          filter: saturate(1.7) drop-shadow(0 0 10px rgba(255, 54, 54, 0.62));
         }
 
         .profile-planner-toggle button {

@@ -1,6 +1,8 @@
 const express = require("express");
 const router = express.Router();
 const SavedRecipe = require("../models/SavedRecipe");
+const GeneratedRecipe = require("../models/GeneratedRecipe");
+const User = require("../models/User");
 const authMiddleware = require("../middleware/authMiddleware");
 const { enhanceRecipe } = require("../utils/recipeEnhancements");
 
@@ -103,7 +105,7 @@ const generateRecipeText = async (prompt) => {
       messages: [
         {
           role: "system",
-          content: "You are a vegetarian-first recipe API. Return only valid JSON with no markdown."
+          content: "You are an expert vegetarian recipe chef and recipe-data API. Prioritize authentic, commonly accepted recipes for the requested dish. Return only valid JSON with no markdown."
         },
         {
           role: "user",
@@ -155,18 +157,192 @@ const getRecipeSafetyText = (recipe = {}) => {
   ].join(" ");
 };
 
+const getRecipeAccuracyIssue = (query, recipe = {}) => {
+  const normalizedQuery = String(query || "").toLowerCase();
+  const recipeName = String(recipe.name || recipe.title || "").toLowerCase();
+  const ingredients = Array.isArray(recipe.ingredients) ? recipe.ingredients : [];
+  const recipeText = getRecipeSafetyText(recipe).toLowerCase();
+  const isPaneerDish = /\bpaneer\b/.test(normalizedQuery) || /\bpaneer\b/.test(recipeName);
+  const isPaneerTikka = /\bpaneer\s+tikka\b/.test(normalizedQuery) || /\bpaneer\s+tikka\b/.test(recipeName);
+  const isPaneerSabji = /\bpaneer\s+(sabji|subji|sabzi|curry|masala|gravy)\b/.test(normalizedQuery)
+    || /\bpaneer\s+(sabji|subji|sabzi|curry|masala|gravy)\b/.test(recipeName);
+
+  if (/\b\d+\s*(cloves?|pods?|pieces?)\s+(hing|asafoetida)\b/i.test(recipeText)) {
+    return "invalid hing measurement";
+  }
+
+  if (isPaneerDish && /\b(hing|asafoetida)\b/i.test(recipeText)) {
+    return "hing or asafoetida does not belong in paneer tikka or paneer sabji unless explicitly requested";
+  }
+
+  if (isPaneerDish && !ingredients.some((ingredient) => /\bpaneer\b/i.test(String(ingredient)))) {
+    return "paneer dish missing paneer";
+  }
+
+  if (isPaneerTikka) {
+    const hasCurdBase = ingredients.some((ingredient) => /\b(curd|yogurt|yoghurt|hung curd|thick curd|dahi)\b/i.test(String(ingredient)));
+    const hasTikkaBinder = ingredients.some((ingredient) => /\b(besan|gram flour|chickpea flour)\b/i.test(String(ingredient)));
+    if (!hasCurdBase) return "paneer tikka missing curd or yogurt marinade";
+    if (!hasTikkaBinder) return "paneer tikka missing besan or gram flour marinade binder";
+  }
+
+  if ((isPaneerTikka || isPaneerSabji) && /\b(raw banana|plantain)\b/i.test(recipeText)) {
+    return "paneer dish contains unrelated raw banana substitute";
+  }
+
+  return "";
+};
+
+const normalizeRegionalStyle = (value) => {
+  return String(value || "").trim().replace(/\s+/g, " ");
+};
+
+const normalizeRecipeQuery = (value) => {
+  return String(value || "")
+    .toLowerCase()
+    .replace(/\([^)]*\)/g, " ")
+    .replace(/\b(recipe|style|styled|authentic|traditional|homestyle|home style)\b/gi, " ")
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim();
+};
+
+const getUserRegionalStyle = async (userId) => {
+  const user = await User.findById(userId).select("onboarding.ethnicity onboarding.currentBase").lean();
+  return normalizeRegionalStyle(user?.onboarding?.ethnicity || user?.onboarding?.currentBase);
+};
+
+const getRegionalStyleRules = (regionalStyle) => {
+  if (!regionalStyle) {
+    return `
+REGIONAL STYLE:
+- No saved regional preference is available. Use the most authentic, commonly accepted Indian preparation for the requested dish.
+`;
+  }
+
+  return `
+REGIONAL STYLE ACTIVE: ${regionalStyle}
+- Adapt the recipe to the user's selected regional food style: ${regionalStyle}.
+- Use ingredients, seasoning balance, cooking method, texture, and serving style commonly used in ${regionalStyle} homes.
+- If the requested dish belongs strongly to another state or region, keep the dish recognizable but explain it through a ${regionalStyle}-style vegetarian home preparation where reasonable.
+- If the dish is strongly iconic to its own region, such as Maharashtrian misal pav, Gujarati dhokla/khaman, Punjabi chole, or South Indian dosa/idli, preserve the authentic base recipe and add only natural ${regionalStyle} touches that do not make it incorrect.
+- For examples: Gujarat-style dhokla/khaman should lean mildly sweet, tangy, tempered with mustard/sesame/curry leaves/green chili when allowed; Maharashtra-style poha or misal pav should use the common Maharashtrian flavor profile and ingredients.
+- Do not add random ingredients only because of the region. Accuracy for the requested dish is more important than forced regional twists.
+`;
+};
+
+const toTitleCase = (value) => {
+  return String(value || "")
+    .toLowerCase()
+    .replace(/\b[a-z]/g, (letter) => letter.toUpperCase());
+};
+
+const getCleanDishName = (query, generatedName = "") => {
+  const source = String(query || generatedName || "").trim();
+  const cleaned = source
+    .replace(/\([^)]*\)/g, " ")
+    .split(/\s[-–—]\s/)[0]
+    .replace(/\b(recipe|style|styled|authentic|traditional|homestyle|home style)\b/gi, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+
+  return toTitleCase(cleaned || source || "Recipe");
+};
+
+const getStoredRecipeName = (query, generatedName = "") => {
+  return getCleanDishName(query, generatedName);
+};
+
+const getSharedRegionalRecipe = async ({ query, regionalStyle, dietMode, servings }) => {
+  const normalizedQuery = normalizeRecipeQuery(query);
+  if (!normalizedQuery || !regionalStyle) return null;
+
+  const matches = await GeneratedRecipe.aggregate([
+    {
+      $match: {
+        normalizedQuery,
+        regionalStyle,
+        dietMode,
+        servings
+      }
+    },
+    { $sample: { size: 1 } }
+  ]);
+
+  const sharedRecipe = matches[0];
+  if (!sharedRecipe) return null;
+
+  await GeneratedRecipe.updateOne(
+    { _id: sharedRecipe._id },
+    {
+      $inc: { usageCount: 1 },
+      $set: { lastUsedAt: new Date(), updatedAt: new Date() }
+    }
+  );
+
+  return sharedRecipe;
+};
+
+const saveGeneratedRecipeToPool = async ({ userId, query, regionalStyle, dietMode, servings, recipe }) => {
+  const normalizedQuery = normalizeRecipeQuery(query);
+  if (!normalizedQuery || !regionalStyle) return;
+
+  const storedName = getStoredRecipeName(query, recipe.name);
+  const enhancedRecipe = enhanceRecipe({ ...recipe, name: storedName, title: storedName });
+
+  await GeneratedRecipe.create({
+    userId,
+    query,
+    normalizedQuery,
+    regionalStyle,
+    dietMode,
+    servings,
+    name: storedName,
+    ingredients: Array.isArray(recipe.ingredients) ? recipe.ingredients : [],
+    steps: Array.isArray(recipe.steps) ? recipe.steps : [],
+    healthScore: enhancedRecipe.healthScore,
+    healthLabel: enhancedRecipe.healthLabel
+  });
+};
+
 // GENERATE RECIPE WITH BACKEND AI
 router.post("/generate", authMiddleware, async (req, res) => {
   try {
     const query = String(req.body.query || "").trim();
     const servings = Number(req.body.servings) || 2;
     const requestedDietMode = normalizeDietMode(req.body.dietMode);
+    const forceRegenerate = Boolean(req.body.forceRegenerate);
+    const regionalStyle = await getUserRegionalStyle(req.user.id);
 
     if (!query) {
       return res.status(400).json({ msg: "Recipe query is required" });
     }
 
     const dietMode = requestedDietMode === "jain" || /jain/i.test(query) ? "jain" : "veg";
+
+    if (!forceRegenerate) {
+      const sharedRecipe = await getSharedRegionalRecipe({ query, regionalStyle, dietMode, servings });
+      if (sharedRecipe) {
+        const sharedResponseRecipe = {
+          name: getStoredRecipeName(query, sharedRecipe.name),
+          ingredients: Array.isArray(sharedRecipe.ingredients) ? sharedRecipe.ingredients : [],
+          steps: Array.isArray(sharedRecipe.steps) ? sharedRecipe.steps : [],
+          servings: sharedRecipe.servings || servings,
+          healthScore: sharedRecipe.healthScore,
+          healthLabel: sharedRecipe.healthLabel,
+          dietMode,
+          regionalStyle,
+          source: "sharedRegional",
+          sharedRecipeId: sharedRecipe._id
+        };
+        const sharedAccuracyIssue = getRecipeAccuracyIssue(query, sharedResponseRecipe);
+        if (!sharedAccuracyIssue) {
+          return res.json({ recipe: enhanceRecipe(sharedResponseRecipe) });
+        }
+
+        console.warn("Skipped shared recipe because of accuracy issue:", sharedAccuracyIssue);
+      }
+    }
+
     const dietRules = dietMode === "jain"
       ? `
 STRICT JAIN MODE ACTIVE:
@@ -175,7 +351,10 @@ STRICT JAIN MODE ACTIVE:
 - NEVER use meat, seafood, fish, chicken, eggs, gelatin, animal stock, lard, bacon, ham, or any non-vegetarian ingredient.
 - For searches like "diet recipe", "healthy recipe", or any generic recipe request, still make the recipe strictly Jain by default.
 - If the requested dish normally uses restricted ingredients, create a Jain-friendly version and name it clearly.
-- Use Jain-safe alternatives such as raw banana, cauliflower, cabbage, capsicum, peas, beans, tomato, cucumber, spinach, paneer, tofu, lentils, grains, spices, and asafoetida (hing).
+- Keep the recipe faithful to the requested dish. Do not add unrelated substitutes like raw banana, cabbage, cauliflower, or hing unless they are normal for that exact dish.
+- For paneer dishes, paneer must remain the main ingredient. Do not replace paneer with raw banana or unrelated vegetables.
+- Hing/asafoetida is not a default Jain replacement for onion or garlic. Use it only in dishes where it is traditionally normal, such as some dals or kadhis.
+- Do not add hing/asafoetida to paneer tikka, paneer sabji, paneer curry, paneer masala, paneer bhurji, grilled paneer starters, or tandoori-style paneer unless the user explicitly asks for hing.
 `
       : `
 STRICT VEG MODE ACTIVE:
@@ -188,9 +367,21 @@ STRICT VEG MODE ACTIVE:
     const buildPrompt = (retryNote = "") => `
 Output ONLY pure JSON. No markdown, no commentary.
 ${dietRules}
+${getRegionalStyleRules(regionalStyle)}
 ${retryNote}
 
 Generate a detailed recipe for ${servings} servings: ${query}
+Accuracy rules:
+- The JSON "name" must be exactly "${getStoredRecipeName(query)}". Keep the state/region only in the separate "regionalStyle" app field, not in the recipe name.
+- Do not add descriptions like "steamed savory cake", "Maharashtrian-style", subtitles, or alternate names to the name.
+- Generate the real, recognizable recipe for the requested dish, not a random variation.
+- Use ingredients that commonly belong in that dish and cuisine.
+- Do not invent unusual ingredients or substitutions unless the diet mode requires it.
+- If the query is specific, such as "paneer tikka", "paneer sabji", "pav bhaji", "tiramisu", or "veg biryani", the ingredients and steps must match that dish.
+- For paneer tikka, use paneer cubes, thick curd or hung curd, besan or gram flour, capsicum, firm tomato if allowed, lemon juice, oil or butter for brushing, and standard tikka spices. Do not use hing/asafoetida.
+- For paneer sabji/curry/masala, use paneer as the main ingredient and a normal paneer gravy base allowed by the active diet mode. Do not use raw banana, plantain, or hing unless the user explicitly requested them.
+- Never write impossible spice measurements like "cloves hing". Hing is a pinch or powder only when it truly belongs.
+- Do not overuse any single spice. Include hing/asafoetida only if it genuinely belongs to the requested dish, never just because Jain mode is active.
 Ingredient rules:
 - Every ingredient must include an amount, for example "1 cup basmati rice" or "2 tablespoons oil".
 - Keep each ingredient as one complete grocery item.
@@ -216,7 +407,7 @@ Format:
         ? ""
         : `
 The previous recipe was rejected because it contained "${blockedReason}".
-Rewrite from scratch and remove every restricted item from ingredients and steps.`;
+Rewrite from scratch. Keep the requested dish authentic, remove every restricted or inaccurate item from ingredients and steps, and do not replace the main ingredient with unrelated substitutes.`;
       const result = await generateRecipeText(buildPrompt(retryNote));
       const candidate = extractJson(result);
       const recipeText = getRecipeSafetyText(candidate);
@@ -228,6 +419,12 @@ Rewrite from scratch and remove every restricted item from ingredients and steps
 
       if (dietMode === "jain" && isJainRestricted(recipeText)) {
         blockedReason = "onion, garlic, ginger, potato, carrot, or another Jain-restricted root vegetable";
+        continue;
+      }
+
+      const accuracyIssue = getRecipeAccuracyIssue(query, candidate);
+      if (accuracyIssue) {
+        blockedReason = accuracyIssue;
         continue;
       }
 
@@ -243,14 +440,40 @@ Rewrite from scratch and remove every restricted item from ingredients and steps
       });
     }
 
+    const displayName = getStoredRecipeName(query, recipe.name);
+    const enhancedGeneratedRecipe = enhanceRecipe({
+      name: displayName,
+      title: displayName,
+      ingredients: Array.isArray(recipe.ingredients) ? recipe.ingredients : [],
+      steps: Array.isArray(recipe.steps) ? recipe.steps : []
+    });
+    const responseRecipe = {
+      name: displayName,
+      ingredients: Array.isArray(recipe.ingredients) ? recipe.ingredients : [],
+      steps: Array.isArray(recipe.steps) ? recipe.steps : [],
+      servings,
+      healthScore: enhancedGeneratedRecipe.healthScore,
+      healthLabel: enhancedGeneratedRecipe.healthLabel,
+      dietMode,
+      regionalStyle,
+      source: "aiGenerated"
+    };
+
+    try {
+      await saveGeneratedRecipeToPool({
+        userId: req.user.id,
+        query,
+        regionalStyle,
+        dietMode,
+        servings: responseRecipe.servings,
+        recipe: responseRecipe
+      });
+    } catch (poolErr) {
+      console.error("Failed to save generated recipe to shared pool:", poolErr);
+    }
+
     res.json({
-      recipe: {
-        name: recipe.name || query,
-        ingredients: Array.isArray(recipe.ingredients) ? recipe.ingredients : [],
-        steps: Array.isArray(recipe.steps) ? recipe.steps : [],
-        servings: recipe.servings || servings,
-        dietMode
-      }
+      recipe: responseRecipe
     });
   } catch (err) {
     console.error(err);
@@ -261,10 +484,12 @@ Rewrite from scratch and remove every restricted item from ingredients and steps
 // SAVE RECIPE
 router.post("/save", authMiddleware, async (req, res) => {
   try {
-    const { title, ingredients, steps, image, nutrition } = req.body;
+    const { title, ingredients, steps, image, nutrition, healthScore, healthLabel } = req.body;
     const dietMode = normalizeDietMode(req.body.dietMode);
-    const enhancedRecipe = enhanceRecipe({ title, ingredients, steps, image, nutrition });
-    const recipeText = getRecipeSafetyText({ title, ingredients, steps });
+    const regionalStyle = await getUserRegionalStyle(req.user.id);
+    const storedTitle = getStoredRecipeName(title);
+    const enhancedRecipe = enhanceRecipe({ title: storedTitle, ingredients, steps, image, nutrition, healthScore, healthLabel });
+    const recipeText = getRecipeSafetyText({ title: storedTitle, ingredients, steps });
 
     if (isNonVegetarian(recipeText)) {
       return res.status(422).json({ msg: "Recipe was blocked because Veg mode does not allow non-vegetarian content." });
@@ -277,13 +502,17 @@ router.post("/save", authMiddleware, async (req, res) => {
     // Check if recipe already exists for this user
     const existing = await SavedRecipe.findOne({ 
       userId: req.user.id, 
-      title: title 
+      title: storedTitle,
+      regionalStyle
     });
 
     if (existing) {
       existing.ingredients = Array.isArray(ingredients) ? ingredients : [];
       existing.steps = Array.isArray(steps) ? steps : [];
+      existing.regionalStyle = regionalStyle;
       existing.image = enhancedRecipe.image;
+      existing.healthScore = enhancedRecipe.healthScore;
+      existing.healthLabel = enhancedRecipe.healthLabel;
       existing.nutrition = enhancedRecipe.nutrition;
       existing.updatedAt = Date.now();
       await existing.save();
@@ -293,10 +522,13 @@ router.post("/save", authMiddleware, async (req, res) => {
 
     const saved = await SavedRecipe.create({
       userId: req.user.id,
-      title,
+      title: storedTitle,
       ingredients,
       steps,
+      regionalStyle,
       image: enhancedRecipe.image,
+      healthScore: enhancedRecipe.healthScore,
+      healthLabel: enhancedRecipe.healthLabel,
       nutrition: enhancedRecipe.nutrition,
     });
 
@@ -319,7 +551,15 @@ router.get("/my-recipes", authMiddleware, async (req, res) => {
 // DELETE RECIPE
 router.delete("/:id", authMiddleware, async (req, res) => {
   try {
-    await SavedRecipe.findByIdAndDelete(req.params.id);
+    const deletedRecipe = await SavedRecipe.findOneAndDelete({
+      _id: req.params.id,
+      userId: req.user.id
+    });
+
+    if (!deletedRecipe) {
+      return res.status(404).json({ msg: "Recipe not found" });
+    }
+
     res.json({ msg: "Recipe removed" });
   } catch (err) {
     res.status(500).json({ msg: "Failed to remove recipe" });

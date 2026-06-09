@@ -5,7 +5,10 @@ const savedRecipeSchema = new mongoose.Schema({
   title: { type: String, required: true },
   ingredients: { type: Array, required: true },
   steps: { type: Array, required: true },
+  regionalStyle: { type: String, default: "" },
   image: { type: String, default: "" },
+  healthScore: { type: Number, default: 50 },
+  healthLabel: { type: String, default: "Moderate" },
   nutrition: {
     calories: { type: Number, default: 0 },
     protein: { type: Number, default: 0 },

@@ -2,6 +2,7 @@ const express = require("express");
 const { GoogleGenerativeAI } = require("@google/generative-ai");
 const authMiddleware = require("../middleware/authMiddleware");
 const VisionScan = require("../models/VisionScan");
+const User = require("../models/User");
 const { enhanceRecipe } = require("../utils/recipeEnhancements");
 
 const router = express.Router();
@@ -64,6 +65,9 @@ JAIN MODE ACTIVE:
 - For generic requests like diet recipes or healthy recipes, keep the result strictly Jain by default.
 - If any Jain-restricted item is visible, put it in rejectedItems and do not include it in ingredients or uncertainItems.
 - Never include meat, seafood, fish, chicken, eggs, gelatin, animal stock, lard, bacon, ham, or non-vegetarian ingredients.
+- Keep recipes faithful to the requested dish. Do not add unrelated substitutes like raw banana, cabbage, cauliflower, or hing unless they are normal for that dish or strictly needed to replace a blocked ingredient.
+- For paneer dishes, paneer must remain the main ingredient. Do not replace paneer with raw banana or unrelated vegetables.
+- Use hing only when it is traditionally appropriate or clearly needed for Jain flavoring; do not add hing by default.
 `;
   }
 
@@ -74,6 +78,55 @@ VEG MODE ACTIVE:
 - Normal vegetarian ingredients such as onion, garlic, potato, carrot, ginger, beetroot, and other root vegetables are allowed in Veg mode when they are visible or belong in the recipe.
 - If non-vegetarian food is visible, put it in rejectedItems and do not include it in ingredients or uncertainItems.
 `;
+};
+
+const normalizeRegionalStyle = (value) => {
+  return String(value || "").trim().replace(/\s+/g, " ");
+};
+
+const getUserRegionalStyle = async (userId) => {
+  const user = await User.findById(userId).select("onboarding.ethnicity onboarding.currentBase").lean();
+  return normalizeRegionalStyle(user?.onboarding?.ethnicity || user?.onboarding?.currentBase);
+};
+
+const getRegionalStyleRules = (regionalStyle) => {
+  if (!regionalStyle) {
+    return `
+REGIONAL STYLE:
+- No saved regional preference is available. Use the most authentic, commonly accepted preparation for the requested dish.
+`;
+  }
+
+  return `
+REGIONAL STYLE ACTIVE: ${regionalStyle}
+- Adapt recipe suggestions and generated recipes to the user's selected regional food style: ${regionalStyle}.
+- Use ingredients, seasoning balance, cooking method, texture, and serving style commonly used in ${regionalStyle} homes.
+- If the dish is iconic to another region, keep its authentic base and add only natural ${regionalStyle} touches that do not make it incorrect.
+- Do not add random ingredients only because of the region. Accuracy for the dish and visible ingredients is more important than forced regional twists.
+`;
+};
+
+const toTitleCase = (value) => {
+  return String(value || "")
+    .toLowerCase()
+    .replace(/\b[a-z]/g, (letter) => letter.toUpperCase());
+};
+
+const getCleanDishName = (query, generatedName = "") => {
+  const source = String(query || generatedName || "").trim();
+  const cleaned = source
+    .replace(/\([^)]*\)/g, " ")
+    .split(/\s[-–—]\s/)[0]
+    .replace(/\b(recipe|style|styled|authentic|traditional|homestyle|home style)\b/gi, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+
+  return toTitleCase(cleaned || source || "Recipe");
+};
+
+const getDisplayRecipeName = (query, regionalStyle, generatedName = "") => {
+  const dishName = getCleanDishName(query, generatedName);
+  return regionalStyle ? `${dishName} (${regionalStyle})` : dishName;
 };
 
 const getApiKey = () => {
@@ -373,6 +426,7 @@ Format exactly:
 router.post("/suggest-recipes", authMiddleware, async (req, res) => {
   try {
     const dietMode = normalizeDietMode(req.body.dietMode);
+    const regionalStyle = await getUserRegionalStyle(req.user.id);
     const ingredients = cleanIngredients(req.body.ingredients || [], dietMode).map((item) => item.name);
     if (ingredients.length === 0) {
       return res.status(400).json({ msg: `Add at least one ${dietMode === "jain" ? "Jain-friendly" : "vegetarian"} ingredient` });
@@ -381,9 +435,12 @@ router.post("/suggest-recipes", authMiddleware, async (req, res) => {
     const result = await generateContentWithFallback(`
 Suggest ${dietMode === "jain" ? "Jain vegetarian" : "vegetarian"} recipes using these ingredients: ${ingredients.join(", ")}.
 ${getDietRules(dietMode)}
+${getRegionalStyleRules(regionalStyle)}
 Rules:
 - Output only JSON.
 - Prefer Indian-friendly and practical recipes.
+- Suggest recognizable recipes that naturally fit the detected ingredients.
+- Do not suggest recipes that would require unrelated main ingredients not present in the scan.
 - Suggest 5 recipes.
 Format:
 [
@@ -406,8 +463,10 @@ Format:
 router.post("/generate-recipe", authMiddleware, async (req, res) => {
   try {
     const dietMode = normalizeDietMode(req.body.dietMode);
+    const regionalStyle = await getUserRegionalStyle(req.user.id);
     const ingredients = cleanIngredients(req.body.ingredients || [], dietMode).map((item) => item.name);
     const recipeName = String(req.body.recipeName || "").trim();
+    const requestedServings = Math.min(10, Math.max(1, Math.round(Number(req.body.servings) || 2)));
 
     if (!recipeName) {
       return res.status(400).json({ msg: "Recipe name is required" });
@@ -418,10 +477,17 @@ Generate a detailed ${dietMode === "jain" ? "Jain vegetarian" : "vegetarian"} re
 Recipe: ${recipeName}
 Available ingredients: ${ingredients.join(", ")}
 ${getDietRules(dietMode)}
+${getRegionalStyleRules(regionalStyle)}
 Rules:
 - Output only JSON.
+- The JSON "name" must be exactly "${getDisplayRecipeName(recipeName, regionalStyle)}". Do not add descriptions, subtitles, "style" text, or alternate names.
 - Use mostly the available ingredients, but basic pantry items like salt, oil, water, spices are allowed.
-- Make ingredients clear with quantities for 2 servings.
+- Generate the real, recognizable recipe for the requested dish, not a random variation.
+- Use ingredients that commonly belong in that dish and cuisine.
+- Do not invent unusual ingredients or substitutions unless the diet mode requires it.
+- For paneer recipes, paneer must remain the main ingredient. Do not replace paneer with raw banana or unrelated vegetables.
+- Do not overuse any single spice. Include hing/asafoetida only if it genuinely belongs or is necessary for Jain mode.
+- Make ingredients clear with quantities for ${requestedServings} servings.
 - Keep each ingredient as one complete grocery item.
 - Do not create separate ingredients like "chopped", "sliced", "to taste", "for garnish", "for serving", or "peeled and grated".
 - Attach preparation words to the grocery item, for example "2 tomatoes, chopped".
@@ -431,7 +497,7 @@ Format:
   "name": "",
   "ingredients": ["", ""],
   "steps": ["", ""],
-  "servings": 2
+  "servings": ${requestedServings}
 }
 `);
 
@@ -446,23 +512,25 @@ Format:
       return res.status(422).json({ msg: "Generated recipe was blocked because it included ingredients that are not allowed in Jain mode." });
     }
 
+    const displayName = getDisplayRecipeName(recipeName, regionalStyle, recipe.name);
     const enhancedRecipe = enhanceRecipe({
-        name: recipe.name || recipeName,
-        title: recipe.name || recipeName,
+        name: displayName,
+        title: displayName,
         ingredients: Array.isArray(recipe.ingredients) ? recipe.ingredients : [],
         steps: Array.isArray(recipe.steps) ? recipe.steps : [],
-        servings: recipe.servings || 2
+        servings: recipe.servings || requestedServings
     });
 
     res.json({
       recipe: {
-        name: enhancedRecipe.name || enhancedRecipe.title,
+        name: displayName,
         ingredients: enhancedRecipe.ingredients,
         steps: enhancedRecipe.steps,
-        servings: enhancedRecipe.servings || 2,
+        servings: enhancedRecipe.servings || requestedServings,
         image: enhancedRecipe.image,
         nutrition: enhancedRecipe.nutrition,
-        dietMode
+        dietMode,
+        regionalStyle
       }
     });
   } catch (err) {

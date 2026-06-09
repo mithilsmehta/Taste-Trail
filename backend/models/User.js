@@ -5,7 +5,7 @@ const userSchema = new mongoose.Schema({
   lastName: { type: String, required: true },
 
   email: { type: String, required: true, unique: true },
-  phone: { type: String, required: true, unique: true },
+  phone: { type: String, unique: true, sparse: true, default: undefined },
 
   password: { type: String, required: true },
 
@@ -16,6 +16,19 @@ const userSchema = new mongoose.Schema({
     diet: { type: String, default: "" },
     allergies: { type: [String], default: [] },
     cuisines: { type: [String], default: [] }
+  },
+
+  onboarding: {
+    displayName: { type: String, default: "" },
+    gender: { type: String, default: "" },
+    ethnicity: { type: String, default: "" },
+    currentBase: { type: String, default: "" },
+    dietaryPreference: { type: String, default: "" },
+    usualServings: { type: Number, default: 2 },
+    healthyGoal: { type: Number, default: 50 },
+    heightCm: { type: Number, default: null },
+    weightKg: { type: Number, default: null },
+    bmi: { type: Number, default: null }
   },
 
   role: { type: String, default: "user" }

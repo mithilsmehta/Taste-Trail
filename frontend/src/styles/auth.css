@@ -1,6 +1,7 @@
 /* MAIN LAYOUT */
 .auth-container {
   display: flex;
+  height: 100vh;
   min-height: 100vh;
   width: 100%;
   overflow: hidden;
@@ -9,10 +10,15 @@
 /* LEFT SIDE SLIDESHOW */
 .auth-left {
   flex: 1.2;
+  min-height: 100vh;
+  overflow: hidden;
   position: relative;
 }
 
 .auth-bg {
+  display: block;
+  inset: 0;
+  position: absolute;
   width: 100%;
   height: 100%;
   object-fit: cover;
@@ -31,6 +37,8 @@
   justify-content: center;
   align-items: center;
   background: #fff;
+  min-height: 100vh;
+  overflow-y: auto;
 }
 
 .auth-box {
@@ -95,10 +103,138 @@
   margin-bottom: 15px;
 }
 
+.auth-stepper {
+  display: flex;
+  justify-content: center;
+  gap: 8px;
+  margin-bottom: 18px;
+}
+
+.auth-stepper span {
+  width: 36px;
+  height: 5px;
+  background: #e9ecef;
+  border-radius: 999px;
+}
+
+.auth-stepper span.active {
+  background: #ff8c42;
+}
+
+.auth-actions-row {
+  display: grid;
+  grid-template-columns: 0.8fr 1.2fr;
+  gap: 12px;
+  align-items: center;
+}
+
+.auth-actions-row .btn-gradient {
+  margin-top: 0;
+}
+
+.btn-auth-secondary {
+  background: #fff;
+  border: 1px solid #d0d5dd;
+  border-radius: 8px;
+  color: #212529;
+  cursor: pointer;
+  font-weight: 700;
+  padding: 12px;
+  transition: 0.2s;
+}
+
+.btn-auth-secondary:hover {
+  border-color: #ff8c42;
+  color: #ff6b00;
+}
+
+.health-meter-wrap {
+  background: #fff8e1;
+  border: 1px solid #ffd166;
+  border-radius: 12px;
+  padding: 16px;
+}
+
+.health-meter-labels {
+  align-items: center;
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 0.9rem;
+  font-weight: 700;
+  margin-bottom: 10px;
+}
+
+.health-meter-labels strong {
+  color: #198754;
+  font-size: 1.05rem;
+}
+
+.health-meter-icons {
+  margin-bottom: 12px;
+}
+
+.health-heart {
+  filter: grayscale(1);
+  font-size: 1.75rem;
+  line-height: 1;
+  opacity: 0.35;
+  transform: scale(0.94);
+  transition: filter 0.2s ease, opacity 0.2s ease, transform 0.2s ease;
+}
+
+.health-heart.active {
+  filter: saturate(1.6) drop-shadow(0 0 9px rgba(255, 71, 87, 0.58));
+  opacity: 1;
+  transform: scale(1.14);
+}
+
+.health-heart-full.active {
+  filter: saturate(1.7) drop-shadow(0 0 10px rgba(220, 53, 69, 0.62));
+}
+
+.health-heart-broken.active {
+  filter: saturate(1.7) drop-shadow(0 0 10px rgba(255, 54, 54, 0.62));
+}
+
+.health-meter {
+  accent-color: #198754;
+  width: 100%;
+}
+
+.bmi-card {
+  align-items: center;
+  background: #f8f9fa;
+  border: 1px solid #e9ecef;
+  border-radius: 12px;
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 4px 12px;
+  padding: 14px 16px;
+}
+
+.bmi-card span {
+  color: #6c757d;
+  font-weight: 700;
+}
+
+.bmi-card strong {
+  color: #212529;
+  font-size: 1.7rem;
+  line-height: 1;
+}
+
+.bmi-card small {
+  color: #6c757d;
+  font-weight: 600;
+  grid-column: 1 / -1;
+}
+
 /* MOBILE RESPONSIVE */
 @media (max-width: 900px) {
   .auth-container {
     flex-direction: column;
+    height: auto;
     min-height: 100vh;
     overflow-y: auto;
   }
@@ -106,11 +242,13 @@
   .auth-left {
     height: 28vh;
     flex: none;
+    min-height: 0;
   }
 
   .auth-right {
     min-height: 72vh;
     height: auto;
+    overflow: visible;
     padding: 24px 0;
   }
 
@@ -137,5 +275,13 @@
 
   .auth-title {
     font-size: 22px;
+  }
+
+  .auth-actions-row {
+    grid-template-columns: 1fr;
+  }
+
+  .auth-stepper span {
+    width: 30px;
   }
 }
