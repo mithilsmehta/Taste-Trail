@@ -3,6 +3,7 @@
   "short_name": "Tastewise",
   "description": "Food discovery and restaurant app",
   "start_url": "/",
+   "scope": "/",
   "display": "standalone",
   "background_color": "#ffffff",
   "theme_color": "#000000",
