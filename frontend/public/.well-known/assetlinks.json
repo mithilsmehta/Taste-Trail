@@ -1,0 +1,8 @@
+[{
+      "relation": ["delegate_permission/common.handle_all_urls"],
+      "target": {
+        "namespace": "android_app",
+        "package_name": "app.vercel.taste_trail_eight.twa",
+        "sha256_cert_fingerprints": ["85:EE:E9:91:5E:4F:0C:7E:0D:5B:56:A0:89:4A:5D:32:78:B7:C7:14:F2:0B:25:A5:CE:47:B5:59:A2:FA:F5:B9"]
+      }
+    }]
