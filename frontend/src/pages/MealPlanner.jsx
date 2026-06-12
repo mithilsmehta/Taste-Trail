@@ -57,8 +57,10 @@ export default function MealPlanner() {
   const [recipeSearch, setRecipeSearch] = useState("");
 
   useEffect(() => {
-    loadPlannerData();
-  }, [weekStartDate, plannerView]);
+    loadMealPlans();
+    loadAllMealPlans();
+    loadSavedRecipes();
+  }, [weekStartDate]);
 
   useEffect(() => {
     localStorage.setItem(plannerViewPreferenceKey, plannerView);
@@ -82,55 +84,33 @@ export default function MealPlanner() {
     return normalized;
   };
 
-  const fetchWeekMealPlans = async (token) => {
-    const res = await fetch(`${API_BASE_URL}/api/meal-plans/my?startDate=${weekDays[0].dateKey}`, {
-      headers: { Authorization: `Bearer ${token}` }
-    });
-
-    if (!res.ok) throw new Error("Failed to load meal plans");
-    return res.json();
-  };
-
-  const fetchSavedRecipes = async (token) => {
-    const res = await fetch(apiUrl("/api/recipes/my-recipes"), {
-      headers: { Authorization: `Bearer ${token}` }
-    });
-
-    if (!res.ok) throw new Error("Failed to load saved recipes");
-    return res.json();
-  };
-
-  const loadPlannerData = async () => {
-    try {
-      setLoading(true);
-      const token = localStorage.getItem("token");
-      const [weekData, recipeData] = await Promise.all([
-        fetchWeekMealPlans(token),
-        fetchSavedRecipes(token)
-      ]);
-
-      setMealPlans(normalizeMealPlans(weekData));
-      setSavedRecipes(Array.isArray(recipeData) ? recipeData : []);
-
-      if (plannerView === "calendar") {
-        await loadAllMealPlans();
-      }
-    } catch (err) {
-      console.error(err);
-      alert("Failed to load meal planner");
-    } finally {
-      setLoading(false);
-    }
-  };
-
   const loadMealPlans = async () => {
     try {
       const token = localStorage.getItem("token");
-      const data = await fetchWeekMealPlans(token);
+      const res = await fetch(`${API_BASE_URL}/api/meal-plans/my?startDate=${weekDays[0].dateKey}`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+
+      const data = await res.json();
       setMealPlans(normalizeMealPlans(data));
     } catch (err) {
       console.error(err);
       alert("Failed to load meal plans");
+    }
+    setLoading(false);
+  };
+
+  const loadSavedRecipes = async () => {
+    try {
+      const token = localStorage.getItem("token");
+      const res = await fetch(apiUrl("/api/recipes/my-recipes"), {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+
+      const data = await res.json();
+      setSavedRecipes(data || []);
+    } catch (err) {
+      console.error(err);
     }
   };
 
@@ -254,10 +234,8 @@ export default function MealPlanner() {
       setShowCalendarDayModal(false);
       setSelectedSlot(null);
       setRecipeSearch("");
-      await Promise.all([
-        loadMealPlans(),
-        plannerView === "calendar" ? loadAllMealPlans() : Promise.resolve()
-      ]);
+      loadMealPlans();
+      loadAllMealPlans();
     } catch (err) {
       console.error(err);
       alert("Failed to assign recipe");
@@ -284,10 +262,8 @@ export default function MealPlanner() {
       }
 
       alert("Meal plan deleted!");
-      await Promise.all([
-        loadMealPlans(),
-        plannerView === "calendar" ? loadAllMealPlans() : Promise.resolve()
-      ]);
+      loadMealPlans();
+      loadAllMealPlans();
     } catch (err) {
       console.error(err);
       alert("Failed to delete meal plan");
@@ -616,7 +592,7 @@ export default function MealPlanner() {
                   <div className="recipe-empty-state">
                     <p className="fw-semibold mb-1">No saved recipe found</p>
                     <p className="text-muted mb-0">
-                      Generate "{recipeSearch.trim()}" and add it after the recipe opens.
+                      ₹ "{recipeSearch.trim()}" and add it after the recipe opens.
                     </p>
                   </div>
                 ) : (
