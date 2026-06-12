@@ -1,23 +1,32 @@
-import { useContext, useEffect } from "react";
+import { lazy, Suspense, useContext, useEffect } from "react";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AuthContext } from "./context/AuthContext";
-import Login from "./pages/Login";
-import Register from "./pages/Register";
-import ForgotPassword from "./pages/ForgotPassword";
-import ResetPassword from "./pages/ResetPassword";
-import Home from "./pages/Home";
 import ProtectedRoute from "./components/ProtectedRoute";
-import Profile from "./pages/Profile";
-import SearchResults from "./pages/SearchResults";
-import SavedRecipes from "./pages/SavedRecipes";
-import MealPlanner from "./pages/MealPlanner";
-import GroceryList from "./pages/GroceryList";
-import MealSettings from "./pages/MealSettings";
-import DetectIngredients from "./pages/DetectIngredients";
 // Admin dashboard is disabled for now.
 // Uncomment this import and the /admin route below when you want it back.
 // import AdminDashboard from "./pages/AdminDashboard";
 import notificationManager from "./services/NotificationManager";
+
+const Login = lazy(() => import("./pages/Login"));
+const Register = lazy(() => import("./pages/Register"));
+const ForgotPassword = lazy(() => import("./pages/ForgotPassword"));
+const ResetPassword = lazy(() => import("./pages/ResetPassword"));
+const Home = lazy(() => import("./pages/Home"));
+const Profile = lazy(() => import("./pages/Profile"));
+const SearchResults = lazy(() => import("./pages/SearchResults"));
+const SavedRecipes = lazy(() => import("./pages/SavedRecipes"));
+const MealPlanner = lazy(() => import("./pages/MealPlanner"));
+const GroceryList = lazy(() => import("./pages/GroceryList"));
+const MealSettings = lazy(() => import("./pages/MealSettings"));
+const DetectIngredients = lazy(() => import("./pages/DetectIngredients"));
+
+function PageLoader() {
+  return (
+    <div style={{ padding: "48px", textAlign: "center", fontWeight: 700 }}>
+      Loading...
+    </div>
+  );
+}
 
 export default function App() {
   const { user, token } = useContext(AuthContext);
@@ -32,104 +41,106 @@ export default function App() {
 
   return (
     <BrowserRouter>
-      <Routes>
+      <Suspense fallback={<PageLoader />}>
+        <Routes>
 
-        {/* Redirect based on saved login */}
-        <Route path="/" element={<Navigate to={user && token ? "/home" : "/login"} replace />} />
+          {/* Redirect based on saved login */}
+          <Route path="/" element={<Navigate to={user && token ? "/home" : "/login"} replace />} />
 
-        {/* Public Routes */}
-        <Route path="/login" element={<Login />} />
-        <Route path="/register" element={<Register />} />
-        <Route path="/forgot-password" element={<ForgotPassword />} />
-        <Route path="/reset-password/:token" element={<ResetPassword />} />
+          {/* Public Routes */}
+          <Route path="/login" element={<Login />} />
+          <Route path="/register" element={<Register />} />
+          <Route path="/forgot-password" element={<ForgotPassword />} />
+          <Route path="/reset-password/:token" element={<ResetPassword />} />
 
-        {/* Protected Routes */}
-        <Route
-          path="/home"
-          element={
-            <ProtectedRoute>
-              <Home />
-            </ProtectedRoute>
-          }
-        />
+          {/* Protected Routes */}
+          <Route
+            path="/home"
+            element={
+              <ProtectedRoute>
+                <Home />
+              </ProtectedRoute>
+            }
+          />
 
-        <Route
-          path="/profile"
-          element={
-            <ProtectedRoute>
-              <Profile />
-            </ProtectedRoute>
-          }
-        />
+          <Route
+            path="/profile"
+            element={
+              <ProtectedRoute>
+                <Profile />
+              </ProtectedRoute>
+            }
+          />
 
-        {/* AI Search + Saved Recipes */}
-        <Route
-          path="/search"
-          element={
-            <ProtectedRoute>
-              <SearchResults />
-            </ProtectedRoute>
-          }
-        />
+          {/* AI Search + Saved Recipes */}
+          <Route
+            path="/search"
+            element={
+              <ProtectedRoute>
+                <SearchResults />
+              </ProtectedRoute>
+            }
+          />
 
-        <Route
-          path="/saved"
-          element={
-            <ProtectedRoute>
-              <SavedRecipes />
-            </ProtectedRoute>
-          }
-        />
+          <Route
+            path="/saved"
+            element={
+              <ProtectedRoute>
+                <SavedRecipes />
+              </ProtectedRoute>
+            }
+          />
 
-        {/* Meal Planning & Grocery */}
-        <Route
-          path="/meal-planner"
-          element={
-            <ProtectedRoute>
-              <MealPlanner />
-            </ProtectedRoute>
-          }
-        />
+          {/* Meal Planning & Grocery */}
+          <Route
+            path="/meal-planner"
+            element={
+              <ProtectedRoute>
+                <MealPlanner />
+              </ProtectedRoute>
+            }
+          />
 
-        <Route
-          path="/grocery-list"
-          element={
-            <ProtectedRoute>
-              <GroceryList />
-            </ProtectedRoute>
-          }
-        />
+          <Route
+            path="/grocery-list"
+            element={
+              <ProtectedRoute>
+                <GroceryList />
+              </ProtectedRoute>
+            }
+          />
 
-        <Route
-          path="/meal-settings"
-          element={
-            <ProtectedRoute>
-              <MealSettings />
-            </ProtectedRoute>
-          }
-        />
+          <Route
+            path="/meal-settings"
+            element={
+              <ProtectedRoute>
+                <MealSettings />
+              </ProtectedRoute>
+            }
+          />
 
-        <Route
-          path="/detect"
-          element={
-            <ProtectedRoute>
-              <DetectIngredients />
-            </ProtectedRoute>
-          }
-        />
+          <Route
+            path="/detect"
+            element={
+              <ProtectedRoute>
+                <DetectIngredients />
+              </ProtectedRoute>
+            }
+          />
 
-        {/*
-        <Route
-          path="/admin"
-          element={
-            <ProtectedRoute>
-              <AdminDashboard />
-            </ProtectedRoute>
-          }
-        />
-        */}
+          {/*
+          <Route
+            path="/admin"
+            element={
+              <ProtectedRoute>
+                <AdminDashboard />
+              </ProtectedRoute>
+            }
+          />
+          */}
 
-      </Routes>
+        </Routes>
+      </Suspense>
     </BrowserRouter>
   );
 }

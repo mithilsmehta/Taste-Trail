@@ -187,7 +187,6 @@ router.post("/create", authMiddleware, async (req, res) => {
 // GET ALL MEAL PLANS FOR USER
 router.get("/my", authMiddleware, async (req, res) => {
   try {
-    const mealPlans = await MealPlan.find({ userId: req.user.id }).sort({ planDate: 1, dayIndex: 1, mealType: 1 });
     const startDate = typeof req.query.startDate === "string" ? req.query.startDate : "";
 
     if (startDate && !isValidPlanDate(startDate)) {
@@ -195,6 +194,13 @@ router.get("/my", authMiddleware, async (req, res) => {
     }
 
     const weekDateKeys = getUpcomingDateKeys(startDate);
+    const query = {
+      userId: req.user.id,
+      ...(startDate
+        ? { planDate: { $in: weekDateKeys } }
+        : {})
+    };
+    const mealPlans = await MealPlan.find(query).sort({ planDate: 1, dayIndex: 1, mealType: 1 }).lean();
 
     // Organize by meal type
     const organized = {
@@ -237,7 +243,7 @@ router.get("/all", authMiddleware, async (req, res) => {
       }
     };
 
-    const mealPlans = await MealPlan.find(query).sort({ planDate: 1, dayIndex: 1, mealType: 1 });
+    const mealPlans = await MealPlan.find(query).sort({ planDate: 1, dayIndex: 1, mealType: 1 }).lean();
     res.json(mealPlans);
   } catch (err) {
     console.error(err);

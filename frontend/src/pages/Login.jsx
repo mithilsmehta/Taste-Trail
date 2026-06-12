@@ -1,5 +1,6 @@
 import { apiUrl } from "../utils/api";
 import { useState, useContext } from "react";
+import { useNavigate } from "react-router-dom";
 import axios from "axios";
 import toast from "react-hot-toast";
 import { AuthContext } from "../context/AuthContext";
@@ -8,13 +9,17 @@ import "../styles/auth.css";
 
 export default function Login() {
   const { login } = useContext(AuthContext);
+  const navigate = useNavigate();
   const [identifier, setIdentifier] = useState("");
   const [password, setPassword] = useState("");
+  const [loggingIn, setLoggingIn] = useState(false);
 
   const handleLogin = async (e) => {
     e.preventDefault();
+    if (loggingIn) return;
 
     try {
+      setLoggingIn(true);
       const res = await axios.post(apiUrl("/api/auth/login"), {
         identifier,
         password,
@@ -23,9 +28,11 @@ export default function Login() {
       login(res.data.user, res.data.token);
 
       toast.success("Login successful!");
-      window.location.href = "/home";
+      navigate("/home", { replace: true });
     } catch (err) {
       toast.error(err.response?.data?.msg || "Login failed");
+    } finally {
+      setLoggingIn(false);
     }
   };
 
@@ -57,7 +64,9 @@ export default function Login() {
           />
         </div>
 
-        <button className="btn-gradient">Login</button>
+        <button className="btn-gradient" disabled={loggingIn}>
+          {loggingIn ? "Logging in..." : "Login"}
+        </button>
 
         <div className="text-center mt-3">
           <a href="/forgot-password" className="auth-link">Forgot Password?</a>

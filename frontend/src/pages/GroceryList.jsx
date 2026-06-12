@@ -159,10 +159,6 @@ export default function GroceryList() {
   const loadGroceryList = async () => {
     try {
       const token = localStorage.getItem("token");
-      await fetch(`${API_BASE_URL}/api/grocery/list`, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-
       const res = await fetch(`${API_BASE_URL}/api/meal-plans/all`, {
         headers: { Authorization: `Bearer ${token}` }
       });

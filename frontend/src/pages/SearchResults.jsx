@@ -151,10 +151,6 @@ export default function SearchResults() {
     return String(value || "").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
   };
 
-  const normalizeBaseRecipeTitle = (value) => {
-    return normalizeTitle(String(value || "").replace(/\([^)]*\)/g, " "));
-  };
-
   const getDietMode = () => {
     return localStorage.getItem("tastewiseDietMode") === "jain" ? "jain" : "veg";
   };
@@ -311,15 +307,14 @@ export default function SearchResults() {
     const token = localStorage.getItem("token");
     if (!token) return null;
 
-    const res = await fetch(apiUrl("/api/recipes/my-recipes"), {
+    const res = await fetch(apiUrl(`/api/recipes/find?title=${encodeURIComponent(query)}`), {
       headers: { Authorization: `Bearer ${token}` }
     });
 
+    if (res.status === 404) return null;
     if (!res.ok) return null;
 
-    const recipes = await res.json();
-    const queryTitle = normalizeBaseRecipeTitle(query);
-    const savedRecipe = recipes.find((item) => normalizeBaseRecipeTitle(item.title) === queryTitle);
+    const savedRecipe = await res.json();
 
     if (!savedRecipe) return null;
     if (regionalStyle && normalizeTitle(savedRecipe.regionalStyle) !== normalizeTitle(regionalStyle)) return null;

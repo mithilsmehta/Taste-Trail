@@ -19,4 +19,7 @@ const savedRecipeSchema = new mongoose.Schema({
   updatedAt: { type: Date, default: Date.now }
 });
 
+savedRecipeSchema.index({ userId: 1, title: 1, regionalStyle: 1 });
+savedRecipeSchema.index({ userId: 1, createdAt: -1 });
+
 module.exports = mongoose.model("SavedRecipe", savedRecipeSchema);

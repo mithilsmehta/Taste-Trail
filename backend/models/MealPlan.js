@@ -66,5 +66,6 @@ mealPlanSchema.pre("save", function(next) {
 // Compound index for efficient weekly meal queries
 mealPlanSchema.index({ userId: 1, mealType: 1, dayIndex: 1 });
 mealPlanSchema.index({ userId: 1, mealType: 1, planDate: 1 });
+mealPlanSchema.index({ userId: 1, planDate: 1, mealType: 1 });
 
 module.exports = mongoose.model("MealPlan", mealPlanSchema);

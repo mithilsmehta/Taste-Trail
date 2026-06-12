@@ -56,6 +56,37 @@ const normalizeDietMode = (value) => {
   return String(value || "").toLowerCase() === "jain" ? "jain" : "veg";
 };
 
+const recipeMemoryCache = new Map();
+const recipeMemoryCacheTtlMs = Number(process.env.RECIPE_MEMORY_CACHE_TTL_MS) || 15 * 60 * 1000;
+
+const getRecipeMemoryCacheKey = ({ query, regionalStyle, dietMode, servings }) => {
+  return [
+    normalizeRecipeQuery(query),
+    normalizeRegionalStyle(regionalStyle).toLowerCase(),
+    dietMode,
+    servings
+  ].join("|");
+};
+
+const getRecipeFromMemoryCache = (cacheKey) => {
+  const cached = recipeMemoryCache.get(cacheKey);
+  if (!cached) return null;
+
+  if (cached.expiresAt <= Date.now()) {
+    recipeMemoryCache.delete(cacheKey);
+    return null;
+  }
+
+  return cached.recipe;
+};
+
+const saveRecipeToMemoryCache = (cacheKey, recipe) => {
+  recipeMemoryCache.set(cacheKey, {
+    recipe,
+    expiresAt: Date.now() + recipeMemoryCacheTtlMs
+  });
+};
+
 const getOpenRouterApiKey = () => {
   const key = process.env.OPENROUTER_API_KEY || "";
   return key && key !== "YOUR_OPENROUTER_API_KEY" ? key : "";
@@ -63,6 +94,16 @@ const getOpenRouterApiKey = () => {
 
 const getOpenRouterModel = () => {
   return process.env.OPENROUTER_MODEL || "meta-llama/llama-3.1-8b-instruct";
+};
+
+const getOpenRouterMaxTokens = () => {
+  const value = Number(process.env.OPENROUTER_MAX_TOKENS);
+  return Number.isFinite(value) && value > 0 ? value : 1300;
+};
+
+const getOpenRouterTimeoutMs = () => {
+  const value = Number(process.env.OPENROUTER_TIMEOUT_MS);
+  return Number.isFinite(value) && value > 0 ? value : 45000;
 };
 
 const getClientErrorMessage = (err) => {
@@ -81,6 +122,10 @@ const getClientErrorMessage = (err) => {
     return "The selected OpenRouter model is not available. Set OPENROUTER_MODEL to a valid OpenRouter chat model and restart the backend.";
   }
 
+  if (statusCode === 504 || /timed out/i.test(message)) {
+    return "Recipe generation took too long. Please try again, or use a faster OPENROUTER_MODEL on the backend.";
+  }
+
   return "Failed to generate recipe. Please try again.";
 };
 
@@ -92,30 +137,46 @@ const generateRecipeText = async (prompt) => {
     throw error;
   }
 
-  const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${apiKey}`,
-      "Content-Type": "application/json",
-      "HTTP-Referer": process.env.OPENROUTER_SITE_URL || process.env.FRONTEND_URL || "http://localhost:5173",
-      "X-Title": process.env.OPENROUTER_APP_NAME || "Tastewise"
-    },
-    body: JSON.stringify({
-      model: getOpenRouterModel(),
-      messages: [
-        {
-          role: "system",
-          content: "You are an expert vegetarian recipe chef and recipe-data API. Prioritize authentic, commonly accepted recipes for the requested dish. Return only valid JSON with no markdown."
-        },
-        {
-          role: "user",
-          content: prompt
-        }
-      ],
-      temperature: 0.3,
-      max_tokens: 1600
-    })
-  });
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), getOpenRouterTimeoutMs());
+
+  let response;
+  try {
+    response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+      method: "POST",
+      signal: controller.signal,
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        "Content-Type": "application/json",
+        "HTTP-Referer": process.env.OPENROUTER_SITE_URL || process.env.FRONTEND_URL || "http://localhost:5173",
+        "X-Title": process.env.OPENROUTER_APP_NAME || "Tastewise"
+      },
+      body: JSON.stringify({
+        model: getOpenRouterModel(),
+        messages: [
+          {
+            role: "system",
+            content: "You are an expert vegetarian recipe chef and recipe-data API. Prioritize authentic, commonly accepted recipes for the requested dish. Return only valid JSON with no markdown."
+          },
+          {
+            role: "user",
+            content: prompt
+          }
+        ],
+        temperature: 0.2,
+        max_tokens: getOpenRouterMaxTokens()
+      })
+    });
+  } catch (err) {
+    if (err.name === "AbortError") {
+      const error = new Error("OpenRouter request timed out. Try again or choose a faster OPENROUTER_MODEL.");
+      error.statusCode = 504;
+      throw error;
+    }
+    throw err;
+  } finally {
+    clearTimeout(timeout);
+  }
 
   const responseText = await response.text();
   if (!response.ok) {
@@ -318,8 +379,14 @@ router.post("/generate", authMiddleware, async (req, res) => {
     }
 
     const dietMode = requestedDietMode === "jain" || /jain/i.test(query) ? "jain" : "veg";
+    const memoryCacheKey = getRecipeMemoryCacheKey({ query, regionalStyle, dietMode, servings });
 
     if (!forceRegenerate) {
+      const cachedRecipe = getRecipeFromMemoryCache(memoryCacheKey);
+      if (cachedRecipe && !getRecipeAccuracyIssue(query, cachedRecipe)) {
+        return res.json({ recipe: enhanceRecipe({ ...cachedRecipe, source: "serverCache" }) });
+      }
+
       const sharedRecipe = await getSharedRegionalRecipe({ query, regionalStyle, dietMode, servings });
       if (sharedRecipe) {
         const sharedResponseRecipe = {
@@ -336,7 +403,9 @@ router.post("/generate", authMiddleware, async (req, res) => {
         };
         const sharedAccuracyIssue = getRecipeAccuracyIssue(query, sharedResponseRecipe);
         if (!sharedAccuracyIssue) {
-          return res.json({ recipe: enhanceRecipe(sharedResponseRecipe) });
+          const enhancedSharedRecipe = enhanceRecipe(sharedResponseRecipe);
+          saveRecipeToMemoryCache(memoryCacheKey, enhancedSharedRecipe);
+          return res.json({ recipe: enhancedSharedRecipe });
         }
 
         console.warn("Skipped shared recipe because of accuracy issue:", sharedAccuracyIssue);
@@ -472,6 +541,8 @@ Rewrite from scratch. Keep the requested dish authentic, remove every restricted
       console.error("Failed to save generated recipe to shared pool:", poolErr);
     }
 
+    saveRecipeToMemoryCache(memoryCacheKey, responseRecipe);
+
     res.json({
       recipe: responseRecipe
     });
@@ -535,6 +606,32 @@ router.post("/save", authMiddleware, async (req, res) => {
     res.json({ msg: "Recipe saved!", recipe: saved });
   } catch (err) {
     res.status(500).json({ msg: "Failed to save recipe" });
+  }
+});
+
+// FIND ONE SAVED RECIPE BY TITLE
+router.get("/find", authMiddleware, async (req, res) => {
+  try {
+    const title = String(req.query.title || "").trim();
+    if (!title) {
+      return res.status(400).json({ msg: "Recipe title is required" });
+    }
+
+    const regionalStyle = await getUserRegionalStyle(req.user.id);
+    const storedTitle = getStoredRecipeName(title);
+    const recipe = await SavedRecipe.findOne({
+      userId: req.user.id,
+      title: storedTitle,
+      regionalStyle
+    }).lean();
+
+    if (!recipe) {
+      return res.status(404).json({ msg: "Recipe not found" });
+    }
+
+    res.json(enhanceRecipe(recipe));
+  } catch (err) {
+    res.status(500).json({ msg: "Failed to fetch recipe" });
   }
 });
 
