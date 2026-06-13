@@ -254,6 +254,43 @@ const getRecipeAccuracyIssue = (query, recipe = {}) => {
   return "";
 };
 
+const getJainFallbackRecipe = (query, servings) => {
+  const normalizedQuery = String(query || "").toLowerCase();
+  const isMixedVegetableDish = /\b(mix|mixed)\s+veg\b/.test(normalizedQuery)
+    || /\bmixed\s+vegetable/.test(normalizedQuery)
+    || /\bveg(etables?)?\s+(sabji|sabzi|subji|curry)\b/.test(normalizedQuery);
+
+  if (!isMixedVegetableDish) return null;
+
+  return {
+    name: getStoredRecipeName(query),
+    ingredients: [
+      "1 cup cauliflower florets",
+      "1 cup chopped capsicum",
+      "1 cup chopped cabbage",
+      "1/2 cup green peas",
+      "2 medium tomatoes, finely chopped",
+      "2 tablespoons ghee or oil",
+      "1 teaspoon cumin seeds",
+      "1 teaspoon coriander powder",
+      "1/2 teaspoon turmeric powder",
+      "1 teaspoon Kashmiri red chilli powder",
+      "1 teaspoon garam masala",
+      "1/2 teaspoon salt",
+      "2 tablespoons chopped fresh coriander"
+    ],
+    steps: [
+      "Heat ghee or oil in a pan over medium heat and add cumin seeds.",
+      "Add chopped tomatoes and cook until soft and pulpy.",
+      "Add cauliflower, capsicum, cabbage, and green peas. Mix well.",
+      "Add coriander powder, turmeric powder, Kashmiri red chilli powder, garam masala, and salt.",
+      "Cover and cook for 8-10 minutes, stirring occasionally, until the vegetables are tender but not mushy.",
+      "Garnish with fresh coriander and serve hot with roti or paratha."
+    ],
+    servings
+  };
+};
+
 const normalizeRegionalStyle = (value) => {
   return String(value || "").trim().replace(/\s+/g, " ");
 };
@@ -268,8 +305,8 @@ const normalizeRecipeQuery = (value) => {
 };
 
 const getUserRegionalStyle = async (userId) => {
-  const user = await User.findById(userId).select("onboarding.ethnicity onboarding.currentBase").lean();
-  return normalizeRegionalStyle(user?.onboarding?.ethnicity || user?.onboarding?.currentBase);
+  const user = await User.findById(userId).select("onboarding.ethnicity").lean();
+  return normalizeRegionalStyle(user?.onboarding?.ethnicity);
 };
 
 const getRegionalStyleRules = (regionalStyle) => {
@@ -420,6 +457,7 @@ STRICT JAIN MODE ACTIVE:
 - NEVER use meat, seafood, fish, chicken, eggs, gelatin, animal stock, lard, bacon, ham, or any non-vegetarian ingredient.
 - For searches like "diet recipe", "healthy recipe", or any generic recipe request, still make the recipe strictly Jain by default.
 - If the requested dish normally uses restricted ingredients, create a Jain-friendly version and name it clearly.
+- For "mix veg", "mixed veg", "mixed vegetable sabji", or similar generic vegetable recipes in Jain mode, use only non-root Jain-safe vegetables such as cauliflower, capsicum, cabbage, green peas, French beans, tomatoes, bottle gourd, ridge gourd, or paneer. Do not use onion, garlic, ginger, potato, carrot, beetroot, radish, or any root vegetable.
 - Keep the recipe faithful to the requested dish. Do not add unrelated substitutes like raw banana, cabbage, cauliflower, or hing unless they are normal for that exact dish.
 - For paneer dishes, paneer must remain the main ingredient. Do not replace paneer with raw banana or unrelated vegetables.
 - Hing/asafoetida is not a default Jain replacement for onion or garlic. Use it only in dishes where it is traditionally normal, such as some dals or kadhis.
@@ -476,7 +514,8 @@ Format:
         ? ""
         : `
 The previous recipe was rejected because it contained "${blockedReason}".
-Rewrite from scratch. Keep the requested dish authentic, remove every restricted or inaccurate item from ingredients and steps, and do not replace the main ingredient with unrelated substitutes.`;
+Rewrite from scratch. Keep the requested dish authentic, remove every restricted or inaccurate item from ingredients and steps, and do not replace the main ingredient with unrelated substitutes.
+If this is a mixed vegetable dish in Jain mode, use cauliflower, capsicum, cabbage, green peas, French beans, tomatoes, bottle gourd, ridge gourd, or paneer only.`;
       const result = await generateRecipeText(buildPrompt(retryNote));
       const candidate = extractJson(result);
       const recipeText = getRecipeSafetyText(candidate);
@@ -502,6 +541,28 @@ Rewrite from scratch. Keep the requested dish authentic, remove every restricted
     }
 
     if (!recipe) {
+      const fallbackRecipe = dietMode === "jain" ? getJainFallbackRecipe(query, servings) : null;
+      if (fallbackRecipe) {
+        const enhancedFallbackRecipe = enhanceRecipe({
+          ...fallbackRecipe,
+          title: fallbackRecipe.name
+        });
+        const responseRecipe = {
+          ...fallbackRecipe,
+          healthScore: enhancedFallbackRecipe.healthScore,
+          healthLabel: enhancedFallbackRecipe.healthLabel,
+          dietMode,
+          regionalStyle,
+          source: "jainFallback"
+        };
+
+        saveRecipeToMemoryCache(memoryCacheKey, responseRecipe);
+
+        return res.json({
+          recipe: responseRecipe
+        });
+      }
+
       return res.status(422).json({
         msg: dietMode === "jain"
           ? "Could not generate a Jain-safe recipe. Please try again; Jain mode blocks onion, garlic, ginger, potato, carrot, and root vegetables."

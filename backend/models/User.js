@@ -22,7 +22,6 @@ const userSchema = new mongoose.Schema({
     displayName: { type: String, default: "" },
     gender: { type: String, default: "" },
     ethnicity: { type: String, default: "" },
-    currentBase: { type: String, default: "" },
     dietaryPreference: { type: String, default: "" },
     usualServings: { type: Number, default: 2 },
     healthyGoal: { type: Number, default: 50 },

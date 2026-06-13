@@ -85,8 +85,8 @@ const normalizeRegionalStyle = (value) => {
 };
 
 const getUserRegionalStyle = async (userId) => {
-  const user = await User.findById(userId).select("onboarding.ethnicity onboarding.currentBase").lean();
-  return normalizeRegionalStyle(user?.onboarding?.ethnicity || user?.onboarding?.currentBase);
+  const user = await User.findById(userId).select("onboarding.ethnicity").lean();
+  return normalizeRegionalStyle(user?.onboarding?.ethnicity);
 };
 
 const getRegionalStyleRules = (regionalStyle) => {
@@ -126,7 +126,7 @@ const getCleanDishName = (query, generatedName = "") => {
 
 const getDisplayRecipeName = (query, regionalStyle, generatedName = "") => {
   const dishName = getCleanDishName(query, generatedName);
-  return regionalStyle ? `${dishName} (${regionalStyle})` : dishName;
+  return dishName;
 };
 
 const getApiKey = () => {

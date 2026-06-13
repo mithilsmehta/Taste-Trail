@@ -61,7 +61,6 @@ export default function Profile() {
   const [onboarding, setOnboarding] = useState({
     gender: userOnboarding.gender || "",
     ethnicity: userOnboarding.ethnicity || "",
-    currentBase: userOnboarding.currentBase || "",
     dietaryPreference: userOnboarding.dietaryPreference || user?.preferences?.diet || "",
     usualServings: userOnboarding.usualServings || 2,
     healthyGoal: userOnboarding.healthyGoal ?? 50,
@@ -79,7 +78,6 @@ export default function Profile() {
     setOnboarding({
       gender: profileUser?.onboarding?.gender || "",
       ethnicity: profileUser?.onboarding?.ethnicity || "",
-      currentBase: profileUser?.onboarding?.currentBase || "",
       dietaryPreference: profileUser?.onboarding?.dietaryPreference || profileUser?.preferences?.diet || "",
       usualServings: profileUser?.onboarding?.usualServings || 2,
       healthyGoal: profileUser?.onboarding?.healthyGoal ?? 50,
@@ -296,36 +294,19 @@ const handleProfileUpdate = async (e) => {
                 </select>
               </div>
 
-              <div className="row">
-                <div className="col-12 col-sm-6 mb-3">
-                  <label className="form-label fw-semibold">Ethnicity</label>
-                  <select
-                    className="form-select p-2"
-                    value={onboarding.ethnicity}
-                    onChange={(e) => updateOnboarding("ethnicity", e.target.value)}
-                    disabled={!isEditingInfo}
-                  >
-                    <option value="">Select state</option>
-                    {indianStates.map((state) => (
-                      <option key={state} value={state}>{state}</option>
-                    ))}
-                  </select>
-                </div>
-
-                <div className="col-12 col-sm-6 mb-3">
-                  <label className="form-label fw-semibold">Current Base</label>
-                  <select
-                    className="form-select p-2"
-                    value={onboarding.currentBase}
-                    onChange={(e) => updateOnboarding("currentBase", e.target.value)}
-                    disabled={!isEditingInfo}
-                  >
-                    <option value="">Select state</option>
-                    {indianStates.map((state) => (
-                      <option key={state} value={state}>{state}</option>
-                    ))}
-                  </select>
-                </div>
+              <div className="mb-3">
+                <label className="form-label fw-semibold">Ethnicity</label>
+                <select
+                  className="form-select p-2"
+                  value={onboarding.ethnicity}
+                  onChange={(e) => updateOnboarding("ethnicity", e.target.value)}
+                  disabled={!isEditingInfo}
+                >
+                  <option value="">Select state</option>
+                  {indianStates.map((state) => (
+                    <option key={state} value={state}>{state}</option>
+                  ))}
+                </select>
               </div>
 
               <div className="profile-health-box mb-3">

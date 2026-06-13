@@ -48,7 +48,6 @@ const initialForm = {
   confirmPass: "",
   gender: "",
   ethnicity: "",
-  currentBase: "",
   dietaryPreference: "",
   usualServings: 2,
   healthyGoal: 50,
@@ -111,7 +110,7 @@ export default function Register() {
   };
 
   const validateKnowYouStep = () => {
-    if (!form.gender || !form.ethnicity || !form.currentBase || !form.dietaryPreference || !form.usualServings) {
+    if (!form.gender || !form.ethnicity || !form.dietaryPreference || !form.usualServings) {
       toast.error("Please complete all personal details");
       return false;
     }
@@ -151,7 +150,6 @@ export default function Register() {
         onboarding: {
           gender: form.gender,
           ethnicity: form.ethnicity,
-          currentBase: form.currentBase,
           dietaryPreference: form.dietaryPreference,
           usualServings: Number(form.usualServings) || 2,
           healthyGoal: Number(form.healthyGoal),
@@ -276,21 +274,6 @@ export default function Register() {
                 className="form-select auth-input"
                 value={form.ethnicity}
                 onChange={(e) => updateField("ethnicity", e.target.value)}
-                required
-              >
-                <option value="">Select state</option>
-                {indianStates.map((state) => (
-                  <option key={state} value={state}>{state}</option>
-                ))}
-              </select>
-            </div>
-
-            <div className="mb-3">
-              <label className="form-label fw-semibold">Your current base?</label>
-              <select
-                className="form-select auth-input"
-                value={form.currentBase}
-                onChange={(e) => updateField("currentBase", e.target.value)}
                 required
               >
                 <option value="">Select state</option>
