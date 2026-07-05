@@ -1,375 +1,490 @@
-import { useContext, useState } from "react";
+import { useContext, useEffect, useMemo, useState } from "react";
 import { AuthContext } from "../context/AuthContext";
 import { Link, useNavigate } from "react-router-dom";
+import { apiUrl } from "../utils/api";
+import { getMondayDateKey, getWeekFromDateKey, toDateKey } from "../utils/weekPlan";
 import "./Home.css";
-import img1 from "../assets/img1.jpg";
-import img2 from "../assets/img2.jpg";
-import img3 from "../assets/img3.jpg";
-import img4 from "../assets/img4.jpg";
-import img5 from "../assets/img5.jpg";
-import img6 from "../assets/img6.jpg";
 import Navbar from "../components/Navbar";
+import fridgeIdeaOne from "../assets/img1.jpg";
+import fridgeIdeaTwo from "../assets/img2.jpg";
+import fridgeIdeaThree from "../assets/img3.jpg";
+import fridgeIdeaFour from "../assets/img4.jpg";
 
-const categories = [
-  {
-    name: "Indian",
-    icon: "🍛",
-    dishes: [
-      "Paneer Tikka",
-      "Masala Dosa",
-      "Veg Biryani",
-      "Chole Bhature",
-      "Pav Bhaji",
-      "Rajma Chawal",
-      "Palak Paneer",
-      "Aloo Paratha",
-      "Dhokla",
-      "Dal Tadka",
-      "Idli Sambar",
-      "Veg Pulao",
-    ],
-  },
-  {
-    name: "Italian",
-    icon: "🍝",
-    dishes: [
-      "Margherita Pizza",
-      "Pasta Alfredo",
-      "Arrabbiata Pasta",
-      "Pesto Pasta",
-      "Veg Lasagna",
-      "Mushroom Risotto",
-      "Bruschetta",
-      "Minestrone Soup",
-      "Caprese Salad",
-      "Garlic Bread",
-      "Focaccia",
-      "Four Cheese Pizza",
-    ],
-  },
-  {
-    name: "Chinese",
-    icon: "🥡",
-    dishes: [
-      "Veg Manchurian",
-      "Veg Hakka Noodles",
-      "Chilli Paneer",
-      "Veg Fried Rice",
-      "Spring Rolls",
-      "Schezwan Noodles",
-      "Hot and Sour Soup",
-      "Honey Chilli Potato",
-      "Veg Momos",
-      "Crispy Corn",
-      "Kung Pao Tofu",
-      "Chilli Garlic Noodles",
-    ],
-  },
-  {
-    name: "Desserts",
-    icon: "🍰",
-    dishes: [
-      "Gulab Jamun",
-      "Rasgulla",
-      "Kheer",
-      "Jalebi",
-      "Chocolate Brownie",
-      "Fruit Custard",
-      "Cheesecake",
-      "Tiramisu",
-      "Mango Mousse",
-      "Carrot Halwa",
-      "Ice Cream Sundae",
-      "Apple Pie",
-    ],
-  },
-  {
-    name: "Breakfast",
-    icon: "🥣",
-    dishes: [
-      "Poha",
-      "Upma",
-      "Masala Dosa",
-      "Idli Sambar",
-      "Aloo Paratha",
-      "Besan Chilla",
-      "Moong Dal Chilla",
-      "Oats Porridge",
-      "Vegetable Sandwich",
-      "Thepla",
-      "Avocado Toast",
-      "Smoothie Bowl",
-    ],
-  },
-  {
-    name: "Healthy",
-    icon: "🥗",
-    dishes: [
-      "Quinoa Salad",
-      "Sprouts Chaat",
-      "Vegetable Soup",
-      "Buddha Bowl",
-      "Millet Khichdi",
-      "Greek Salad",
-      "Paneer Salad",
-      "Lentil Soup",
-      "Grilled Vegetable Wrap",
-      "Hummus Bowl",
-      "Stuffed Bell Peppers",
-      "Fruit Smoothie",
-    ],
-  },
+const popularSearches = [
+  "Paneer Tikka",
+  "Masala Dosa",
+  "Veg Biryani",
+  "Margherita Pizza",
+  "Rajma Chawal",
+  "Veg Hakka Noodles",
+  "Chole Bhature",
+  "Palak Paneer"
 ];
 
-const jainRestrictedPattern = /\b(onions?|garlic|potatoes?|aloo|carrots?|radish|beetroot|beet|turnip|ginger|sweet potato|yam|tapioca|cassava|arbi|colocasia|spring onion|green onion|scallion|leek|shallot)\b/i;
+const fridgeIdeas = [
+  { title: "Fresh bowls", image: fridgeIdeaOne },
+  { title: "Spaghetti", image: fridgeIdeaTwo },
+  { title: "Pizza", image: fridgeIdeaThree },
+  { title: "Pasta", image: fridgeIdeaFour }
+];
+
+const quickCategories = [
+  { name: "Indian", icon: "🍛", query: "Indian dinner" },
+  { name: "Breakfast", icon: "🥣", query: "healthy breakfast" },
+  { name: "Italian", icon: "🍝", query: "Italian pasta" },
+  { name: "Dessert", icon: "🍰", query: "eggless dessert" }
+];
+
+const emptyNutrition = {
+  calories: 0,
+  protein: 0,
+  carbs: 0,
+  fat: 0,
+  fiber: 0
+};
+
+const nutritionMeta = [
+  { key: "carbs", label: "Carbs", unit: "g", color: "#f1b84b", softColor: "#fff2cf" },
+  { key: "fat", label: "Fat", unit: "g", color: "#dd6b78", softColor: "#ffe3e7" },
+  { key: "protein", label: "Protein", unit: "g", color: "#5f9467", softColor: "#e1f2e5" },
+  { key: "fiber", label: "Fiber", unit: "g", color: "#5aa8d6", softColor: "#e0f2fb" }
+];
+
+const getGreeting = () => {
+  const hour = new Date().getHours();
+  if (hour < 12) return "Good morning";
+  if (hour < 17) return "Good afternoon";
+  return "Good evening";
+};
 
 export default function Home() {
   const { user } = useContext(AuthContext);
   const navigate = useNavigate();
-  const [showSearchModal, setShowSearchModal] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
-  const [selectedCategory, setSelectedCategory] = useState(null);
-  const [dietMode, setDietMode] = useState(() => {
-    return localStorage.getItem("tastewiseDietMode") === "jain" ? "jain" : "veg";
+  const [dashboard, setDashboard] = useState({
+    mealsPlanned: 0,
+    groceryItems: [],
+    savedRecipes: [],
+    nutrition: emptyNutrition
   });
+  const [updatingGroceryId, setUpdatingGroceryId] = useState("");
+  const [activeFridgeIdea, setActiveFridgeIdea] = useState(0);
+  const [showMobileNutrition, setShowMobileNutrition] = useState(false);
 
-  const updateDietMode = (nextMode) => {
-    const normalizedMode = nextMode === "jain" ? "jain" : "veg";
-    setDietMode(normalizedMode);
-    localStorage.setItem("tastewiseDietMode", normalizedMode);
-  };
+  const token = localStorage.getItem("token");
+  const firstName = user?.onboarding?.displayName || user?.firstName || "chef";
+  const groceryItems = dashboard.groceryItems.slice(0, 4);
+  const checkedGroceryCount = dashboard.groceryItems.filter((item) => item.marked).length;
+  const groceryCount = dashboard.groceryItems.length;
+  const moreGroceryCount = Math.max(0, groceryCount - 4);
+  const savedRecipes = dashboard.savedRecipes.slice(0, 3);
+  const hasWeeklyNutrition = Object.values(dashboard.nutrition).some((value) => Number(value) > 0);
 
-  const getModeSafeDishes = (dishes = []) => {
-    if (dietMode !== "jain") return dishes;
-    return dishes.filter((dish) => !jainRestrictedPattern.test(dish));
+  const savedRecipeText = useMemo(() => {
+    if (!dashboard.savedRecipes.length) return "No recipes saved yet";
+    return `${dashboard.savedRecipes.length} saved favorite${dashboard.savedRecipes.length === 1 ? "" : "s"}`;
+  }, [dashboard.savedRecipes.length]);
+
+  useEffect(() => {
+    const sliderTimer = window.setInterval(() => {
+      setActiveFridgeIdea((current) => (current + 1) % fridgeIdeas.length);
+    }, 2500);
+
+    return () => window.clearInterval(sliderTimer);
+  }, []);
+
+  useEffect(() => {
+    if (!token) return;
+
+    const loadDashboard = async () => {
+      try {
+        const monday = getMondayDateKey(toDateKey(new Date()));
+        const weekKeys = getWeekFromDateKey(monday).map((day) => day.dateKey);
+        const [mealRes, groceryRes, savedRes] = await Promise.all([
+          fetch(apiUrl(`/api/meal-plans/all?fromDate=${monday}`), {
+            headers: { Authorization: `Bearer ${token}` }
+          }),
+          fetch(apiUrl(`/api/grocery/list?startDate=${monday}`), {
+            headers: { Authorization: `Bearer ${token}` }
+          }),
+          fetch(apiUrl("/api/recipes/my-recipes"), {
+            headers: { Authorization: `Bearer ${token}` }
+          })
+        ]);
+
+        const [mealData, groceryData, savedData] = await Promise.all([
+          mealRes.ok ? mealRes.json() : [],
+          groceryRes.ok ? groceryRes.json() : { items: [] },
+          savedRes.ok ? savedRes.json() : []
+        ]);
+
+        const weekMealPlans = Array.isArray(mealData)
+          ? mealData.filter((plan) => weekKeys.includes(plan?.planDate))
+          : [];
+        const nutrition = weekMealPlans.reduce((totals, plan) => {
+          const planNutrition = plan?.recipe?.nutrition || {};
+          return {
+            calories: totals.calories + (Number(planNutrition.calories) || 0),
+            protein: totals.protein + (Number(planNutrition.protein) || 0),
+            carbs: totals.carbs + (Number(planNutrition.carbs) || 0),
+            fat: totals.fat + (Number(planNutrition.fat) || 0),
+            fiber: totals.fiber + (Number(planNutrition.fiber) || 0)
+          };
+        }, emptyNutrition);
+
+        setDashboard({
+          mealsPlanned: weekMealPlans.length,
+          groceryItems: Array.isArray(groceryData.items) ? groceryData.items : [],
+          savedRecipes: Array.isArray(savedData) ? savedData : [],
+          nutrition: {
+            calories: Math.round(nutrition.calories),
+            protein: Math.round(nutrition.protein),
+            carbs: Math.round(nutrition.carbs),
+            fat: Math.round(nutrition.fat),
+            fiber: Math.round(nutrition.fiber)
+          }
+        });
+      } catch (err) {
+        console.error("Failed to load home dashboard", err);
+      }
+    };
+
+    loadDashboard();
+  }, [token]);
+
+  const getNutritionSegments = () => {
+    const macroTotal = nutritionMeta.reduce((total, item) => total + (Number(dashboard.nutrition[item.key]) || 0), 0);
+
+    return nutritionMeta.map((item) => {
+      const value = Number(dashboard.nutrition[item.key]) || 0;
+      const percentage = macroTotal > 0 ? Math.max(4, Math.round((value / macroTotal) * 100)) : 0;
+      return {
+        ...item,
+        value,
+        percentage
+      };
+    });
   };
 
   const openRecipe = (recipeName) => {
     navigate(`/search?q=${encodeURIComponent(recipeName)}`);
-    setSelectedCategory(null);
-    setShowSearchModal(false);
+  };
+
+  const submitSearch = (event) => {
+    event.preventDefault();
+    const query = searchQuery.trim();
+    if (query) openRecipe(query);
+  };
+
+  const toggleGroceryItem = async (event, item) => {
+    event.preventDefault();
+    event.stopPropagation();
+
+    if (!item?._id || updatingGroceryId) return;
+
+    const nextMarked = !item.marked;
+    setUpdatingGroceryId(item._id);
+    setDashboard((prev) => ({
+      ...prev,
+      groceryItems: prev.groceryItems.map((current) =>
+        current._id === item._id ? { ...current, marked: nextMarked } : current
+      )
+    }));
+
+    try {
+      const res = await fetch(apiUrl(`/api/grocery/mark/${item._id}`), {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify({ marked: nextMarked })
+      });
+
+      if (!res.ok) {
+        throw new Error("Failed to update grocery item");
+      }
+    } catch (err) {
+      console.error(err);
+      setDashboard((prev) => ({
+        ...prev,
+        groceryItems: prev.groceryItems.map((current) =>
+          current._id === item._id ? { ...current, marked: !nextMarked } : current
+        )
+      }));
+    } finally {
+      setUpdatingGroceryId("");
+    }
   };
 
   return (
-    <>
-    <Navbar />
-    <div className="container mt-4">
+    <div className="home-shell">
+      <Navbar />
 
-      {/* ---------------- HERO SECTION ---------------- */}
-      <div className="row align-items-center hero-section">
-        {/* LEFT SIDE */}
-        <div className="col-md-6 text-section">
-          <div className="welcome-mode-row">
-            <h1 className="fw-bold title mb-0">Welcome, {user?.firstName} </h1>
-            <div className="diet-mode-toggle" aria-label="Diet mode selector">
-              <span className="diet-mode-label">{dietMode === "jain" ? "Jain" : "Veg"}</span>
-              <label className="diet-switch">
-                <input
-                  type="checkbox"
-                  checked={dietMode === "veg"}
-                  onChange={(event) => updateDietMode(event.target.checked ? "veg" : "jain")}
-                />
-                <span className="diet-slider"></span>
-              </label>
+      <main className="home-page">
+        <section className="home-hero-grid">
+          <div className="home-primary">
+            <div className="home-greeting-row">
+              <div>
+                <p className="home-kicker">{getGreeting()}</p>
+                <h1 className="home-title">
+                  What shall we <em>cook</em><br />
+                  today, {firstName}?
+                </h1>
+              </div>
             </div>
-          </div>
-          <p className="subtitle">
-            Discover delicious recipes, detect ingredients from photos, and instantly generate meals with AI.
-          </p>
 
-          <div className="mt-4 d-flex flex-column gap-3">
-            <Link to="/detect" className="btn btn-warning p-3 fw-semibold shadow-sm">
-              Upload Image to Detect Ingredients
-            </Link>
-
-           <button 
-              onClick={() => setShowSearchModal(true)}
-              className="btn btn-dark p-3 fw-semibold shadow-sm"
-            >
-              🔍 Search Recipes with AI
-            </button>
-          </div>
-        </div>
-
-        {/* RIGHT SIDE — AUTO SLIDING IMAGES */}
-        <div className="col-md-6">
-          <div id="foodCarousel" className="carousel slide hero-carousel" data-bs-ride="carousel">
-  <div className="carousel-inner rounded shadow">
-    <div className="carousel-item active">
-      <img src={img1} className="d-block w-100 hero-img" />
-    </div>
-    <div className="carousel-item">
-      <img src={img2} className="d-block w-100 hero-img" />
-    </div>
-    <div className="carousel-item">
-      <img src={img3} className="d-block w-100 hero-img" />
-    </div>
-    <div className="carousel-item">
-      <img src={img4} className="d-block w-100 hero-img" />
-    </div>
-    <div className="carousel-item">
-      <img src={img5} className="d-block w-100 hero-img" />
-    </div>
-    <div className="carousel-item">
-      <img src={img6} className="d-block w-100 hero-img" />
-    </div>
-  </div>
-</div>
-        </div>
-      </div>
-
-      {/* ---------------- CATEGORIES ---------------- */}
-      <h3 className="fw-bold mt-5">Categories</h3>
-      <div className="row mt-3 g-4">
-        {categories.map((cat) => (
-          <div className="col-6 col-md-4 col-lg-2" key={cat.name}>
-            <div 
-              className="category-card shadow-sm text-center"
-              onClick={() => {
-                setSelectedCategory(cat);
-              }}
-              style={{ cursor: "pointer" }}
-            >
-              <div className="emoji">{cat.icon}</div>
-              <p className="fw-semibold">{cat.name}</p>
-            </div>
-          </div>
-        ))}
-      </div>
-
-      {/* ---------------- TRENDING RECIPES ---------------- */}
-      {/* <h3 className="fw-bold mt-5">Trending Recipes</h3>
-      <div className="row mt-3 g-4">
-        {[
-          "Butter Pav Bhaji",
-          "Paneer Tikka",
-          "Masala Dosa",
-          "Veg Biryani",
-          "Pasta Alfredo",
-          "Veg Pizza",
-        ].map((recipe) => (
-          <div className="col-md-4" key={recipe}>
-            <div className="recipe-card shadow p-3 rounded">
-              <h5 className="fw-bold">{recipe}</h5>
-              <p className="text-muted">
-                Explore this delicious recipe in one click.
-              </p>
-              <button 
-                className="btn btn-warning w-100"
-                onClick={() => openRecipe(recipe)}
-              >
-                View Recipe
-              </button>
-            </div>
-          </div>
-        ))}
-      </div> */}
-
-      {/* ---------------- UPLOAD SECTION ---------------- */}
-      <div className="upload-box mt-5 p-5 text-center shadow rounded">
-        <h3 className="fw-bold mb-3">Upload an Image</h3>
-        <p className="text-muted">Detect ingredients instantly and get recipe suggestions.</p>
-        <Link to="/detect" className="btn btn-dark p-3 fw-semibold mt-2">
-          Upload Now
-        </Link>
-      </div>
-
-      {/* ---------------- SEARCH MODAL ---------------- */}
-      {showSearchModal && (
-        <div className="search-modal-overlay" onClick={() => setShowSearchModal(false)}>
-          <div className="search-modal-content" onClick={(e) => e.stopPropagation()}>
-            <div className="search-modal-header">
-              <h3 className="fw-bold mb-0">🔍 Search Recipes</h3>
-              <button 
-                className="btn-close" 
-                onClick={() => setShowSearchModal(false)}
-              ></button>
-            </div>
-            
-            <div className="search-modal-body">
+            <form className="home-search-card" onSubmit={submitSearch}>
+              <span className="home-search-icon">⌕</span>
               <input
-                type="text"
-                className="form-control search-input"
-                placeholder="Search any recipe (e.g., Paneer Tikka, Pasta, Dosa)..."
                 value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" && searchQuery.trim()) {
-                    navigate(`/search?q=${encodeURIComponent(searchQuery.trim())}`);
-                    setShowSearchModal(false);
-                  }
-                }}
-                autoFocus
+                onChange={(event) => setSearchQuery(event.target.value)}
+                placeholder="Search 12,000+ recipes..."
+                aria-label="Search recipes"
               />
-              
-              <div className="search-suggestions mt-4">
-                <p className="text-muted mb-2">Popular Searches:</p>
-                <div className="d-flex flex-wrap gap-2">
-                  {getModeSafeDishes(["Paneer Tikka", "Masala Dosa", "Veg Biryani", "Margherita Pizza", "Rajma Chawal", "Veg Hakka Noodles"]).map((suggestion) => (
-                    <button
-                      key={suggestion}
-                      className="btn btn-outline-secondary btn-sm"
-                      onClick={() => openRecipe(suggestion)}
+              <button type="submit" aria-label="Search">
+                <span></span>
+              </button>
+            </form>
+
+            <div className="home-chip-row" aria-label="Popular searches">
+              {popularSearches.map((item) => (
+                <button type="button" key={item} onClick={() => openRecipe(item)}>
+                  {item}
+                </button>
+              ))}
+            </div>
+
+            <section className="fridge-card">
+              <div className="fridge-card-bg fridge-card-bg-one"></div>
+              <div className="fridge-card-bg fridge-card-bg-two"></div>
+              <div className="ai-pill"><span></span>AI powered</div>
+              <h2>
+                Generate a recipe from<br />
+                your <em>fridge</em>
+              </h2>
+              <p>Snap a photo of your ingredients and we’ll create a recipe just for you.</p>
+              <div className="fridge-actions">
+                <Link to="/detect" className="fridge-primary-action">
+                  <span>📷</span>
+                  Take Photo
+                </Link>
+              </div>
+              <div className="fridge-image-slider" aria-label="Recipe inspiration">
+                <div className="fridge-slide-card">
+                  {fridgeIdeas.map((idea, index) => (
+                    <span
+                      className={`fridge-slide ${index === activeFridgeIdea ? "active" : ""}`}
+                      key={idea.title}
                     >
-                      {suggestion}
-                    </button>
+                      <img src={idea.image} alt="" />
+                      <strong>{idea.title}</strong>
+                    </span>
+                  ))}
+                </div>
+                <div className="fridge-slide-dots" aria-hidden="true">
+                  {fridgeIdeas.map((idea, index) => (
+                    <span className={index === activeFridgeIdea ? "active" : ""} key={idea.title}></span>
                   ))}
                 </div>
               </div>
-
-              <button
-                className="btn btn-warning w-100 mt-4 p-3 fw-semibold"
-                onClick={() => {
-                  if (searchQuery.trim()) {
-                    navigate(`/search?q=${encodeURIComponent(searchQuery.trim())}`);
-                    setShowSearchModal(false);
-                  }
-                }}
-                disabled={!searchQuery.trim()}
-              >
-                Search Recipe
-              </button>
-            </div>
+            </section>
           </div>
-        </div>
-      )}
 
-      {/* ---------------- CATEGORY DISH MODAL ---------------- */}
-      {selectedCategory && (
-        <div className="search-modal-overlay" onClick={() => setSelectedCategory(null)}>
-          <div className="search-modal-content category-dishes-modal" onClick={(e) => e.stopPropagation()}>
-            <div className="search-modal-header">
-              <h3 className="fw-bold mb-0">
-                {selectedCategory.icon} {selectedCategory.name} Dishes
-              </h3>
-              <button
-                className="btn-close"
-                onClick={() => setSelectedCategory(null)}
-              ></button>
+        </section>
+
+        <section className="browse-section">
+          <div className="section-heading-row">
+            <h2>Browse & Save</h2>
+            <Link to="/saved">See all →</Link>
+          </div>
+          {savedRecipes.length > 0 ? (
+            <div className="browse-scroll">
+              {savedRecipes.map((recipe, index) => (
+                <button
+                  key={recipe._id || recipe.title}
+                  type="button"
+                  className="browse-card"
+                  onClick={() => navigate(`/search?savedId=${encodeURIComponent(recipe._id)}`)}
+                >
+                  <div className={`browse-art ${["peach", "mint", "sage"][index % 3]}`}>
+                    <span>{["🍛", "🥗", "🍲"][index % 3]}</span>
+                    <i>♡</i>
+                  </div>
+                  <div className="browse-copy">
+                    <p>Saved recipe</p>
+                    <h3>{recipe.title || recipe.name}</h3>
+                    {recipe.description && <small>{recipe.description}</small>}
+                    <div>
+                      <span>{recipe.ingredients?.length || 0} ingredients</span>
+                      <strong>{recipe.healthLabel || "Saved"}</strong>
+                    </div>
+                  </div>
+                </button>
+              ))}
             </div>
+          ) : (
+            <div className="home-empty-card">
+              <strong>No recipes saved yet</strong>
+              <p>Search a recipe, save it, and your cookbook will start appearing here.</p>
+              <button type="button" onClick={() => openRecipe("Paneer Tikka")}>Find a recipe</button>
+            </div>
+          )}
+        </section>
 
-            <div className="search-modal-body">
-              <div className="category-dish-grid">
-                {getModeSafeDishes(selectedCategory.dishes).map((dish) => (
-                  <button
-                    key={dish}
-                    className="category-dish-btn"
-                    onClick={() => openRecipe(dish)}
+        <section className="mobile-home-tools" aria-label="Planning shortcuts">
+          <div className="mobile-tool-card mobile-tool-card-planner">
+            <button
+              type="button"
+              className="mobile-tool-logo-btn"
+              onClick={() => hasWeeklyNutrition && setShowMobileNutrition((value) => !value)}
+              aria-expanded={showMobileNutrition}
+              aria-label="Show weekly nutrition spectrum"
+              disabled={!hasWeeklyNutrition}
+            >
+              <span className="mobile-tool-icon planner">▣</span>
+            </button>
+            <div>
+              <p>Plan ahead</p>
+              <h2>Meal Planner</h2>
+              <small>{dashboard.mealsPlanned} meal{dashboard.mealsPlanned === 1 ? "" : "s"} this week</small>
+            </div>
+            <Link to="/meal-planner" aria-label="Open meal planner">›</Link>
+          </div>
+
+          <Link to="/grocery-list" className="mobile-tool-card mobile-tool-card-link">
+            <span className="mobile-tool-icon grocery">🛒</span>
+            <div>
+              <p>Shopping</p>
+              <h2>Grocery List</h2>
+              <small>{groceryCount} item{groceryCount === 1 ? "" : "s"}</small>
+            </div>
+            <b>›</b>
+          </Link>
+        </section>
+
+        {hasWeeklyNutrition && showMobileNutrition && (
+          <div
+            className="mobile-nutrition-overlay"
+            role="dialog"
+            aria-modal="true"
+            aria-label="Weekly nutrition spectrum"
+            onClick={() => setShowMobileNutrition(false)}
+          >
+            <div className="mobile-nutrition-dialog" onClick={(event) => event.stopPropagation()}>
+              <button
+                type="button"
+                className="mobile-nutrition-close"
+                onClick={() => setShowMobileNutrition(false)}
+                aria-label="Close nutrition spectrum"
+              >
+                ×
+              </button>
+              <p>Weekly total</p>
+              <h2>Nutrition Spectrum</h2>
+              <div className="home-nutrition-orb" aria-label="Weekly nutrition spectrum">
+                {getNutritionSegments().map((segment, index) => (
+                  <span
+                    key={segment.key}
+                    className={`home-nutrition-dot home-nutrition-dot-${index}`}
+                    style={{
+                      "--macro-color": segment.color,
+                      "--macro-soft-color": segment.softColor,
+                      "--macro-percent": `${segment.percentage}%`
+                    }}
                   >
-                    {dish}
-                  </button>
+                    <small>{segment.label}</small>
+                    <strong>{segment.value}{segment.unit}</strong>
+                  </span>
                 ))}
-                {getModeSafeDishes(selectedCategory.dishes).length === 0 && (
-                  <p className="text-muted mb-0">
-                    No Jain-safe suggestions are available in this category yet.
-                  </p>
-                )}
+                <div className="home-nutrition-center">
+                  <strong>{dashboard.nutrition.calories}</strong>
+                  <span>Cal</span>
+                </div>
               </div>
             </div>
           </div>
-        </div>
-      )}
+        )}
+
+        <section className="home-lower-grid">
+          <Link to="/meal-planner" className="planner-card">
+            <div className="planner-icon">▣</div>
+            <div>
+              <p>Plan ahead</p>
+              <h2>Meal Planner</h2>
+              <span>{dashboard.mealsPlanned} meal{dashboard.mealsPlanned === 1 ? "" : "s"} planned this week</span>
+            </div>
+            <b>›</b>
+            <span className="pasta-mark">🍝</span>
+          </Link>
+
+          <section className="grocery-card">
+            <div className="grocery-title-row">
+              <div className="grocery-icon">🛒</div>
+              <div>
+                <p>Shopping</p>
+                <h2>Grocery List</h2>
+              </div>
+              <strong>{groceryCount} items</strong>
+            </div>
+
+            {groceryItems.length > 0 ? (
+              <div className="grocery-preview-list">
+                {groceryItems.map((item, index) => (
+                  <div key={`${item._id || item.name}-${index}`} className={item.marked ? "checked" : ""}>
+                    <button
+                      type="button"
+                      disabled={updatingGroceryId === item._id}
+                      onClick={(event) => toggleGroceryItem(event, item)}
+                      aria-label={`${item.marked ? "Uncheck" : "Check"} ${item.name}`}
+                    >
+                      {item.marked ? "✓" : ""}
+                    </button>
+                    <em>{item.name}</em>
+                    <small>{item.mealType || ""}</small>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="home-empty-card grocery-empty">
+                <strong>No grocery items yet</strong>
+                <p>Add recipes to your meal planner and ingredients will appear here.</p>
+              </div>
+            )}
+
+            <div className="grocery-more">
+              {moreGroceryCount > 0
+                ? `+ ${moreGroceryCount} more item${moreGroceryCount === 1 ? "" : "s"}`
+                : `${checkedGroceryCount} checked so far`}
+            </div>
+            <Link to="/grocery-list" className="grocery-open-link">Open full list</Link>
+          </section>
+        </section>
+
+        <section className="quick-category-row" aria-label="Quick categories">
+          {quickCategories.map((category) => (
+            <button type="button" key={category.name} onClick={() => openRecipe(category.query)}>
+              <span>{category.icon}</span>
+              {category.name}
+            </button>
+          ))}
+        </section>
+
+        <section className="saved-strip">
+          <div>
+            <p>Saved recipes</p>
+            <h2>{savedRecipeText}</h2>
+          </div>
+          <Link to="/saved">Open cookbook</Link>
+        </section>
+      </main>
+
+      <nav className="home-mobile-nav" aria-label="Home shortcuts">
+        <Link to="/home" className="active"><span>⌂</span>Home</Link>
+        <Link to="/mobile-search"><span>⌕</span>Search</Link>
+        <Link to="/meal-planner"><span>▣</span>Meal Plan</Link>
+        <Link to="/profile"><span>♙</span>Profile</Link>
+      </nav>
     </div>
-    </>
   );
 }

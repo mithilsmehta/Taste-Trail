@@ -3,6 +3,7 @@ import { useMemo, useState } from "react";
 import axios from "axios";
 import toast from "react-hot-toast";
 import AuthLayout from "../components/AuthLayout";
+import { foodPreferenceOptions } from "../utils/foodPreference";
 import "../styles/auth.css";
 
 const indianStates = [
@@ -37,7 +38,6 @@ const indianStates = [
 ];
 
 const genderOptions = ["Female", "Male"];
-const dietaryOptions = ["Diet", "Veg", "Vegan"];
 const servingOptions = Array.from({ length: 10 }, (_, index) => index + 1);
 
 const initialForm = {
@@ -48,7 +48,7 @@ const initialForm = {
   confirmPass: "",
   gender: "",
   ethnicity: "",
-  dietaryPreference: "",
+  foodPreference: "",
   usualServings: 2,
   healthyGoal: 50,
   heightCm: "",
@@ -110,7 +110,7 @@ export default function Register() {
   };
 
   const validateKnowYouStep = () => {
-    if (!form.gender || !form.ethnicity || !form.dietaryPreference || !form.usualServings) {
+    if (!form.gender || !form.ethnicity || !form.foodPreference || !form.usualServings) {
       toast.error("Please complete all personal details");
       return false;
     }
@@ -150,7 +150,8 @@ export default function Register() {
         onboarding: {
           gender: form.gender,
           ethnicity: form.ethnicity,
-          dietaryPreference: form.dietaryPreference,
+          foodPreference: form.foodPreference,
+          dietaryPreference: form.foodPreference,
           usualServings: Number(form.usualServings) || 2,
           healthyGoal: Number(form.healthyGoal),
           heightCm: Number(form.heightCm),
@@ -284,15 +285,15 @@ export default function Register() {
             </div>
 
             <div className="mb-3">
-              <label className="form-label fw-semibold">Dietary preference</label>
+              <label className="form-label fw-semibold">Food preference</label>
               <select
                 className="form-select auth-input"
-                value={form.dietaryPreference}
-                onChange={(e) => updateField("dietaryPreference", e.target.value)}
+                value={form.foodPreference}
+                onChange={(e) => updateField("foodPreference", e.target.value)}
                 required
               >
                 <option value="">Select preference</option>
-                {dietaryOptions.map((option) => (
+                {foodPreferenceOptions.map((option) => (
                   <option key={option} value={option}>{option}</option>
                 ))}
               </select>

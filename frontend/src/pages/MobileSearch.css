@@ -1,0 +1,227 @@
+.mobile-search-page {
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.6), rgba(247, 244, 234, 0) 320px),
+    var(--tw-cream);
+  color: var(--tw-ink);
+  min-height: 100vh;
+  padding: 22px 18px 42px;
+}
+
+.mobile-search-topbar {
+  align-items: center;
+  display: grid;
+  grid-template-columns: 48px 1fr 48px;
+  margin: 0 auto 26px;
+  max-width: 720px;
+}
+
+.mobile-search-topbar a {
+  align-items: center;
+  background: var(--tw-surface);
+  border: 1px solid var(--tw-border);
+  border-radius: 16px;
+  color: var(--tw-sage);
+  display: flex;
+  font-size: 2rem;
+  font-weight: 500;
+  height: 48px;
+  justify-content: center;
+  line-height: 1;
+  text-decoration: none;
+  width: 48px;
+}
+
+.mobile-search-topbar span {
+  color: var(--tw-sage);
+  font-size: 0.86rem;
+  font-weight: 900;
+  letter-spacing: 0.14em;
+  text-align: center;
+  text-transform: uppercase;
+}
+
+.mobile-search-hero {
+  margin: 0 auto 24px;
+  max-width: 720px;
+}
+
+.mobile-search-hero p {
+  color: var(--tw-sage);
+  font-size: 0.78rem;
+  font-weight: 900;
+  letter-spacing: 0.14em;
+  margin: 0 0 10px;
+  text-transform: uppercase;
+}
+
+.mobile-search-hero h1 {
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: clamp(2.65rem, 8vw, 4.4rem);
+  font-weight: 500;
+  letter-spacing: 0;
+  line-height: 0.98;
+  margin: 0;
+}
+
+.mobile-search-card {
+  align-items: center;
+  background: var(--tw-surface);
+  border: 1px solid rgba(72, 101, 76, 0.06);
+  border-radius: 24px;
+  box-shadow: var(--tw-shadow);
+  display: grid;
+  gap: 14px;
+  grid-template-columns: auto 1fr auto;
+  margin: 0 auto 18px;
+  max-width: 720px;
+  padding: 12px 12px 12px 18px;
+}
+
+.mobile-search-icon {
+  color: #a5a5a1;
+  font-size: 2rem;
+  line-height: 1;
+  transform: rotate(-18deg);
+}
+
+.mobile-search-card input {
+  background: transparent;
+  border: 0;
+  color: var(--tw-ink);
+  font-size: 1.06rem;
+  font-weight: 700;
+  min-width: 0;
+  outline: 0;
+}
+
+.mobile-search-card input::placeholder {
+  color: #aaa9a5;
+}
+
+.mobile-search-card button {
+  align-items: center;
+  background: var(--tw-sage-soft);
+  border: 0;
+  border-radius: 16px;
+  display: flex;
+  height: 52px;
+  justify-content: center;
+  width: 52px;
+}
+
+.mobile-search-card button span {
+  border: 3px solid var(--tw-sage);
+  border-radius: 50%;
+  display: block;
+  height: 21px;
+  position: relative;
+  width: 21px;
+}
+
+.mobile-search-card button span::after {
+  background: var(--tw-sage);
+  border-radius: 999px;
+  content: "";
+  display: block;
+  height: 10px;
+  position: absolute;
+  right: -6px;
+  top: 14px;
+  transform: rotate(-45deg);
+  width: 3px;
+}
+
+.mobile-search-groups {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  margin: 0 auto 32px;
+  max-width: 720px;
+}
+
+.mobile-search-groups button {
+  align-items: center;
+  background: var(--tw-surface);
+  border: 1px solid var(--tw-border);
+  border-radius: 18px;
+  color: var(--tw-sage);
+  display: flex;
+  flex-direction: column;
+  font-weight: 900;
+  gap: 6px;
+  min-height: 86px;
+  padding: 12px 8px;
+}
+
+.mobile-search-groups span {
+  font-size: 1.45rem;
+}
+
+.mobile-suggestions {
+  margin: 0 auto;
+  max-width: 720px;
+}
+
+.mobile-section-heading {
+  align-items: center;
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 14px;
+}
+
+.mobile-section-heading h2 {
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: clamp(1.9rem, 5vw, 2.6rem);
+  font-weight: 500;
+  margin: 0;
+}
+
+.mobile-suggestion-list {
+  display: grid;
+  gap: 12px;
+}
+
+.mobile-suggestion-list button {
+  align-items: center;
+  background: var(--tw-surface);
+  border: 1px solid var(--tw-border);
+  border-radius: 18px;
+  box-shadow: 0 12px 24px rgba(48, 44, 35, 0.06);
+  color: var(--tw-ink);
+  display: flex;
+  font-size: 1rem;
+  font-weight: 850;
+  justify-content: space-between;
+  min-height: 58px;
+  padding: 0 18px;
+  text-align: left;
+}
+
+.mobile-suggestion-list b {
+  color: var(--tw-sage);
+  font-size: 1.65rem;
+  font-weight: 400;
+}
+
+@media (min-width: 992px) {
+  .mobile-search-page {
+    align-items: center;
+    display: flex;
+    flex-direction: column;
+    padding-top: 64px;
+  }
+}
+
+@media (max-width: 575.98px) {
+  .mobile-search-page {
+    padding: 18px 14px 34px;
+  }
+
+  .mobile-search-topbar {
+    margin-bottom: 22px;
+  }
+
+  .mobile-search-groups {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}

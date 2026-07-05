@@ -4,14 +4,6 @@ import { useNavigate } from "react-router-dom";
 import Navbar from "../components/Navbar";
 import { getMondayDateKey, getWeekFromDateKey, toDateKey } from "../utils/weekPlan";
 import { getDisplayIngredients } from "../utils/recipeFormatting";
-// Saved recipe photos are disabled for now.
-// Uncomment these imports and the RecipeImage code below when you want photos again.
-// import fallbackFood1 from "../assets/img1.jpg";
-// import fallbackFood2 from "../assets/img2.jpg";
-// import fallbackFood3 from "../assets/img3.jpg";
-// import fallbackFood4 from "../assets/img4.jpg";
-// import fallbackFood5 from "../assets/img5.jpg";
-// import fallbackFood6 from "../assets/img6.jpg";
 
 const defaultTimes = {
   breakfast: "08:00",
@@ -31,78 +23,6 @@ const emptyNutrition = {
   carbs: 0,
   fat: 0
 };
-
-/*
-Saved recipe photos are disabled for now.
-Uncomment this whole block and the image JSX/CSS below when you want photos again.
-
-const fallbackRecipeImages = [
-  fallbackFood1,
-  fallbackFood2,
-  fallbackFood3,
-  fallbackFood4,
-  fallbackFood6
-];
-
-const getFallbackRecipeImage = (title = "") => {
-  const seed = Array.from(String(title || "recipe")).reduce((total, char) => total + char.charCodeAt(0), 0);
-  return fallbackRecipeImages[seed % fallbackRecipeImages.length];
-};
-
-const commonsImage = (fileName) =>
-  `https://commons.wikimedia.org/wiki/Special:FilePath/${encodeURIComponent(fileName)}?width=900`;
-
-const dishImageRules = [
-  { pattern: /jain.*pav\s*bhaji|pav\s*bhaji.*jain/i, image: commonsImage("Jain dosa, Pav bhaji, Chole bhature.jpg") },
-  { pattern: /tiramisu|tiramisù/i, image: commonsImage("Tiramisu (44840044151).jpg") },
-  { pattern: /paneer.*salad|salad.*paneer/i, image: commonsImage("Paneer masaledar and fresh veggies salad.png") },
-  { pattern: /manchurian/i, image: commonsImage("Manchurian.jpg") },
-  { pattern: /poha|pohe/i, image: commonsImage("poha.jpg") },
-  { pattern: /chole|cholle|bhature|bhatura/i, image: commonsImage("Cholle-Bhature.jpg") },
-  { pattern: /dosa/i, image: commonsImage("Masala_Dosa.JPG") },
-  { pattern: /pav\s*bhaji/i, image: commonsImage("Pav_Bhaji.jpg") },
-  { pattern: /paneer\s*tikka/i, image: commonsImage("Paneer_Tikka.jpg") },
-  { pattern: /biryani/i, image: commonsImage("Vegetable-biryani.jpg") },
-  { pattern: /pizza/i, image: fallbackFood3 },
-  { pattern: /pasta|noodle|lo mein/i, image: fallbackFood2 },
-  { pattern: /salad|healthy/i, image: fallbackFood1 }
-];
-
-const getDishSpecificImage = (title = "") =>
-  dishImageRules.find((rule) => rule.pattern.test(String(title)))?.image || "";
-
-const isUnreliableRecipeImage = (image = "") =>
-  /image\.pollinations\.ai|source\.unsplash\.com/i.test(String(image));
-
-const isExplicitNonVegRecipe = (title = "") =>
-  /\b(chicken|mutton|lamb|fish|prawn|shrimp|egg|beef|pork|bacon|ham|seafood|keema)\b/i.test(String(title));
-
-function RecipeImage({ recipe, className = "", detail = false }) {
-  const [useFallback, setUseFallback] = useState(false);
-  const title = recipe?.title || recipe?.name;
-  const dishImage = getDishSpecificImage(title);
-  const fallbackImage = getFallbackRecipeImage(title);
-  const canUseRecipeImage = recipe?.image && !isUnreliableRecipeImage(recipe.image);
-  const shouldPreferDishImage = dishImage && !isExplicitNonVegRecipe(title);
-  const imageSrc = useFallback
-    ? fallbackImage
-    : shouldPreferDishImage
-      ? dishImage
-      : canUseRecipeImage
-        ? recipe.image
-        : dishImage || fallbackImage;
-
-  return (
-    <img
-      className={className}
-      src={imageSrc}
-      alt={recipe?.title || recipe?.name || "Recipe"}
-      onError={() => setUseFallback(true)}
-      loading={detail ? "eager" : "lazy"}
-    />
-  );
-}
-*/
 
 export default function SavedRecipes() {
   const navigate = useNavigate();
@@ -285,7 +205,9 @@ export default function SavedRecipes() {
   };
 
   useEffect(() => {
-    fetchRecipes();
+    window.scrollTo({ top: 0, left: 0 });
+    const loadTimer = window.setTimeout(fetchRecipes, 0);
+    return () => window.clearTimeout(loadTimer);
   }, []);
 
   if (loading) {
@@ -348,14 +270,10 @@ export default function SavedRecipes() {
             return (
             <div key={recipe._id} className="col-md-6 col-lg-4">
               <div className="saved-recipe-card shadow-sm p-4 rounded h-100">
-                {/*
-                Saved recipe card photo is disabled for now.
-                Uncomment this block with the RecipeImage code at the top of this file to show photos again.
-                <div className="saved-recipe-image mb-3">
-                  <RecipeImage recipe={recipe} />
-                </div>
-                */}
-                <h4 className="fw-bold mb-3">{recipe.title}</h4>
+                <h4 className="fw-bold mb-2">{recipe.title}</h4>
+                {recipe.description && (
+                  <p className="saved-recipe-description mb-3">{recipe.description}</p>
+                )}
 
                 {recipe.ingredients && recipe.ingredients.length > 0 && (
                   <div className="recipe-preview mb-3">
@@ -412,7 +330,7 @@ export default function SavedRecipes() {
 
       <style>{`
         .saved-header {
-          border-bottom: 3px solid #ffc107;
+          border-bottom: 3px solid var(--tw-sage);
           padding-bottom: 16px;
         }
 
@@ -427,33 +345,15 @@ export default function SavedRecipes() {
         .saved-recipe-card:hover {
           transform: translateY(-5px);
           box-shadow: 0 8px 20px rgba(0, 0, 0, 0.15) !important;
-          border-color: #ffc107;
+          border-color: var(--tw-sage);
         }
 
-        /*
-        Saved recipe photo styles are disabled for now.
-        Uncomment this CSS with the RecipeImage code at the top of this file to show photos again.
-
-        .saved-recipe-image {
-          align-items: center;
-          aspect-ratio: 16 / 9;
-          background: #f8f9fa;
-          border-radius: 10px;
-          display: flex;
-          justify-content: center;
-          overflow: hidden;
+        .saved-recipe-description {
+          color: var(--tw-muted);
+          font-size: 0.92rem;
+          font-weight: 600;
+          line-height: 1.45;
         }
-
-        .saved-recipe-image img {
-          height: 100%;
-          object-fit: cover;
-          width: 100%;
-        }
-
-        .saved-recipe-image span {
-          font-size: 2.5rem;
-        }
-        */
 
         .recipe-preview {
           padding: 8px 12px;
@@ -499,7 +399,7 @@ export default function SavedRecipes() {
           width: 7px;
           height: 7px;
           border-radius: 999px;
-          background: #ffc107;
+          background: var(--tw-sage);
           flex: 0 0 auto;
           margin-top: 9px;
         }
@@ -524,8 +424,8 @@ export default function SavedRecipes() {
 
         .nutrition-mini-grid span,
         .nutrition-grid div {
-          background: #fff9e6;
-          border: 1px solid #ffe082;
+          background: var(--tw-sage-soft);
+          border: 1px solid rgba(95, 143, 103, 0.28);
           border-radius: 8px;
           padding: 8px 10px;
           text-transform: capitalize;
@@ -552,13 +452,6 @@ export default function SavedRecipes() {
           font-weight: 700;
         }
 
-        .recipe-detail-image {
-          border-radius: 12px;
-          max-height: 320px;
-          object-fit: cover;
-          width: 100%;
-        }
-
         @media (max-width: 768px) {
           .saved-recipe-card {
             margin-bottom: 16px;
@@ -577,18 +470,15 @@ export default function SavedRecipes() {
             <div className="modal-header-meal">
               <div>
                 <h4 className="fw-bold mb-1">{viewRecipe.title}</h4>
+                {viewRecipe.description && (
+                  <p className="saved-recipe-description mb-1">{viewRecipe.description}</p>
+                )}
                 <p className="text-muted small mb-0">Saved recipe from your database</p>
               </div>
               <button className="btn-close" onClick={() => setViewRecipe(null)}></button>
             </div>
 
             <div className="modal-body-meal">
-              {/*
-              Saved recipe detail photo is disabled for now.
-              Uncomment this block with the RecipeImage code at the top of this file to show photos again.
-              <RecipeImage recipe={viewRecipe} className="recipe-detail-image mb-4" detail />
-              */}
-
               <h5 className="fw-bold mb-3">Nutrition Estimate</h5>
               <div className="nutrition-grid mb-4">
                 {Object.entries(viewRecipe.nutrition || emptyNutrition).map(([key, value]) => (
@@ -744,8 +634,8 @@ export default function SavedRecipes() {
         }
 
         .meal-option-btn:hover {
-          border-color: #ffc107;
-          background: #fff9e6;
+          border-color: var(--tw-sage);
+          background: var(--tw-sage-soft);
           transform: translateX(5px);
         }
 
@@ -773,7 +663,7 @@ export default function SavedRecipes() {
 
         .meal-date-picker:focus {
           outline: none;
-          border-color: #ffc107;
+          border-color: var(--tw-sage);
           box-shadow: 0 0 0 3px rgba(255, 193, 7, 0.18);
         }
 

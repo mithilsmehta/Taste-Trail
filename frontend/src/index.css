@@ -1,9 +1,22 @@
 :root {
+  --tw-cream: #f7f4ea;
+  --tw-cream-2: #fffaf0;
+  --tw-surface: #ffffff;
+  --tw-ink: #2b2928;
+  --tw-muted: #726f69;
+  --tw-sage: #5f8f67;
+  --tw-sage-2: #8db99a;
+  --tw-sage-soft: #edf5ed;
+  --tw-orange: #f3a64f;
+  --tw-orange-soft: #fff1dd;
+  --tw-border: #ebe4d8;
+  --tw-shadow: 0 18px 42px rgba(48, 44, 35, 0.1);
+  --tw-radius: 24px;
   font-family: system-ui, Avenir, Helvetica, Arial, sans-serif;
   line-height: 1.5;
   font-weight: 400;
   color: #212529;
-  background: #ffffff;
+  background: var(--tw-cream);
   font-synthesis: none;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
@@ -25,7 +38,7 @@ body {
   min-height: 100vh;
   width: 100%;
   overflow-x: hidden;
-  background: #ffffff;
+  background: var(--tw-cream);
 }
 
 img {
@@ -41,4 +54,140 @@ textarea {
 
 .btn {
   white-space: normal;
+}
+
+body,
+.app-page {
+  color: var(--tw-ink);
+}
+
+.container,
+.container-fluid {
+  color: var(--tw-ink);
+}
+
+.container.mt-4,
+.container-fluid.mt-4,
+.container.mt-5,
+.container-fluid.mt-5 {
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.54), rgba(247, 244, 234, 0) 320px),
+    var(--tw-cream);
+}
+
+.card,
+.modal-content,
+.dropdown-menu,
+.list-group-item,
+.accordion-item,
+.empty-state,
+.recipe-header-card,
+.ingredients-card,
+.steps-card,
+.settings-card,
+.info-card,
+.meal-section,
+.provider-picker,
+.calendar-planner,
+.detect-panel,
+.suggestions-section,
+.generated-recipe,
+.saved-recipe-card {
+  background: var(--tw-surface) !important;
+  border-color: var(--tw-border) !important;
+  border-radius: var(--tw-radius) !important;
+  box-shadow: var(--tw-shadow) !important;
+}
+
+.shadow,
+.shadow-sm,
+.shadow-lg {
+  box-shadow: var(--tw-shadow) !important;
+}
+
+.btn {
+  border-radius: 999px;
+  font-weight: 850;
+}
+
+.btn-warning,
+.btn-success,
+.btn-primary {
+  background: var(--tw-sage) !important;
+  border-color: var(--tw-sage) !important;
+  color: #fff !important;
+}
+
+.btn-warning:hover,
+.btn-success:hover,
+.btn-primary:hover {
+  background: #4f7e57 !important;
+  border-color: #4f7e57 !important;
+  color: #fff !important;
+}
+
+.btn-outline-warning,
+.btn-outline-success,
+.btn-outline-primary,
+.btn-outline-info {
+  background: var(--tw-surface) !important;
+  border-color: rgba(95, 143, 103, 0.38) !important;
+  color: var(--tw-sage) !important;
+}
+
+.btn-outline-warning:hover,
+.btn-outline-success:hover,
+.btn-outline-primary:hover,
+.btn-outline-info:hover {
+  background: var(--tw-sage-soft) !important;
+  border-color: var(--tw-sage) !important;
+  color: var(--tw-sage) !important;
+}
+
+.badge.bg-warning,
+.badge.bg-success,
+.bg-warning,
+.bg-success {
+  background: var(--tw-sage-soft) !important;
+  color: var(--tw-sage) !important;
+}
+
+.text-warning,
+.text-success {
+  color: var(--tw-sage) !important;
+}
+
+.spinner-border.text-warning {
+  color: var(--tw-sage) !important;
+}
+
+.form-control,
+.form-select {
+  background-color: var(--tw-surface);
+  border: 1px solid var(--tw-border);
+  border-radius: 14px;
+  color: var(--tw-ink);
+}
+
+.form-control:focus,
+.form-select:focus {
+  border-color: var(--tw-sage);
+  box-shadow: 0 0 0 4px rgba(95, 143, 103, 0.14);
+}
+
+.text-muted {
+  color: var(--tw-muted) !important;
+}
+
+.page-title,
+.search-header h2,
+.saved-header h2,
+.grocery-header h2,
+.meal-planner-header h2,
+.detect-header h1,
+.settings-header h2 {
+  color: var(--tw-ink);
+  font-family: Georgia, "Times New Roman", serif;
+  font-weight: 500 !important;
+  letter-spacing: 0;
 }

@@ -4,6 +4,7 @@ import { AuthContext } from "../context/AuthContext";
 import axios from "axios";
 import toast from "react-hot-toast";
 import Navbar from "../components/Navbar";
+import { foodPreferenceOptions } from "../utils/foodPreference";
 
 const indianStates = [
   "Andhra Pradesh",
@@ -37,7 +38,6 @@ const indianStates = [
 ];
 
 const genderOptions = ["Female", "Male"];
-const dietaryOptions = ["Diet", "Veg", "Vegan"];
 const servingOptions = Array.from({ length: 10 }, (_, index) => index + 1);
 
 const calculateBmi = (heightCm, weightKg) => {
@@ -46,6 +46,12 @@ const calculateBmi = (heightCm, weightKg) => {
   if (!height || !weight) return "";
   return Number((weight / ((height / 100) ** 2)).toFixed(1));
 };
+
+const getStoredFoodPreference = (profileUser = {}) =>
+  profileUser?.onboarding?.foodPreference ||
+  profileUser?.onboarding?.dietaryPreference ||
+  profileUser?.preferences?.diet ||
+  "Veg";
 
 export default function Profile() {
   const { user, setUser } = useContext(AuthContext);
@@ -61,7 +67,7 @@ export default function Profile() {
   const [onboarding, setOnboarding] = useState({
     gender: userOnboarding.gender || "",
     ethnicity: userOnboarding.ethnicity || "",
-    dietaryPreference: userOnboarding.dietaryPreference || user?.preferences?.diet || "",
+    foodPreference: getStoredFoodPreference(user),
     usualServings: userOnboarding.usualServings || 2,
     healthyGoal: userOnboarding.healthyGoal ?? 50,
     heightCm: userOnboarding.heightCm || "",
@@ -78,7 +84,7 @@ export default function Profile() {
     setOnboarding({
       gender: profileUser?.onboarding?.gender || "",
       ethnicity: profileUser?.onboarding?.ethnicity || "",
-      dietaryPreference: profileUser?.onboarding?.dietaryPreference || profileUser?.preferences?.diet || "",
+      foodPreference: getStoredFoodPreference(profileUser),
       usualServings: profileUser?.onboarding?.usualServings || 2,
       healthyGoal: profileUser?.onboarding?.healthyGoal ?? 50,
       heightCm: profileUser?.onboarding?.heightCm || "",
@@ -114,6 +120,8 @@ const handleProfileUpdate = async (e) => {
         phone,
         onboarding: {
           ...onboarding,
+          foodPreference: onboarding.foodPreference,
+          dietaryPreference: onboarding.foodPreference,
           usualServings: Number(onboarding.usualServings) || 2,
           healthyGoal: Number(onboarding.healthyGoal),
           heightCm: onboarding.heightCm ? Number(onboarding.heightCm) : null,
@@ -265,15 +273,15 @@ const handleProfileUpdate = async (e) => {
                 </div>
 
                 <div className="col-12 col-sm-6 mb-3">
-                  <label className="form-label fw-semibold">Dietary Preference</label>
+                  <label className="form-label fw-semibold">Food Preference</label>
                   <select
                     className="form-select p-2"
-                    value={onboarding.dietaryPreference}
-                    onChange={(e) => updateOnboarding("dietaryPreference", e.target.value)}
+                    value={onboarding.foodPreference}
+                    onChange={(e) => updateOnboarding("foodPreference", e.target.value)}
                     disabled={!isEditingInfo}
                   >
                     <option value="">Select preference</option>
-                    {dietaryOptions.map((option) => (
+                    {foodPreferenceOptions.map((option) => (
                       <option key={option} value={option}>{option}</option>
                     ))}
                   </select>
@@ -455,8 +463,8 @@ const handleProfileUpdate = async (e) => {
         }
 
         .profile-health-box {
-          background: #fff8e1;
-          border: 1px solid #ffd166;
+          background: var(--tw-sage-soft);
+          border: 1px solid rgba(95, 143, 103, 0.32);
           border-radius: 12px;
           padding: 14px;
         }
@@ -510,8 +518,8 @@ const handleProfileUpdate = async (e) => {
         }
 
         .profile-planner-toggle button.active {
-          background: #fff8e1;
-          border-color: #ffc107;
+          background: var(--tw-sage-soft);
+          border-color: var(--tw-sage);
           box-shadow: 0 0 0 3px rgba(255, 193, 7, 0.16);
         }
 

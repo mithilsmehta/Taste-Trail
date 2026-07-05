@@ -111,3 +111,33 @@
     font-size: 28px;
   }
 }
+
+.auth-wrapper,
+.auth-right {
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.54), rgba(247, 244, 234, 0) 320px),
+    var(--tw-cream);
+}
+
+.auth-form-container {
+  background: var(--tw-surface);
+  border: 1px solid var(--tw-border);
+  border-radius: var(--tw-radius);
+  box-shadow: var(--tw-shadow);
+  padding: 32px;
+}
+
+.auth-logo h2 {
+  color: var(--tw-ink);
+  font-family: Georgia, "Times New Roman", serif;
+  font-weight: 500;
+}
+
+.auth-logo p,
+.auth-footer {
+  color: var(--tw-muted);
+}
+
+.auth-overlay {
+  background: rgba(40, 54, 39, 0.34);
+}

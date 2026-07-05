@@ -6,10 +6,10 @@ export default function FormInput({ label, type, value, onChange }) {
         type={type}
         className="form-control"
         style={{
-          borderRadius: "12px",
+          borderRadius: "14px",
           padding: "12px",
-          border: "2px solid #ffb84d",
-          background: "white",
+          border: "1px solid var(--tw-border)",
+          background: "var(--tw-surface)",
         }}
         value={value}
         onChange={onChange}

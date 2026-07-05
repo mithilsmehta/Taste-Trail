@@ -129,6 +129,21 @@ const getDisplayRecipeName = (query, regionalStyle, generatedName = "") => {
   return dishName;
 };
 
+const getRecipeDescription = (recipeName, recipe = {}) => {
+  const provided = String(recipe.description || "").replace(/\s+/g, " ").trim();
+  if (provided) return provided.slice(0, 220);
+
+  const name = String(recipeName || recipe.name || "This recipe").trim() || "This recipe";
+  const text = [name, ...(Array.isArray(recipe.ingredients) ? recipe.ingredients : [])].join(" ").toLowerCase();
+
+  if (/\bpaneer\b/.test(text)) return `${name} brings smoky, creamy confidence like it knows it is the headline act.`;
+  if (/\bpav\s*bhaji\b/.test(text)) return `${name} is vegetables, butter, and pav forming a very successful committee.`;
+  if (/\bbiryani|pulao|pulav\b/.test(text)) return `${name} has layers, aroma, and enough drama to make plain rice nervous.`;
+  if (/\bdosa|idli|uttapam|uthappam\b/.test(text)) return `${name} is humble batter doing a full career transformation.`;
+  if (/\bpizza|pasta\b/.test(text)) return `${name} tastes like the weekend filed an early arrival notice.`;
+  return `${name} brings comfort, flavor, and just enough kitchen confidence to make takeout nervous.`;
+};
+
 const getApiKey = () => {
   const key = process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY || "";
   return key && key !== "YOUR_GEMINI_API_KEY" ? key : "";
@@ -414,8 +429,7 @@ Format exactly:
       ingredients: detectedIngredients,
       uncertainItems,
       rejectedItems,
-      notes,
-      dietMode
+      notes
     });
   } catch (err) {
     console.error(err);
@@ -453,7 +467,7 @@ Format:
 `);
 
     const parsed = extractJson(result.response.text());
-    res.json({ suggestions: cleanSuggestions(parsed, dietMode), dietMode });
+    res.json({ suggestions: cleanSuggestions(parsed, dietMode) });
   } catch (err) {
     console.error(err);
     res.status(err.statusCode || 500).json({ msg: getClientErrorMessage(err) });
@@ -481,10 +495,11 @@ ${getRegionalStyleRules(regionalStyle)}
 Rules:
 - Output only JSON.
 - The JSON "name" must be exactly "${getDisplayRecipeName(recipeName, regionalStyle)}". Do not add descriptions, subtitles, "style" text, or alternate names.
+- Add a JSON "description" with one short playful line under 170 characters. Make it recipe-specific: a fun fact, light joke, or sarcastic newsroom-style comment. Do not mention real current political/news events or any person.
 - Use mostly the available ingredients, but basic pantry items like salt, oil, water, spices are allowed.
 - Generate the real, recognizable recipe for the requested dish, not a random variation.
 - Use ingredients that commonly belong in that dish and cuisine.
-- Do not invent unusual ingredients or substitutions unless the diet mode requires it.
+- Do not invent unusual ingredients or substitutions unless the active recipe rules require it.
 - For paneer recipes, paneer must remain the main ingredient. Do not replace paneer with raw banana or unrelated vegetables.
 - Do not overuse any single spice. Include hing/asafoetida only if it genuinely belongs or is necessary for Jain mode.
 - Make ingredients clear with quantities for ${requestedServings} servings.
@@ -495,6 +510,7 @@ Rules:
 Format:
 {
   "name": "",
+  "description": "",
   "ingredients": ["", ""],
   "steps": ["", ""],
   "servings": ${requestedServings}
@@ -513,9 +529,11 @@ Format:
     }
 
     const displayName = getDisplayRecipeName(recipeName, regionalStyle, recipe.name);
+    const description = getRecipeDescription(displayName, recipe);
     const enhancedRecipe = enhanceRecipe({
         name: displayName,
         title: displayName,
+        description,
         ingredients: Array.isArray(recipe.ingredients) ? recipe.ingredients : [],
         steps: Array.isArray(recipe.steps) ? recipe.steps : [],
         servings: recipe.servings || requestedServings
@@ -524,12 +542,12 @@ Format:
     res.json({
       recipe: {
         name: displayName,
+        description,
         ingredients: enhancedRecipe.ingredients,
         steps: enhancedRecipe.steps,
         servings: enhancedRecipe.servings || requestedServings,
         image: enhancedRecipe.image,
         nutrition: enhancedRecipe.nutrition,
-        dietMode,
         regionalStyle
       }
     });

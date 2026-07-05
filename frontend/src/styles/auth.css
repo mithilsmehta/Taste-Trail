@@ -58,13 +58,13 @@
 }
 
 .auth-input:focus {
-  border-color: #ff6b00 !important;
+  border-color: var(--tw-sage) !important;
   box-shadow: 0 0 5px rgba(255, 107, 0, 0.4) !important;
 }
 
 /* BUTTON */
 .btn-gradient {
-  background: linear-gradient(135deg, #ff8c42, #ff3d00);
+  background: linear-gradient(135deg, var(--tw-sage), #4f7e57);
   color: #fff !important;
   padding: 12px;
   margin-top: 12px;
@@ -84,7 +84,7 @@
 
 /* LINKS */
 .auth-link {
-  color: #ff6b00;
+  color: var(--tw-sage);
   font-weight: 600;
 }
 
@@ -118,7 +118,7 @@
 }
 
 .auth-stepper span.active {
-  background: #ff8c42;
+  background: var(--tw-sage);
 }
 
 .auth-actions-row {
@@ -144,13 +144,13 @@
 }
 
 .btn-auth-secondary:hover {
-  border-color: #ff8c42;
-  color: #ff6b00;
+  border-color: var(--tw-sage);
+  color: var(--tw-sage);
 }
 
 .health-meter-wrap {
-  background: #fff8e1;
-  border: 1px solid #ffd166;
+  background: var(--tw-sage-soft);
+  border: 1px solid rgba(95, 143, 103, 0.32);
   border-radius: 12px;
   padding: 16px;
 }
@@ -284,4 +284,76 @@
   .auth-stepper span {
     width: 30px;
   }
+}
+
+.auth-container,
+.auth-right {
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.54), rgba(247, 244, 234, 0) 320px),
+    var(--tw-cream);
+}
+
+.auth-box {
+  background: var(--tw-surface);
+  border: 1px solid var(--tw-border);
+  border-radius: var(--tw-radius);
+  box-shadow: var(--tw-shadow);
+}
+
+.auth-title {
+  color: var(--tw-ink);
+  font-family: Georgia, "Times New Roman", serif;
+  font-weight: 500;
+}
+
+.auth-subtitle,
+.bmi-card span,
+.bmi-card small {
+  color: var(--tw-muted);
+}
+
+.auth-input {
+  border-color: var(--tw-border) !important;
+  border-radius: 14px !important;
+}
+
+.auth-input:focus {
+  border-color: var(--tw-sage) !important;
+  box-shadow: 0 0 0 4px rgba(95, 143, 103, 0.14) !important;
+}
+
+.btn-gradient {
+  background: var(--tw-sage);
+  border-radius: 999px;
+}
+
+.btn-gradient:hover {
+  background: #4f7e57;
+  transform: translateY(-1px);
+}
+
+.auth-link,
+.btn-auth-secondary:hover {
+  color: var(--tw-sage);
+}
+
+.auth-stepper span.active {
+  background: var(--tw-sage);
+}
+
+.btn-auth-secondary,
+.health-meter-wrap,
+.bmi-card {
+  background: var(--tw-surface);
+  border-color: var(--tw-border);
+  border-radius: 18px;
+}
+
+.health-meter-wrap {
+  background: var(--tw-sage-soft);
+}
+
+.health-meter,
+.notification-toggle .form-check-input {
+  accent-color: var(--tw-sage);
 }

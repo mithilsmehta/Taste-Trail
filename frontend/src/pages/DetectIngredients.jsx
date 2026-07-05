@@ -20,7 +20,6 @@ const mealOptions = [
 
 const scanHistoryKey = "tastewiseIngredientScans";
 const nonVegetarianPattern = /\b(chicken|mutton|beef|pork|fish|seafood|prawn|shrimp|eggs?|gelatin|bacon|ham|turkey|lamb|keema)\b/i;
-const jainRestrictedPattern = /\b(onions?|garlic|potatoes?|aloo|carrots?|radish|beetroot|beet|turnip|ginger|sweet potato|yam|tapioca|cassava|arbi|colocasia|spring onion|green onion|scallion|leek|shallot)\b/i;
 
 const getPreferredServings = (user) => {
   const servings = Number(user?.onboarding?.usualServings);
@@ -60,13 +59,9 @@ export default function DetectIngredients() {
   const token = localStorage.getItem("token");
   const ingredientNames = useMemo(() => ingredients.map((item) => item.name), [ingredients]);
 
-  const getDietMode = () => {
-    return localStorage.getItem("tastewiseDietMode") === "jain" ? "jain" : "veg";
-  };
-
   const isIngredientBlockedByMode = (name) => {
     const value = String(name || "");
-    return nonVegetarianPattern.test(value) || (getDietMode() === "jain" && jainRestrictedPattern.test(value));
+    return nonVegetarianPattern.test(value);
   };
 
   const filterIngredientsForCurrentMode = (items = []) => {
@@ -74,9 +69,6 @@ export default function DetectIngredients() {
   };
 
   const sanitizeNotesForCurrentMode = (value = "") => {
-    if (getDietMode() === "jain" && jainRestrictedPattern.test(value)) {
-      return "Jain mode removed restricted ingredients from this scan.";
-    }
     if (nonVegetarianPattern.test(value)) {
       return "Veg mode removed non-vegetarian items from this scan.";
     }
@@ -205,7 +197,7 @@ export default function DetectIngredients() {
           "Content-Type": "application/json",
           Authorization: `Bearer ${token}`
         },
-        body: JSON.stringify({ image: imagePayload, dietMode: getDietMode() })
+        body: JSON.stringify({ image: imagePayload })
       });
       const data = await res.json();
 
@@ -242,7 +234,7 @@ export default function DetectIngredients() {
     const normalizedName = String(name || "").trim();
     if (!normalizedName) return;
     if (isIngredientBlockedByMode(normalizedName)) {
-      setError(`${getDietMode() === "jain" ? "Jain" : "Veg"} mode is on, so "${normalizedName}" cannot be added.`);
+      setError(`Vegetarian recipes block "${normalizedName}".`);
       return;
     }
 
@@ -276,7 +268,7 @@ export default function DetectIngredients() {
           "Content-Type": "application/json",
           Authorization: `Bearer ${token}`
         },
-        body: JSON.stringify({ ingredients, dietMode: getDietMode() })
+        body: JSON.stringify({ ingredients })
       });
       const data = await res.json();
 
@@ -309,8 +301,7 @@ export default function DetectIngredients() {
         body: JSON.stringify({
           recipeName: suggestion.name,
           ingredients,
-          servings: getPreferredServings(user),
-          dietMode: getDietMode()
+          servings: getPreferredServings(user)
         })
       });
       const data = await res.json();
@@ -330,10 +321,6 @@ export default function DetectIngredients() {
 
   const saveRecipe = async () => {
     if (!generatedRecipe || saving) return;
-    if (getDietMode() === "jain" && (generatedRecipe.ingredients || []).some(isIngredientBlockedByMode)) {
-      alert("Jain mode is on, so remove Jain-restricted ingredients before saving.");
-      return;
-    }
     setSaving(true);
 
     try {
@@ -345,11 +332,11 @@ export default function DetectIngredients() {
         },
         body: JSON.stringify({
           title: generatedRecipe.name,
+          description: generatedRecipe.description || "",
           ingredients: generatedRecipe.ingredients,
           steps: generatedRecipe.steps,
           image: imagePreview || generatedRecipe.image,
-          nutrition: generatedRecipe.nutrition,
-          dietMode: getDietMode()
+          nutrition: generatedRecipe.nutrition
         })
       });
       const data = await res.json();
@@ -374,11 +361,6 @@ export default function DetectIngredients() {
       alert("Choose meal and date first.");
       return;
     }
-    if (getDietMode() === "jain" && (generatedRecipe.ingredients || []).some(isIngredientBlockedByMode)) {
-      alert("Jain mode is on, so remove Jain-restricted ingredients before adding this recipe.");
-      return;
-    }
-
     setAddingMealPlan(true);
 
     try {
@@ -395,6 +377,7 @@ export default function DetectIngredients() {
           recipe: {
             id: "",
             title: generatedRecipe.name,
+            description: generatedRecipe.description || "",
             ingredients: generatedRecipe.ingredients || [],
             steps: generatedRecipe.steps || [],
             image: imagePreview || generatedRecipe.image,
@@ -641,6 +624,9 @@ export default function DetectIngredients() {
             <div className="recipe-title-row">
               <div>
                 <h2>{generatedRecipe.name}</h2>
+                {generatedRecipe.description && (
+                  <p className="generated-recipe-description">{generatedRecipe.description}</p>
+                )}
                 <p>{generatedRecipe.servings || 2} servings • Generated from your ingredients</p>
               </div>
               <div className="recipe-actions">

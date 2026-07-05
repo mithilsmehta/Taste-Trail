@@ -9,7 +9,7 @@ Uncomment this file when AdminDashboard.jsx is enabled again.
 */
 
 .admin-header {
-  border-bottom: 3px solid #ffc107;
+  border-bottom: 3px solid var(--tw-sage);
   margin-bottom: 24px;
   padding-bottom: 16px;
 }
@@ -104,7 +104,7 @@ Uncomment this file when AdminDashboard.jsx is enabled again.
 }
 
 .admin-user-list small {
-  background: #fff9e6;
+  background: var(--tw-sage-soft);
   border-radius: 999px;
   font-weight: 800;
   padding: 4px 10px;

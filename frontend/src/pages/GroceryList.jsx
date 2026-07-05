@@ -152,10 +152,6 @@ export default function GroceryList() {
   const [expandedRecipes, setExpandedRecipes] = useState({});
   const [checkedItems, setCheckedItems] = useState({});
 
-  useEffect(() => {
-    loadGroceryList();
-  }, []);
-
   const loadGroceryList = async () => {
     try {
       const token = localStorage.getItem("token");
@@ -175,6 +171,11 @@ export default function GroceryList() {
     }
     setLoading(false);
   };
+
+  useEffect(() => {
+    const loadTimer = window.setTimeout(loadGroceryList, 0);
+    return () => window.clearTimeout(loadTimer);
+  }, []);
 
   const toggleMark = (itemId) => {
     setCheckedItems(prev => ({
@@ -351,9 +352,9 @@ export default function GroceryList() {
       <div className="container mt-4 mb-5">
         <button 
           className="btn btn-outline-secondary mb-4"
-          onClick={() => navigate("/meal-planner")}
+          onClick={() => navigate("/home")}
         >
-          ← Back to Meal Planner
+          ← Back to Home
         </button>
 
         <div className="grocery-header mb-4">
@@ -419,9 +420,9 @@ export default function GroceryList() {
             <p className="text-muted mb-4">Add meal plans to generate your grocery list</p>
             <button 
               className="btn btn-warning px-4"
-              onClick={() => navigate("/meal-planner")}
+              onClick={() => navigate("/home")}
             >
-              Go to Meal Planner
+              Go to Home
             </button>
           </div>
         )}
@@ -513,9 +514,9 @@ export default function GroceryList() {
           <div className="quick-actions mt-5">
             <button
               className="btn btn-outline-dark btn-lg"
-              onClick={() => navigate("/meal-planner")}
+              onClick={() => navigate("/home")}
             >
-              📅 Back to Meal Planner
+              🏠 Back to Home
             </button>
           </div>
         )}

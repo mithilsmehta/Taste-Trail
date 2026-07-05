@@ -1,5 +1,5 @@
 .grocery-header {
-  border-bottom: 3px solid #ffc107;
+  border-bottom: 3px solid var(--tw-sage);
   padding-bottom: 16px;
 }
 
@@ -42,8 +42,8 @@
 }
 
 .provider-option.active {
-  background: #ffc107;
-  border-color: #f2b705;
+  background: var(--tw-sage);
+  border-color: var(--tw-orange);
 }
 
 .provider-zepto.active {
@@ -98,7 +98,7 @@
 .recipe-grocery-header {
   width: 100%;
   border: 0;
-  background: #fff8e1;
+  background: var(--tw-sage-soft);
   padding: 16px 18px;
   display: flex;
   align-items: center;
@@ -129,7 +129,7 @@
   width: 34px;
   height: 34px;
   border-radius: 999px;
-  background: #ffc107;
+  background: var(--tw-sage);
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -163,8 +163,8 @@
 }
 
 .grocery-item:hover {
-  border-color: #ffc107;
-  background: #fff9e6;
+  border-color: var(--tw-sage);
+  background: var(--tw-sage-soft);
 }
 
 .grocery-item.marked {
@@ -187,10 +187,10 @@
 }
 
 .btn-blinkit {
-  background: #ffd43b;
+  background: var(--tw-orange);
   color: #1f1f1f;
   font-weight: 600;
-  border: 2px solid #f2b705;
+  border: 2px solid var(--tw-orange);
   border-radius: 999px;
   padding: 8px 18px;
   display: flex;
@@ -200,7 +200,7 @@
 }
 
 .btn-blinkit:hover {
-  background: #ffc107;
+  background: var(--tw-sage);
   border-color: #d99a00;
   transform: translateY(-1px);
   color: #1f1f1f;
@@ -295,4 +295,63 @@
   .empty-state {
     padding: 36px 16px;
   }
+}
+
+.grocery-header {
+  border-bottom-color: var(--tw-border);
+}
+
+.provider-picker,
+.meal-section,
+.recipe-grocery-group,
+.grocery-item,
+.empty-state {
+  background: var(--tw-surface);
+  border-color: var(--tw-border);
+  border-radius: var(--tw-radius);
+  box-shadow: var(--tw-shadow);
+}
+
+.provider-option {
+  border-color: var(--tw-border);
+  color: var(--tw-sage);
+}
+
+.provider-option.active,
+.provider-zepto.active,
+.provider-bigbasket.active,
+.provider-instamart.active {
+  background: var(--tw-sage-soft);
+  border-color: var(--tw-sage);
+  color: var(--tw-sage);
+}
+
+.recipe-grocery-header {
+  background: var(--tw-sage-soft);
+}
+
+.recipe-chevron {
+  background: var(--tw-sage);
+  color: #fff;
+}
+
+.grocery-item:hover,
+.grocery-item.marked {
+  background: var(--tw-sage-soft);
+  border-color: rgba(95, 143, 103, 0.36);
+}
+
+.btn-blinkit {
+  background: var(--tw-orange);
+  border-color: var(--tw-orange);
+  box-shadow: none;
+  color: #231f1b;
+}
+
+.btn-blinkit:hover,
+.btn-blinkit:active {
+  background: #e9983f;
+  border-color: #e9983f;
+  box-shadow: none;
+  color: #231f1b;
 }

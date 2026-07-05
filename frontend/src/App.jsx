@@ -1,5 +1,5 @@
 import { lazy, Suspense, useContext, useEffect } from "react";
-import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate, useLocation } from "react-router-dom";
 import { AuthContext } from "./context/AuthContext";
 import ProtectedRoute from "./components/ProtectedRoute";
 // Admin dashboard is disabled for now.
@@ -12,6 +12,7 @@ const Register = lazy(() => import("./pages/Register"));
 const ForgotPassword = lazy(() => import("./pages/ForgotPassword"));
 const ResetPassword = lazy(() => import("./pages/ResetPassword"));
 const Home = lazy(() => import("./pages/Home"));
+const MobileSearch = lazy(() => import("./pages/MobileSearch"));
 const Profile = lazy(() => import("./pages/Profile"));
 const SearchResults = lazy(() => import("./pages/SearchResults"));
 const SavedRecipes = lazy(() => import("./pages/SavedRecipes"));
@@ -28,6 +29,16 @@ function PageLoader() {
   );
 }
 
+function ScrollToTop() {
+  const location = useLocation();
+
+  useEffect(() => {
+    window.scrollTo({ top: 0, left: 0 });
+  }, [location.pathname, location.search]);
+
+  return null;
+}
+
 export default function App() {
   const { user, token } = useContext(AuthContext);
 
@@ -41,6 +52,7 @@ export default function App() {
 
   return (
     <BrowserRouter>
+      <ScrollToTop />
       <Suspense fallback={<PageLoader />}>
         <Routes>
 
@@ -68,6 +80,15 @@ export default function App() {
             element={
               <ProtectedRoute>
                 <Profile />
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/mobile-search"
+            element={
+              <ProtectedRoute>
+                <MobileSearch />
               </ProtectedRoute>
             }
           />

@@ -1,5 +1,5 @@
 import { API_BASE_URL, apiUrl } from "../utils/api";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import Navbar from "../components/Navbar";
 import { getMondayDateKey, getTomorrowDateKey, getWeekFromDateKey, parseDateKey, toDateKey } from "../utils/weekPlan";
@@ -15,6 +15,7 @@ const defaultTimes = {
 };
 
 const plannerViewPreferenceKey = "tastewisePlannerView";
+const mobilePlannerNotesKeyPrefix = "tastewisePlannerNotes";
 const monthNames = [
   "January",
   "February",
@@ -32,9 +33,9 @@ const monthNames = [
 const shortWeekDays = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
 const emptyMealPlans = {
-  breakfast: Array(7).fill(null),
-  lunch: Array(7).fill(null),
-  dinner: Array(7).fill(null)
+  breakfast: Array.from({ length: 7 }, () => []),
+  lunch: Array.from({ length: 7 }, () => []),
+  dinner: Array.from({ length: 7 }, () => [])
 };
 
 export default function MealPlanner() {
@@ -46,7 +47,7 @@ export default function MealPlanner() {
   const [mealPlans, setMealPlans] = useState(emptyMealPlans);
   const [allMealPlans, setAllMealPlans] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [plannerView, setPlannerView] = useState(() => localStorage.getItem(plannerViewPreferenceKey) || "week");
+  const [plannerView] = useState(() => localStorage.getItem(plannerViewPreferenceKey) || "week");
   const [showRecipeModal, setShowRecipeModal] = useState(false);
   const [showCalendarDayModal, setShowCalendarDayModal] = useState(false);
   const [selectedSlot, setSelectedSlot] = useState(null);
@@ -55,29 +56,45 @@ export default function MealPlanner() {
   const [calendarMealType, setCalendarMealType] = useState("breakfast");
   const [savedRecipes, setSavedRecipes] = useState([]);
   const [recipeSearch, setRecipeSearch] = useState("");
-
-  useEffect(() => {
-    loadMealPlans();
-    loadAllMealPlans();
-    loadSavedRecipes();
-  }, [weekStartDate]);
+  const [mobileDragPlan, setMobileDragPlan] = useState(null);
+  const [mobileDragOverSlot, setMobileDragOverSlot] = useState(null);
+  const [mobileNotes, setMobileNotes] = useState({});
+  const [activeMobileCommentDay, setActiveMobileCommentDay] = useState("");
+  const mobilePressRef = useRef(null);
 
   useEffect(() => {
     localStorage.setItem(plannerViewPreferenceKey, plannerView);
   }, [plannerView]);
 
+  useEffect(() => {
+    const notesTimer = window.setTimeout(() => {
+      try {
+        const storedNotes = localStorage.getItem(`${mobilePlannerNotesKeyPrefix}:${weekStartDate}`);
+        setMobileNotes(storedNotes ? JSON.parse(storedNotes) : {});
+      } catch (err) {
+        console.error(err);
+        setMobileNotes({});
+      }
+    }, 0);
+
+    return () => window.clearTimeout(notesTimer);
+  }, [weekStartDate]);
+
   const normalizeMealPlans = (data) => {
     const normalized = {
-      breakfast: Array(7).fill(null),
-      lunch: Array(7).fill(null),
-      dinner: Array(7).fill(null)
+      breakfast: Array.from({ length: 7 }, () => []),
+      lunch: Array.from({ length: 7 }, () => []),
+      dinner: Array.from({ length: 7 }, () => [])
     };
 
     mealTypes.forEach((mealType) => {
       if (Array.isArray(data?.[mealType])) {
-        normalized[mealType] = [...data[mealType], ...Array(7).fill(null)].slice(0, 7);
+        normalized[mealType] = [...data[mealType], ...Array(7).fill([])].slice(0, 7).map((slot) => {
+          if (Array.isArray(slot)) return slot.filter(Boolean);
+          return slot ? [slot] : [];
+        });
       } else if (data?.[mealType]) {
-        normalized[mealType][0] = data[mealType];
+        normalized[mealType][0] = [data[mealType]];
       }
     });
 
@@ -127,6 +144,18 @@ export default function MealPlanner() {
       console.error(err);
     }
   };
+
+  useEffect(() => {
+    const loadTimer = window.setTimeout(() => {
+      loadMealPlans();
+      loadAllMealPlans();
+      loadSavedRecipes();
+    }, 0);
+
+    return () => window.clearTimeout(loadTimer);
+    // Reload when the selected week changes; loader functions own their own request state.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [weekStartDate]);
 
   const openRecipeModal = (mealType, dayIndex, planDate) => {
     setSelectedSlot({ mealType, dayIndex, planDate });
@@ -229,7 +258,6 @@ export default function MealPlanner() {
         return;
       }
 
-      alert(`✅ Recipe assigned to ${mealType} for ${getRecipeLabelForDate(planDate)}!`);
       setShowRecipeModal(false);
       setShowCalendarDayModal(false);
       setSelectedSlot(null);
@@ -268,6 +296,202 @@ export default function MealPlanner() {
       console.error(err);
       alert("Failed to delete meal plan");
     }
+  };
+
+  const deleteMealPlanQuietly = async (mealPlan) => {
+    if (!mealPlan) return;
+
+    try {
+      const token = localStorage.getItem("token");
+      const res = await fetch(`${API_BASE_URL}/api/meal-plans/${mealPlan._id}`, {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${token}` }
+      });
+
+      if (!res.ok) {
+        const data = await res.json();
+        alert(data.msg || "Failed to delete");
+        return;
+      }
+
+      loadMealPlans();
+      loadAllMealPlans();
+    } catch (err) {
+      console.error(err);
+      alert("Failed to delete meal plan");
+    }
+  };
+
+  const isMobilePlannerInteraction = () =>
+    typeof window !== "undefined" && window.matchMedia("(max-width: 991.98px)").matches;
+
+  const getMobileSlotKey = (mealType, dayIndex) => `${mealType}-${dayIndex}`;
+
+  const getSlotPlans = (mealType, dayIndex) => {
+    const slot = mealPlans[mealType]?.[dayIndex];
+    if (Array.isArray(slot)) return slot.filter(Boolean);
+    return slot ? [slot] : [];
+  };
+
+  const updateMobileNote = (dateKey, value) => {
+    setMobileNotes((currentNotes) => {
+      const nextNotes = { ...currentNotes, [dateKey]: value };
+      localStorage.setItem(`${mobilePlannerNotesKeyPrefix}:${weekStartDate}`, JSON.stringify(nextNotes));
+      return nextNotes;
+    });
+  };
+
+  const clearMobilePressTimers = () => {
+    const pressState = mobilePressRef.current;
+    if (!pressState) return;
+    window.clearTimeout(pressState.dragTimer);
+    window.clearTimeout(pressState.viewTimer);
+  };
+
+  const finishMobilePress = () => {
+    clearMobilePressTimers();
+    mobilePressRef.current = null;
+    setMobileDragPlan(null);
+    setMobileDragOverSlot(null);
+  };
+
+  const getDropSlotFromPoint = (clientX, clientY) => {
+    const element = document.elementFromPoint(clientX, clientY);
+    return element?.closest("[data-mobile-drop-slot]") || null;
+  };
+
+  const moveMealPlan = async (mealPlan, target) => {
+    if (!mealPlan || !target) return;
+    if (mealPlan.mealType === target.mealType && mealPlan.dayIndex === target.dayIndex && mealPlan.planDate === target.planDate) {
+      return;
+    }
+
+    try {
+      const token = localStorage.getItem("token");
+      const res = await fetch(`${API_BASE_URL}/api/meal-plans/${mealPlan._id}`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          mealType: target.mealType,
+          dayIndex: target.dayIndex,
+          planDate: target.planDate,
+          time: defaultTimes[target.mealType]
+        })
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+        alert(data.msg || "Failed to move meal plan");
+        return;
+      }
+
+      loadMealPlans();
+      loadAllMealPlans();
+    } catch (err) {
+      console.error(err);
+      alert("Failed to move meal plan");
+    }
+  };
+
+  const handleMobileRecipePointerDown = (event, mealPlan, mealType, dayIndex, planDate) => {
+    if (!isMobilePlannerInteraction() || !mealPlan) return;
+    if (event.pointerType === "mouse" && event.button !== 0) return;
+
+    event.preventDefault();
+    event.currentTarget.setPointerCapture?.(event.pointerId);
+    clearMobilePressTimers();
+
+    const pressState = {
+      mealPlan,
+      mealType,
+      dayIndex,
+      planDate,
+      pointerId: event.pointerId,
+      startX: event.clientX,
+      startY: event.clientY,
+      startAt: event.timeStamp,
+      dragReady: false,
+      dragging: false,
+      moved: false,
+      opened: false,
+      dragTimer: 0,
+      viewTimer: 0
+    };
+
+    pressState.dragTimer = window.setTimeout(() => {
+      pressState.dragReady = true;
+      setMobileDragPlan(mealPlan);
+    }, 2000);
+
+    pressState.viewTimer = window.setTimeout(() => {
+      if (!pressState.dragging && !pressState.moved) {
+        pressState.opened = true;
+        setSelectedPlan({ ...mealPlan, displayDayIndex: dayIndex });
+        finishMobilePress();
+      }
+    }, 3000);
+
+    mobilePressRef.current = pressState;
+  };
+
+  const handleMobileRecipePointerMove = (event) => {
+    const pressState = mobilePressRef.current;
+    if (!pressState || pressState.pointerId !== event.pointerId || !isMobilePlannerInteraction()) return;
+
+    const movement = Math.hypot(event.clientX - pressState.startX, event.clientY - pressState.startY);
+    if (movement > 12) {
+      pressState.moved = true;
+    }
+
+    if (!pressState.dragReady) return;
+
+    event.preventDefault();
+    pressState.dragging = true;
+    window.clearTimeout(pressState.viewTimer);
+
+    const slot = getDropSlotFromPoint(event.clientX, event.clientY);
+    if (!slot) {
+      setMobileDragOverSlot(null);
+      return;
+    }
+
+    setMobileDragOverSlot(getMobileSlotKey(slot.dataset.mealType, Number(slot.dataset.dayIndex)));
+  };
+
+  const handleMobileRecipePointerUp = (event) => {
+    const pressState = mobilePressRef.current;
+    if (!pressState || pressState.pointerId !== event.pointerId || !isMobilePlannerInteraction()) return;
+
+    event.preventDefault();
+    const elapsed = event.timeStamp - pressState.startAt;
+
+    if (pressState.dragging) {
+      const slot = getDropSlotFromPoint(event.clientX, event.clientY);
+      if (slot) {
+        moveMealPlan(pressState.mealPlan, {
+          mealType: slot.dataset.mealType,
+          dayIndex: Number(slot.dataset.dayIndex),
+          planDate: slot.dataset.planDate
+        });
+      }
+      finishMobilePress();
+      return;
+    }
+
+    if (!pressState.opened && !pressState.moved && elapsed < 700) {
+      deleteMealPlanQuietly(pressState.mealPlan);
+    }
+
+    finishMobilePress();
+  };
+
+  const handleMobileRecipePointerCancel = (event) => {
+    const pressState = mobilePressRef.current;
+    if (!pressState || pressState.pointerId !== event.pointerId) return;
+    finishMobilePress();
   };
 
   const getMealIcon = (mealType) => {
@@ -331,11 +555,6 @@ export default function MealPlanner() {
 
   const getCalendarMealPlan = (mealType = calendarMealType, dateKey = calendarDate) => {
     return allMealPlans.find((plan) => plan.planDate === dateKey && plan.mealType === mealType) || null;
-  };
-
-  const getCalendarTitle = () => {
-    const date = parseDateKey(calendarDate);
-    return `${monthNames[date.getMonth()]} ${date.getFullYear()}`;
   };
 
   if (loading) {
@@ -440,37 +659,57 @@ export default function MealPlanner() {
                 </div>
 
                 {weekDays.map((day, dayIndex) => {
-                  const mealPlan = mealPlans[mealType]?.[dayIndex];
+                  const slotPlans = getSlotPlans(mealType, dayIndex);
 
                   return (
-                    <div key={`${mealType}-${day.dateKey}`} className="planner-slot">
-                      {mealPlan ? (
-                        <div className="planned-recipe">
-                          <h6 className="fw-bold mb-2">{mealPlan.recipe.title}</h6>
-                          <p className="text-muted small mb-3">
-                            {getDisplayIngredients(mealPlan.recipe.ingredients).length} ingredients
-                          </p>
+                    <div
+                      key={`${mealType}-${day.dateKey}`}
+                      className={`planner-slot ${mobileDragOverSlot === getMobileSlotKey(mealType, dayIndex) ? "mobile-drop-target" : ""}`}
+                      data-mobile-drop-slot="true"
+                      data-meal-type={mealType}
+                      data-day-index={dayIndex}
+                      data-plan-date={day.dateKey}
+                    >
+                      <span className="mobile-slot-date">{day.dayName} • {day.dateLabel}</span>
+                      {slotPlans.length > 0 ? (
+                        <div className="planned-recipes-stack">
+                          {slotPlans.map((mealPlan) => (
+                            <div
+                              key={mealPlan._id}
+                              className={`planned-recipe ${mobileDragPlan?._id === mealPlan._id ? "mobile-drag-source" : ""}`}
+                              onPointerDown={(event) => handleMobileRecipePointerDown(event, mealPlan, mealType, dayIndex, day.dateKey)}
+                              onPointerMove={handleMobileRecipePointerMove}
+                              onPointerUp={handleMobileRecipePointerUp}
+                              onPointerCancel={handleMobileRecipePointerCancel}
+                            >
+                              <h6 className="fw-bold mb-2">{mealPlan.recipe.title}</h6>
+                              <p className="text-muted small mb-3">
+                                {getDisplayIngredients(mealPlan.recipe.ingredients).length} ingredients
+                              </p>
+                              <p className="mobile-recipe-hint">Tap removes • hold 3s opens • hold 2s + drag moves</p>
 
-                          <div className="slot-actions">
-                            <button
-                              className="btn btn-warning btn-sm"
-                              onClick={() => setSelectedPlan({ ...mealPlan, displayDayIndex: dayIndex })}
-                            >
-                              View
-                            </button>
-                            <button
-                              className="btn btn-outline-primary btn-sm"
-                              onClick={() => openRecipeModal(mealType, dayIndex, day.dateKey)}
-                            >
-                              Change
-                            </button>
-                            <button
-                              className="btn btn-outline-danger btn-sm"
-                              onClick={() => deleteMealPlan(mealPlan)}
-                            >
-                              Remove
-                            </button>
-                          </div>
+                              <div className="slot-actions">
+                                <button
+                                  className="btn btn-warning btn-sm"
+                                  onClick={() => setSelectedPlan({ ...mealPlan, displayDayIndex: dayIndex })}
+                                >
+                                  View
+                                </button>
+                                <button
+                                  className="btn btn-outline-danger btn-sm"
+                                  onClick={() => deleteMealPlan(mealPlan)}
+                                >
+                                  Remove
+                                </button>
+                              </div>
+                            </div>
+                          ))}
+                          <button
+                            className="empty-slot-btn compact"
+                            onClick={() => openRecipeModal(mealType, dayIndex, day.dateKey)}
+                          >
+                            + Add another
+                          </button>
                         </div>
                       ) : (
                         <button
@@ -484,6 +723,89 @@ export default function MealPlanner() {
                   );
                 })}
               </div>
+            ))}
+          </div>
+
+          <div className="mobile-week-board" aria-label="7 day meal planner">
+            {weekDays.map((day, dayIndex) => (
+              <section key={day.dateKey} className="mobile-day-line">
+                <button
+                  type="button"
+                  className={`mobile-date-pill ${selectedDate === day.dateKey ? "active" : ""}`}
+                  onClick={() => setSelectedDate(day.dateKey)}
+                  aria-label={`Choose ${day.fullLabel}`}
+                >
+                  <strong>{parseDateKey(day.dateKey).getDate()}</strong>
+                  <span>{day.shortDayName}</span>
+                </button>
+
+                <div className="mobile-day-panel">
+                  <div className="mobile-day-meals">
+                    {mealTypes.map((mealType) => {
+                      const slotPlans = getSlotPlans(mealType, dayIndex);
+                      const slotKey = getMobileSlotKey(mealType, dayIndex);
+
+                      return (
+                        <div
+                          key={`${day.dateKey}-${mealType}`}
+                          className={`mobile-meal-column ${mobileDragOverSlot === slotKey ? "mobile-drop-target" : ""}`}
+                          data-mobile-drop-slot="true"
+                          data-meal-type={mealType}
+                          data-day-index={dayIndex}
+                          data-plan-date={day.dateKey}
+                        >
+                          <h3>{mealType}</h3>
+                          <div className="mobile-meal-list">
+                            {slotPlans.map((mealPlan) => (
+                              <div
+                                key={mealPlan._id}
+                                className={`mobile-meal-recipe ${mealType} ${mobileDragPlan?._id === mealPlan._id ? "mobile-drag-source" : ""}`}
+                                role="button"
+                                tabIndex={0}
+                                aria-label={`${mealPlan.recipe.title}. Tap to remove, hold to open, or hold and drag to move.`}
+                                onPointerDown={(event) => handleMobileRecipePointerDown(event, mealPlan, mealType, dayIndex, day.dateKey)}
+                                onPointerMove={handleMobileRecipePointerMove}
+                                onPointerUp={handleMobileRecipePointerUp}
+                                onPointerCancel={handleMobileRecipePointerCancel}
+                              >
+                                <span>{mealPlan.recipe.title}</span>
+                              </div>
+                            ))}
+                            <button
+                              type="button"
+                              className="mobile-empty-meal"
+                              onClick={() => openRecipeModal(mealType, dayIndex, day.dateKey)}
+                            >
+                              Add
+                            </button>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+
+                  <div className="mobile-day-actions">
+                    <button
+                      type="button"
+                      className={`mobile-comment-btn ${mobileNotes[day.dateKey] ? "has-comment" : ""}`}
+                      onClick={() => setActiveMobileCommentDay((currentDay) => currentDay === day.dateKey ? "" : day.dateKey)}
+                      aria-label={`Add comment for ${day.fullLabel}`}
+                    >
+                      ◌
+                    </button>
+                  </div>
+
+                  {activeMobileCommentDay === day.dateKey && (
+                    <textarea
+                      className="mobile-day-note"
+                      value={mobileNotes[day.dateKey] || ""}
+                      onChange={(event) => updateMobileNote(day.dateKey, event.target.value)}
+                      placeholder="Add comment for this day..."
+                      rows={2}
+                    />
+                  )}
+                </div>
+              </section>
             ))}
           </div>
         </div>

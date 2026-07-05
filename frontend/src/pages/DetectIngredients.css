@@ -5,7 +5,7 @@
 
 .detect-header {
   align-items: flex-start;
-  border-bottom: 3px solid #ffc107;
+  border-bottom: 3px solid var(--tw-sage);
   display: flex;
   gap: 18px;
   justify-content: space-between;
@@ -57,8 +57,8 @@
 
 .image-dropzone:hover,
 .image-dropzone.has-image {
-  border-color: #ffc107;
-  background: #fff9e6;
+  border-color: var(--tw-sage);
+  background: var(--tw-sage-soft);
 }
 
 .image-dropzone img {
@@ -104,8 +104,8 @@
 }
 
 .veg-warning {
-  background: #fff4e5;
-  border: 1px solid #ffc107;
+  background: var(--tw-sage-soft);
+  border: 1px solid var(--tw-sage);
   border-radius: 8px;
   color: #7a4d00;
   font-weight: 700;
@@ -123,8 +123,8 @@
 
 .ingredient-chip {
   align-items: center;
-  background: #fff9e6;
-  border: 1px solid #ffc107;
+  background: var(--tw-sage-soft);
+  border: 1px solid var(--tw-sage);
   border-radius: 999px;
   display: inline-flex;
   gap: 8px;
@@ -153,8 +153,8 @@
 }
 
 .uncertain-items-box {
-  background: #fff9e6;
-  border: 1px solid #ffe082;
+  background: var(--tw-sage-soft);
+  border: 1px solid rgba(95, 143, 103, 0.28);
   border-radius: 8px;
   margin-top: 18px;
   padding: 14px;
@@ -179,7 +179,7 @@
 .uncertain-item-list button {
   align-items: flex-start;
   background: #fff;
-  border: 1px solid #ffc107;
+  border: 1px solid var(--tw-sage);
   border-radius: 8px;
   display: flex;
   flex-direction: column;
@@ -189,7 +189,7 @@
 }
 
 .uncertain-item-list button:hover {
-  background: #fff4cc;
+  background: var(--tw-cream-2);
 }
 
 .uncertain-item-list span {
@@ -203,6 +203,13 @@
 .suggestions-section,
 .generated-recipe {
   margin-top: 24px;
+}
+
+.generated-recipe-description {
+  color: #5f4b17;
+  font-weight: 600;
+  line-height: 1.45;
+  margin: 6px 0;
 }
 
 .suggestion-grid {
@@ -276,8 +283,8 @@
 }
 
 .generated-nutrition-grid div {
-  background: #fff9e6;
-  border: 1px solid #ffe082;
+  background: var(--tw-sage-soft);
+  border: 1px solid rgba(95, 143, 103, 0.28);
   border-radius: 8px;
   padding: 12px;
 }
@@ -493,6 +500,66 @@
     align-items: flex-end;
     padding: 12px;
   }
+}
+
+.detect-page {
+  color: var(--tw-ink);
+}
+
+.detect-header {
+  border-bottom-color: var(--tw-border);
+}
+
+.detect-header h1,
+.panel-heading h3 {
+  font-family: Georgia, "Times New Roman", serif;
+  font-weight: 500;
+}
+
+.detect-panel,
+.suggestions-section,
+.generated-recipe,
+.suggestion-card,
+.scan-history-card,
+.detect-modal-content {
+  background: var(--tw-surface);
+  border-color: var(--tw-border);
+  border-radius: var(--tw-radius);
+  box-shadow: var(--tw-shadow);
+}
+
+.image-dropzone,
+.ingredient-chip,
+.uncertain-items-box,
+.veg-warning,
+.matched-row span {
+  background: var(--tw-sage-soft);
+  border-color: rgba(95, 143, 103, 0.34);
+  color: var(--tw-sage);
+}
+
+.image-dropzone:hover,
+.image-dropzone.has-image,
+.uncertain-item-list button:hover,
+.suggestion-card.selected {
+  background: var(--tw-cream-2);
+  border-color: var(--tw-sage);
+}
+
+.uncertain-item-list button,
+.meal-option-card,
+.plan-date-option {
+  background: var(--tw-surface);
+  border-color: var(--tw-border);
+  border-radius: 14px;
+}
+
+.generated-recipe-description {
+  color: var(--tw-muted);
+}
+
+.detect-modal-header {
+  border-bottom-color: var(--tw-border);
 }
 
 @media (max-width: 480px) {

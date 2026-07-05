@@ -5,6 +5,7 @@ import { AuthContext } from "../context/AuthContext";
 import Navbar from "../components/Navbar";
 import { getMondayDateKey, getWeekFromDateKey } from "../utils/weekPlan";
 import { formatIngredientAmount } from "../utils/recipeFormatting";
+import { estimateNutrition } from "../utils/nutritionEstimator";
 
 const defaultTimes = {
   breakfast: "08:00",
@@ -20,7 +21,8 @@ const mealOptions = [
 
 const nonVegetarianPattern = /\b(chicken|mutton|beef|pork|fish|seafood|prawn|shrimp|eggs?|gelatin|bacon|ham|turkey|lamb|keema)\b/i;
 const jainRestrictedPattern = /\b(onions?|garlic|potatoes?|aloo|carrots?|radish|beetroot|beet|turnip|ginger|sweet potato|yam|tapioca|cassava|arbi|colocasia|spring onion|green onion|scallion|leek|shallot)\b/i;
-const recipeCacheVersion = "v3";
+const veganRestrictedPattern = /\b(milk|curd|yogurt|yoghurt|dahi|paneer|cheese|cream|butter|ghee|honey|mayonnaise|mayo|mozzarella|parmesan|ricotta|mascarpone|malai|buttermilk|whey|casein|milk powder|condensed milk|khoya|mawa|eggs?)\b/i;
+const recipeCacheVersion = "v5";
 
 const getPreferredServings = (user) => {
   const servings = Number(user?.onboarding?.usualServings);
@@ -84,7 +86,9 @@ export default function SearchResults() {
   const location = useLocation();
   const navigate = useNavigate();
   const { user } = useContext(AuthContext);
-  const query = new URLSearchParams(location.search).get("q");
+  const searchParams = new URLSearchParams(location.search);
+  const query = searchParams.get("q");
+  const savedRecipeId = searchParams.get("savedId");
   const preferredServings = getPreferredServings(user);
   const regionalStyle = getRegionalStyle(user);
 
@@ -101,6 +105,7 @@ export default function SearchResults() {
   const [servings, setServings] = useState(preferredServings);
   const [originalRecipe, setOriginalRecipe] = useState(null);
   const [showMealModal, setShowMealModal] = useState(false);
+  const [showNutritionModal, setShowNutritionModal] = useState(false);
   const [addingMealPlan, setAddingMealPlan] = useState(false);
   const [mealPlanChoice, setMealPlanChoice] = useState({
     mealType: "",
@@ -108,12 +113,6 @@ export default function SearchResults() {
     planDate: ""
   });
   const historyGuardActiveRef = useRef(false);
-
-  useEffect(() => {
-    if (!query) return;
-    setServings(preferredServings);
-    fetchRecipe(preferredServings);
-  }, [query, preferredServings, regionalStyle]);
 
   useEffect(() => {
     if (!hasIngredientChanges) return undefined;
@@ -152,33 +151,40 @@ export default function SearchResults() {
   };
 
   const getDietMode = () => {
-    return localStorage.getItem("tastewiseDietMode") === "jain" ? "jain" : "veg";
+    const normalizedQuery = String(query || "").toLowerCase();
+    if (/\bjain\b/.test(normalizedQuery)) return "jain";
+    if (/\bvegan\b/.test(normalizedQuery)) return "vegan";
+    return "veg";
   };
 
-  const isJainSafeRecipe = (value) => {
-    const text = [
-      value?.name,
-      value?.title,
-      ...(Array.isArray(value?.ingredients) ? value.ingredients : [])
-    ].join(" ");
-    return !jainRestrictedPattern.test(text);
+  const getDietModeLabel = () => {
+    const mode = getDietMode();
+    if (mode === "jain") return "Jain";
+    if (mode === "vegan") return "Vegan";
+    return "Veg";
   };
 
-  const isRecipeSafeForDietMode = (value) => {
-    const text = [
+  const getRecipeSafetyText = (value) => {
+    return [
       value?.name,
       value?.title,
       ...(Array.isArray(value?.ingredients) ? value.ingredients : []),
       ...(Array.isArray(value?.steps) ? value.steps : [])
     ].join(" ");
+  };
+
+  const isRecipeSafeForDietMode = (value) => {
+    const text = getRecipeSafetyText(value);
     if (nonVegetarianPattern.test(text)) return false;
-    return getDietMode() !== "jain" || isJainSafeRecipe(value);
+    if (getDietMode() === "jain" && jainRestrictedPattern.test(text)) return false;
+    if (getDietMode() === "vegan" && veganRestrictedPattern.test(text)) return false;
+    return true;
   };
 
   const getModeBlockedText = () => {
-    return getDietMode() === "jain"
-      ? "Jain mode blocks onion, garlic, ginger, potato, carrot, and root vegetables."
-      : "Veg mode blocks non-vegetarian ingredients.";
+    if (getDietMode() === "jain") return "Jain search blocks non-veg items, onion, garlic, ginger, potato, carrot, and root vegetables.";
+    if (getDietMode() === "vegan") return "Vegan search blocks non-veg items, dairy, honey, eggs, and animal products.";
+    return "Veg recipes block non-veg items.";
   };
 
   const getRecipeCacheKey = (servingCount = servings) => `tastewiseRecipe:${recipeCacheVersion}:${getDietMode()}:${normalizeTitle(regionalStyle) || "default"}:${normalizeTitle(query)}:${servingCount}`;
@@ -193,7 +199,7 @@ export default function SearchResults() {
       .map((step, index) => `${index + 1}. ${step}`)
       .join("\n");
 
-    return `${recipe.name}\n\nIngredients:\n${ingredients}\n\nCooking Steps:\n${steps}`;
+    return `${recipe.name}\n${recipe.description || ""}\n\nIngredients:\n${ingredients}\n\nCooking Steps:\n${steps}`;
   };
 
   const getCleanIngredients = (ingredients = []) => {
@@ -208,6 +214,7 @@ export default function SearchResults() {
       ...recipe,
       healthScore: getCurrentHealthScore(),
       healthLabel: getCurrentHealthLabel(),
+      nutrition: getCurrentNutrition(),
       ingredients: getCleanIngredients(recipe.ingredients)
     };
   };
@@ -222,6 +229,50 @@ export default function SearchResults() {
   const getCurrentHealthLabel = () => {
     if (!recipe) return "Moderate";
     return recipe.healthLabel || getHealthLabel(getCurrentHealthScore());
+  };
+
+  const getCurrentNutrition = () => {
+    const nutrition = recipe?.nutrition || {};
+    const ingredients = getCleanIngredients(recipe?.ingredients || []);
+    const estimatedTotalNutrition = estimateNutrition(ingredients, 1);
+    const currentServings = Math.max(1, Number(servings) || Number(recipe?.servings) || 1);
+
+    const readNutritionValue = (key) => {
+      const estimated = Number(estimatedTotalNutrition[key]);
+      const provided = Number(nutrition[key]);
+
+      if (Number.isFinite(estimated) && estimated > 0) {
+        return Math.max(0, Math.round(estimated));
+      }
+
+      return Number.isFinite(provided) && provided > 0
+        ? Math.max(0, Math.round(provided * currentServings))
+        : 0;
+    };
+
+    return {
+      calories: readNutritionValue("calories"),
+      protein: readNutritionValue("protein"),
+      carbs: readNutritionValue("carbs"),
+      fat: readNutritionValue("fat"),
+      fiber: readNutritionValue("fiber")
+    };
+  };
+
+  const getNutritionSegments = () => {
+    const nutrition = getCurrentNutrition();
+    const segments = [
+      { key: "carbs", label: "Carbs", value: nutrition.carbs, unit: "g", color: "#f5b642", softColor: "#fff1cf" },
+      { key: "fat", label: "Fat", value: nutrition.fat, unit: "g", color: "#e85d75", softColor: "#ffe2e8" },
+      { key: "protein", label: "Protein", value: nutrition.protein, unit: "g", color: "#2fa36b", softColor: "#ddf5e9" },
+      { key: "fiber", label: "Fiber", value: nutrition.fiber, unit: "g", color: "#4aa8df", softColor: "#dff1fb" }
+    ];
+    const totalMacros = segments.reduce((sum, segment) => sum + Math.max(0, Number(segment.value) || 0), 0) || 1;
+
+    return segments.map((segment) => ({
+      ...segment,
+      percentage: Math.max(6, Math.min(100, Math.round((Math.max(0, Number(segment.value) || 0) / totalMacros) * 100)))
+    }));
   };
 
   const markRecipeCustomized = () => {
@@ -323,9 +374,10 @@ export default function SearchResults() {
     const savedServings = Number(savedRecipe.servings) || 2;
     const scaleFactor = servingCount / savedServings;
 
-    return {
-      name: savedRecipe.title,
-      ingredients: (savedRecipe.ingredients || []).map((ingredient) => scaleIngredientText(ingredient, scaleFactor)),
+      return {
+        name: savedRecipe.title,
+        description: savedRecipe.description || "",
+        ingredients: (savedRecipe.ingredients || []).map((ingredient) => scaleIngredientText(ingredient, scaleFactor)),
       steps: savedRecipe.steps || [],
       healthScore: savedRecipe.healthScore,
       healthLabel: savedRecipe.healthLabel,
@@ -333,6 +385,54 @@ export default function SearchResults() {
       servings: servingCount
     };
   };
+
+  const getRecipeFromSavedDocument = (savedRecipe, servingCount = Number(savedRecipe?.servings) || preferredServings) => ({
+    name: savedRecipe.title,
+    description: savedRecipe.description || "",
+    ingredients: savedRecipe.ingredients || [],
+    steps: savedRecipe.steps || [],
+    healthScore: savedRecipe.healthScore,
+    healthLabel: savedRecipe.healthLabel,
+    nutrition: savedRecipe.nutrition,
+    regionalStyle: savedRecipe.regionalStyle,
+    servings: servingCount,
+    source: "saved"
+  });
+
+  async function loadSavedRecipeById(id) {
+    setLoading(true);
+    setError("");
+    setRecipe(null);
+    setRecipeSource("");
+    setOriginalRecipe(null);
+    setIsSaved(false);
+    setHasIngredientChanges(false);
+    setCustomIngredient("");
+
+    try {
+      const token = localStorage.getItem("token");
+      const res = await fetch(apiUrl(`/api/recipes/${encodeURIComponent(id)}`), {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      const data = await res.json();
+
+      if (!res.ok) {
+        throw new Error(data.msg || "Failed to load saved recipe");
+      }
+
+      const savedRecipe = getRecipeFromSavedDocument(data);
+      setServings(savedRecipe.servings);
+      setOriginalRecipe(savedRecipe);
+      setRecipe(savedRecipe);
+      setRecipeSource("saved");
+      setIsSaved(true);
+    } catch (err) {
+      console.error(err);
+      setError(err.message || "Failed to load saved recipe");
+    }
+
+    setLoading(false);
+  }
 
   async function fetchRecipe(activeServings = servings, options = {}) {
     const forceRegenerate = Boolean(options.forceRegenerate);
@@ -389,7 +489,6 @@ export default function SearchResults() {
         body: JSON.stringify({
           query,
           servings: activeServings,
-          dietMode: getDietMode(),
           regionalStyle,
           forceRegenerate
         })
@@ -405,7 +504,7 @@ export default function SearchResults() {
 
       if (!isRecipeSafeForDietMode(parsed)) {
         localStorage.removeItem(cacheKey);
-        throw new Error(`Generated recipe did not match ${getDietMode() === "jain" ? "Jain" : "Veg"} mode. ${getModeBlockedText()} Please generate again.`);
+        throw new Error(`Generated recipe did not match ${getDietModeLabel()} search rules. ${getModeBlockedText()} Please generate again.`);
       }
       
       // Store original recipe for scaling
@@ -422,6 +521,23 @@ export default function SearchResults() {
 
     setLoading(false);
   }
+
+  useEffect(() => {
+    const loadTimer = window.setTimeout(() => {
+      if (savedRecipeId) {
+        loadSavedRecipeById(savedRecipeId);
+        return;
+      }
+
+      if (!query) return;
+      setServings(preferredServings);
+      fetchRecipe(preferredServings);
+    }, 0);
+
+    return () => window.clearTimeout(loadTimer);
+    // Route changes should reload the recipe; these loaders intentionally own their internal state resets.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [query, savedRecipeId, preferredServings, regionalStyle]);
 
   const regenerateRecipe = () => {
     if (!query || loading) return;
@@ -473,11 +589,15 @@ export default function SearchResults() {
     const ingredient = customIngredient.trim();
     if (!ingredient) return;
     if (nonVegetarianPattern.test(ingredient)) {
-      alert("Veg mode is strict, so non-veg ingredients cannot be added.");
+      alert("Veg recipes are strict, so non-veg ingredients cannot be added.");
       return;
     }
     if (getDietMode() === "jain" && jainRestrictedPattern.test(ingredient)) {
-      alert("Jain mode is on, so this ingredient cannot be added.");
+      alert("Jain search is active, so this ingredient cannot be added.");
+      return;
+    }
+    if (getDietMode() === "vegan" && veganRestrictedPattern.test(ingredient)) {
+      alert("Vegan search is active, so this ingredient cannot be added.");
       return;
     }
 
@@ -496,7 +616,7 @@ export default function SearchResults() {
   const saveRecipe = async ({ silent = false } = {}) => {
     if (!recipe || saving) return false;
     if (!isRecipeSafeForDietMode(recipe)) {
-      if (!silent) alert(`${getDietMode() === "jain" ? "Jain" : "Veg"} mode is on, so remove blocked ingredients before saving.`);
+      if (!silent) alert(`${getDietModeLabel()} search rules are active, so remove blocked ingredients before saving.`);
       return false;
     }
 
@@ -515,12 +635,12 @@ export default function SearchResults() {
         },
         body: JSON.stringify({
           title: recipeForSaving.name,
+          description: recipeForSaving.description || "",
           ingredients: recipeForSaving.ingredients,
           steps: recipeForSaving.steps,
           image: "",
           healthScore: recipeForSaving.healthScore,
-          healthLabel: recipeForSaving.healthLabel,
-          dietMode: getDietMode()
+          healthLabel: recipeForSaving.healthLabel
         }),
       });
 
@@ -534,8 +654,12 @@ export default function SearchResults() {
 
       setIsSaved(true);
       setHasIngredientChanges(false);
+      const returnedRecipe = data.recipe || {};
       const savedRecipe = {
-        ...(data.recipe || recipeForSaving),
+        ...recipeForSaving,
+        ...returnedRecipe,
+        name: returnedRecipe.title || returnedRecipe.name || recipeForSaving.name,
+        description: returnedRecipe.description || recipeForSaving.description || "",
         steps: recipeForSaving.steps || []
       };
       setRecipe(savedRecipe);
@@ -597,7 +721,7 @@ export default function SearchResults() {
 
       const recipeForSaving = getRecipeForSaving();
       if (!isRecipeSafeForDietMode(recipeForSaving)) {
-        alert(`${getDietMode() === "jain" ? "Jain" : "Veg"} mode is on, so remove blocked ingredients before adding this recipe.`);
+        alert(`${getDietModeLabel()} search rules are active, so remove blocked ingredients before adding this recipe.`);
         return;
       }
 
@@ -614,6 +738,7 @@ export default function SearchResults() {
           recipe: {
             id: "",
             title: recipeForSaving.name,
+            description: recipeForSaving.description || "",
             ingredients: recipeForSaving.ingredients || [],
             steps: recipeForSaving.steps || [],
             image: ""
@@ -708,27 +833,52 @@ export default function SearchResults() {
               <div className="d-flex justify-content-between align-items-start flex-wrap gap-3">
                 <div>
                   <h3 className="fw-bold mb-2">{recipe.name}</h3>
+                  {recipe.description && (
+                    <p className="recipe-description-note mb-3">{recipe.description}</p>
+                  )}
                   <div className="recipe-health-meter-wrap">
                     <div className="recipe-health-title">
-                      Health Meter
+                      <div className="nutrition-popover-anchor">
+                        <button
+                          type="button"
+                          className="nutrition-info-btn"
+                          onClick={() => setShowNutritionModal((value) => !value)}
+                          aria-expanded={showNutritionModal}
+                          aria-label="View nutrition spectrum"
+                          title="View nutrition spectrum"
+                        >
+                          i
+                        </button>
+                        <div className={`nutrition-inline-panel ${showNutritionModal ? "is-open" : ""}`}>
+                          <div className="nutrition-orb" aria-label="Nutrition spectrum">
+                            {getNutritionSegments().map((segment, index) => (
+                              <span
+                                key={segment.key}
+                                className={`nutrition-orb-dot nutrition-orb-dot-${index}`}
+                                style={{
+                                  "--macro-color": segment.color,
+                                  "--macro-soft-color": segment.softColor,
+                                  "--macro-percent": `${segment.percentage}%`
+                                }}
+                                title={`${segment.label}: ${segment.value}${segment.unit} (${segment.percentage}%)`}
+                              >
+                                <small>{segment.label}</small>
+                                <strong>{segment.value}{segment.unit}</strong>
+                              </span>
+                            ))}
+                            <div className="nutrition-orb-center">
+                              <strong>{getCurrentNutrition().calories}</strong>
+                              <span>Total Cal</span>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
                       <span>{getCurrentHealthLabel()}</span>
                     </div>
                     <div className="recipe-health-meter-labels recipe-health-meter-icons">
-                      <span
-                        className={`recipe-health-heart recipe-health-heart-broken ${getCurrentHealthScore() < 30 ? "active" : ""}`}
-                        aria-label="Unhealthy"
-                        title="Unhealthy"
-                      >
-                        💔
-                      </span>
+                      <span className={`recipe-health-heart recipe-health-heart-broken ${getCurrentHealthScore() < 30 ? "active" : ""}`}>💔</span>
                       <strong>{getCurrentHealthScore()}%</strong>
-                      <span
-                        className={`recipe-health-heart recipe-health-heart-full ${getCurrentHealthScore() > 70 ? "active" : ""}`}
-                        aria-label="Healthy"
-                        title="Healthy"
-                      >
-                        ❤️
-                      </span>
+                      <span className={`recipe-health-heart recipe-health-heart-full ${getCurrentHealthScore() > 70 ? "active" : ""}`}>❤️</span>
                     </div>
                     <input
                       type="range"
@@ -737,7 +887,6 @@ export default function SearchResults() {
                       value={getCurrentHealthScore()}
                       readOnly
                       className="recipe-health-meter"
-                      aria-label={`Health score ${getCurrentHealthScore()} percent`}
                     />
                   </div>
                   
@@ -991,7 +1140,7 @@ export default function SearchResults() {
 
       <style>{`
         .search-header {
-          border-bottom: 3px solid #ffc107;
+          border-bottom: 3px solid var(--tw-sage);
           padding-bottom: 16px;
         }
 
@@ -1000,83 +1149,105 @@ export default function SearchResults() {
         }
 
         .recipe-header-card {
-          background: linear-gradient(135deg, #fff9e6 0%, #ffffff 100%);
-          border: 2px solid #ffc107;
+          background: linear-gradient(135deg, var(--tw-sage-soft) 0%, #ffffff 100%);
+          border: 2px solid var(--tw-sage);
+        }
+
+        .recipe-description-note {
+          color: var(--tw-muted);
+          font-size: 0.96rem;
+          font-weight: 600;
+          line-height: 1.45;
+          max-width: 620px;
         }
 
         .shared-recipe-note {
-          background: #fff8df;
-          border: 1px solid #f4c542;
+          background: var(--tw-sage-soft);
+          border: 1px solid rgba(95, 143, 103, 0.32);
           border-radius: 8px;
-          color: #735300;
+          color: var(--tw-sage);
           font-weight: 600;
           padding: 10px 12px;
         }
 
-        .recipe-health-meter-wrap {
-          max-width: 360px;
-          margin: 0 0 18px;
-          background: #fff8e1;
-          border: 1px solid #ffd166;
-          border-radius: 12px;
-          padding: 14px 16px;
-        }
-
-        .recipe-health-title {
+        .nutrition-info-btn {
           align-items: center;
+          background: #ffffff;
+          border: 2px solid #212529;
+          border-radius: 50%;
           color: #212529;
-          display: flex;
-          font-size: 0.92rem;
+          display: inline-flex;
+          flex: 0 0 auto;
+          font-family: Georgia, "Times New Roman", serif;
+          font-size: 0.98rem;
           font-weight: 800;
-          justify-content: space-between;
-          margin-bottom: 8px;
+          height: 28px;
+          justify-content: center;
+          line-height: 1;
+          padding: 0 0 1px;
+          transition: background 0.18s ease, transform 0.18s ease;
+          width: 28px;
         }
 
-        .recipe-health-title span {
-          color: #198754;
-          font-size: 0.86rem;
+        .nutrition-info-btn:hover {
+          background: #f8f9fa;
+          transform: translateY(-1px);
         }
 
+        .nutrition-popover-anchor {
+          display: inline-flex;
+          flex: 0 0 auto;
+          position: relative;
+        }
+
+        .recipe-health-meter-wrap {
+          background: var(--tw-sage-soft);
+          border: 1px solid rgba(95, 143, 103, 0.32);
+          border-radius: 12px;
+          margin: 10px 0 18px;
+          max-width: 430px;
+          padding: 12px 14px 14px;
+        }
+
+        .recipe-health-title,
         .recipe-health-meter-labels {
           align-items: center;
           display: flex;
           justify-content: space-between;
-          gap: 12px;
-          font-size: 0.9rem;
-          font-weight: 700;
-          margin-bottom: 10px;
         }
 
-        .recipe-health-meter-labels strong {
-          color: #198754;
-          font-size: 1.05rem;
+        .recipe-health-title {
+          gap: 10px;
+          margin-bottom: 8px;
+        }
+
+        .recipe-health-title span {
+          color: #146c43;
+          font-size: 0.95rem;
+          font-weight: 800;
         }
 
         .recipe-health-meter-icons {
-          margin-bottom: 12px;
+          margin-bottom: 8px;
         }
 
         .recipe-health-heart {
           filter: grayscale(1);
-          font-size: 1.75rem;
+          font-size: 1.3rem;
           line-height: 1;
-          opacity: 0.35;
-          transform: scale(0.94);
+          opacity: 0.45;
           transition: filter 0.2s ease, opacity 0.2s ease, transform 0.2s ease;
         }
 
         .recipe-health-heart.active {
-          filter: saturate(1.6) drop-shadow(0 0 9px rgba(255, 71, 87, 0.58));
+          filter: grayscale(0);
           opacity: 1;
-          transform: scale(1.14);
+          transform: scale(1.12);
         }
 
-        .recipe-health-heart-full.active {
-          filter: saturate(1.7) drop-shadow(0 0 10px rgba(220, 53, 69, 0.62));
-        }
-
-        .recipe-health-heart-broken.active {
-          filter: saturate(1.7) drop-shadow(0 0 10px rgba(255, 54, 54, 0.62));
+        .recipe-health-meter-labels strong {
+          color: #212529;
+          font-size: 0.98rem;
         }
 
         .recipe-health-meter {
@@ -1086,13 +1257,165 @@ export default function SearchResults() {
           width: 100%;
         }
 
+        .nutrition-inline-panel {
+          align-items: center;
+          background: transparent;
+          border: 0;
+          border-radius: 50%;
+          box-shadow: none;
+          display: flex;
+          height: 260px;
+          justify-content: center;
+          left: 0;
+          min-width: 0;
+          opacity: 0;
+          padding: 0;
+          pointer-events: none;
+          position: absolute;
+          top: calc(100% + 14px);
+          transform: translateY(8px) scale(0.96);
+          transform-origin: top left;
+          transition: opacity 0.16s ease, transform 0.16s ease, visibility 0.16s ease;
+          visibility: hidden;
+          width: 260px;
+          z-index: 35;
+        }
+
+        .nutrition-inline-panel::before {
+          display: none;
+        }
+
+        .nutrition-popover-anchor:hover .nutrition-inline-panel,
+        .nutrition-popover-anchor:focus-within .nutrition-inline-panel,
+        .nutrition-inline-panel.is-open {
+          opacity: 1;
+          pointer-events: auto;
+          transform: translateY(0) scale(1);
+          visibility: visible;
+        }
+
+        .nutrition-orb {
+          align-items: center;
+          background:
+            radial-gradient(circle at 34% 30%, rgba(255, 255, 255, 0.96) 0 8%, transparent 9%),
+            linear-gradient(145deg, #ffffff 0%, #eef3f7 100%);
+          border: 1px solid #e2e8ef;
+          border-radius: 50%;
+          box-shadow: inset 0 -16px 32px rgba(90, 105, 120, 0.08), 0 18px 38px rgba(33, 37, 41, 0.16);
+          display: flex;
+          height: 260px;
+          justify-content: center;
+          position: relative;
+          width: 260px;
+        }
+
+        .nutrition-orb-center {
+          align-items: center;
+          background: #fff9e8;
+          border: 1px solid rgba(95, 143, 103, 0.32);
+          border-radius: 50%;
+          color: #212529;
+          display: flex;
+          flex-direction: column;
+          height: 64px;
+          justify-content: center;
+          position: relative;
+          width: 64px;
+          z-index: 2;
+        }
+
+        .nutrition-orb-center strong {
+          font-size: 1.05rem;
+          line-height: 1;
+        }
+
+        .nutrition-orb-center span {
+          color: var(--tw-muted);
+          font-size: 0.58rem;
+          font-weight: 800;
+          letter-spacing: 0;
+          line-height: 1;
+          margin-top: 4px;
+          text-transform: uppercase;
+        }
+
+        .nutrition-orb-dot {
+          align-items: center;
+          background:
+            radial-gradient(circle at center, #ffffff 0 53%, transparent 54%),
+            conic-gradient(var(--macro-color) 0 var(--macro-percent), var(--macro-soft-color) var(--macro-percent) 100%);
+          border: 2px solid #ffffff;
+          border-radius: 50%;
+          box-shadow: 0 8px 18px rgba(33, 37, 41, 0.13);
+          color: #212529;
+          display: flex;
+          flex-direction: column;
+          font-size: 0.5rem;
+          font-weight: 800;
+          height: 58px;
+          justify-content: center;
+          letter-spacing: 0;
+          position: absolute;
+          text-align: center;
+          text-transform: uppercase;
+          width: 58px;
+          z-index: 1;
+        }
+
+        .nutrition-orb-dot small,
+        .nutrition-orb-dot strong {
+          display: block;
+          max-width: 44px;
+          overflow: hidden;
+          text-overflow: ellipsis;
+          white-space: nowrap;
+        }
+
+        .nutrition-orb-dot small {
+          color: #6c757d;
+          font-size: 0.48rem;
+          line-height: 1;
+        }
+
+        .nutrition-orb-dot strong {
+          color: #212529;
+          font-size: 0.7rem;
+          line-height: 1.1;
+          margin-top: 3px;
+          text-transform: none;
+        }
+
+        .nutrition-orb-dot-0 {
+          left: 50%;
+          top: 22px;
+          transform: translateX(-50%);
+        }
+
+        .nutrition-orb-dot-1 {
+          right: 22px;
+          top: 50%;
+          transform: translateY(-50%);
+        }
+
+        .nutrition-orb-dot-2 {
+          bottom: 22px;
+          left: 50%;
+          transform: translateX(-50%);
+        }
+
+        .nutrition-orb-dot-3 {
+          left: 22px;
+          top: 50%;
+          transform: translateY(-50%);
+        }
+
         .servings-selector {
           display: flex;
           align-items: center;
           padding: 12px 16px;
           background: white;
           border-radius: 10px;
-          border: 2px solid #ffc107;
+          border: 2px solid var(--tw-sage);
           margin-top: 8px;
         }
 
@@ -1140,7 +1463,7 @@ export default function SearchResults() {
         }
 
         .ingredient-bullet {
-          color: #ffc107;
+          color: var(--tw-sage);
           font-size: 1.5rem;
           margin-right: 12px;
           line-height: 1;
@@ -1158,7 +1481,7 @@ export default function SearchResults() {
 
         .ingredient-edit-input:focus {
           outline: none;
-          border-color: #ffc107;
+          border-color: var(--tw-sage);
           box-shadow: 0 0 0 3px rgba(255, 193, 7, 0.16);
         }
 
@@ -1203,7 +1526,7 @@ export default function SearchResults() {
         .step-item {
           padding: 12px 0;
           margin-bottom: 12px;
-          border-left: 3px solid #ffc107;
+          border-left: 3px solid var(--tw-sage);
           padding-left: 16px;
           line-height: 1.6;
         }
@@ -1293,8 +1616,8 @@ export default function SearchResults() {
 
         .meal-option-btn:hover,
         .date-option-btn:hover {
-          border-color: #ffc107;
-          background: #fff9e6;
+          border-color: var(--tw-sage);
+          background: var(--tw-sage-soft);
         }
 
         .meal-date-picker {
@@ -1307,7 +1630,7 @@ export default function SearchResults() {
 
         .meal-date-picker:focus {
           outline: none;
-          border-color: #ffc107;
+          border-color: var(--tw-sage);
           box-shadow: 0 0 0 3px rgba(255, 193, 7, 0.18);
         }
 
@@ -1352,6 +1675,41 @@ export default function SearchResults() {
             align-items: flex-start;
             flex-wrap: wrap;
             gap: 10px;
+          }
+
+          .nutrition-info-btn {
+            font-size: 0.92rem;
+            height: 26px;
+            width: 26px;
+          }
+
+          .nutrition-inline-panel {
+            height: 220px;
+            left: -2px;
+            min-width: 0;
+            padding: 0;
+            width: 220px;
+          }
+
+          .nutrition-orb {
+            height: 220px;
+            width: 220px;
+          }
+
+          .nutrition-orb-center {
+            height: 58px;
+            width: 58px;
+          }
+
+          .nutrition-orb-dot {
+            font-size: 0.5rem;
+            height: 52px;
+            width: 52px;
+          }
+
+          .nutrition-orb-dot small,
+          .nutrition-orb-dot strong {
+            max-width: 40px;
           }
 
           .servings-selector label,

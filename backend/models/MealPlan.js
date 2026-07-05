@@ -28,6 +28,7 @@ const mealPlanSchema = new mongoose.Schema({
   recipe: {
     id: { type: String },
     title: { type: String, required: true },
+    description: { type: String, default: "" },
     ingredients: { type: [String], required: true },
     steps: { type: [String], required: true },
     image: { type: String, default: "" },
@@ -35,7 +36,8 @@ const mealPlanSchema = new mongoose.Schema({
       calories: { type: Number, default: 0 },
       protein: { type: Number, default: 0 },
       carbs: { type: Number, default: 0 },
-      fat: { type: Number, default: 0 }
+      fat: { type: Number, default: 0 },
+      fiber: { type: Number, default: 0 }
     }
   },
   time: { 

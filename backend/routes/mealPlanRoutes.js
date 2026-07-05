@@ -25,6 +25,7 @@ const saveRecipeForUser = async (userId, recipe) => {
   await SavedRecipe.create({
     userId,
     title: enhancedRecipe.title,
+    description: enhancedRecipe.description || recipe.description || "",
     ingredients: enhancedRecipe.ingredients || [],
     steps: enhancedRecipe.steps || [],
     image: enhancedRecipe.image || "",
@@ -106,7 +107,7 @@ const refreshGroceryItems = async (userId, mealPlan) => {
   await GroceryItem.insertMany(groceryItems);
 };
 
-// CREATE OR UPDATE MEAL PLAN
+// CREATE MEAL PLAN
 router.post("/create", authMiddleware, async (req, res) => {
   try {
     const { mealType, recipe, time, planDate } = req.body;
@@ -131,39 +132,14 @@ router.post("/create", authMiddleware, async (req, res) => {
       return res.status(400).json({ msg: "Invalid time format. Use HH:MM" });
     }
 
-    // Check if meal plan already exists for this user, meal type, and day
-    const existingMealPlanQuery = {
+    const mealPlan = await MealPlan.create({
       userId: req.user.id,
       mealType,
-      ...(planDate
-        ? { planDate }
-        : dayIndex === 0
-          ? { $or: [{ dayIndex: 0 }, { dayIndex: { $exists: false } }] }
-          : { dayIndex })
-    };
-
-    let mealPlan = await MealPlan.findOne(existingMealPlanQuery);
-
-    if (mealPlan) {
-      // Update existing meal plan
-      mealPlan.mealType = mealType;
-      mealPlan.dayIndex = dayIndex;
-      if (planDate) mealPlan.planDate = planDate;
-      mealPlan.recipe = enhanceRecipe(recipe);
-      mealPlan.time = time;
-      mealPlan.updatedAt = Date.now();
-      await mealPlan.save();
-    } else {
-      // Create new meal plan
-      mealPlan = await MealPlan.create({
-        userId: req.user.id,
-        mealType,
-        dayIndex,
-        planDate,
-        recipe: enhanceRecipe(recipe),
-        time
-      });
-    }
+      dayIndex,
+      planDate,
+      recipe: enhanceRecipe(recipe),
+      time
+    });
 
     await refreshGroceryItems(req.user.id, mealPlan);
 
@@ -202,11 +178,11 @@ router.get("/my", authMiddleware, async (req, res) => {
     };
     const mealPlans = await MealPlan.find(query).sort({ planDate: 1, dayIndex: 1, mealType: 1 }).lean();
 
-    // Organize by meal type
+    // Organize by meal type. Each meal slot can contain multiple recipes.
     const organized = {
-      breakfast: Array(7).fill(null),
-      lunch: Array(7).fill(null),
-      dinner: Array(7).fill(null)
+      breakfast: Array.from({ length: 7 }, () => []),
+      lunch: Array.from({ length: 7 }, () => []),
+      dinner: Array.from({ length: 7 }, () => [])
     };
 
     mealPlans.forEach((mealPlan) => {
@@ -215,7 +191,7 @@ router.get("/my", authMiddleware, async (req, res) => {
 
       const dayIndex = dateIndex >= 0 ? dateIndex : Number.isInteger(mealPlan.dayIndex) ? mealPlan.dayIndex : 0;
       if (organized[mealPlan.mealType] && dayIndex >= 0 && dayIndex <= 6) {
-        organized[mealPlan.mealType][dayIndex] = mealPlan;
+        organized[mealPlan.mealType][dayIndex].push(mealPlan);
       }
     });
 
@@ -296,21 +272,6 @@ router.put("/:id", authMiddleware, async (req, res) => {
         return res.status(400).json({ msg: "Invalid time format" });
       }
       mealPlan.time = time;
-    }
-
-    if (planDate || dayIndex !== undefined || mealType) {
-      const duplicateMealPlan = await MealPlan.findOne({
-        _id: { $ne: mealPlan._id },
-        userId: req.user.id,
-        mealType: mealPlan.mealType,
-        ...(mealPlan.planDate ? { planDate: mealPlan.planDate } : { dayIndex: mealPlan.dayIndex })
-      });
-
-      if (duplicateMealPlan) {
-        cancelMealReminderForPlan(duplicateMealPlan._id);
-        await GroceryItem.deleteMany({ mealPlanId: duplicateMealPlan._id });
-        await MealPlan.findByIdAndDelete(duplicateMealPlan._id);
-      }
     }
 
     mealPlan.updatedAt = Date.now();

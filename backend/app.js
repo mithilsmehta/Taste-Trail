@@ -15,9 +15,24 @@ const allowedOrigins = [
   process.env.FRONTEND_URL
 ].filter(Boolean);
 
+const isDevLanOrigin = (origin = "") => {
+  if (process.env.NODE_ENV === "production") return false;
+
+  try {
+    const url = new URL(origin);
+    return url.protocol === "http:" && (
+      /^192\.168\.\d{1,3}\.\d{1,3}$/.test(url.hostname) ||
+      /^10\.\d{1,3}\.\d{1,3}\.\d{1,3}$/.test(url.hostname) ||
+      /^172\.(1[6-9]|2\d|3[0-1])\.\d{1,3}\.\d{1,3}$/.test(url.hostname)
+    );
+  } catch {
+    return false;
+  }
+};
+
 app.use(cors({
   origin(origin, callback) {
-    if (!origin || allowedOrigins.includes(origin)) {
+    if (!origin || allowedOrigins.includes(origin) || isDevLanOrigin(origin)) {
       callback(null, true);
       return;
     }

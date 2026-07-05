@@ -19,12 +19,20 @@ const normalizeUsualServings = (value) => {
   return Math.min(10, Math.max(1, Math.round(servings)));
 };
 
+const normalizeDietPreference = (value) => {
+  const normalized = String(value || "").trim().toLowerCase();
+  if (normalized === "jain") return "jain";
+  if (normalized === "vegan") return "vegan";
+  return "veg";
+};
+
 // REGISTER
 exports.register = async (req, res) => {
   try {
     const { firstName, lastName, email, phone, password, onboarding } = req.body;
+    const cleanEmail = String(email || "").trim().toLowerCase();
 
-    const emailExists = await User.findOne({ email });
+    const emailExists = await User.findOne({ email: cleanEmail });
     if (emailExists) return res.status(400).json({ msg: "Email already exists" });
 
     const cleanPhone = String(phone || "").trim();
@@ -35,15 +43,18 @@ exports.register = async (req, res) => {
 
     const hashed = await bcrypt.hash(password, 10);
     const cleanOnboarding = onboarding || {};
+    const dietaryPreference = normalizeDietPreference(
+      cleanOnboarding.dietaryPreference || cleanOnboarding.foodPreference
+    );
 
     const newUser = new User({
       firstName,
       lastName,
-      email,
+      email: cleanEmail,
       phone: cleanPhone,
       password: hashed,
       preferences: {
-        diet: cleanOnboarding.dietaryPreference || "",
+        diet: dietaryPreference,
         allergies: [],
         cuisines: []
       },
@@ -51,7 +62,7 @@ exports.register = async (req, res) => {
         displayName: cleanOnboarding.displayName || "",
         gender: cleanOnboarding.gender || "",
         ethnicity: cleanOnboarding.ethnicity || "",
-        dietaryPreference: cleanOnboarding.dietaryPreference || "",
+        dietaryPreference,
         usualServings: normalizeUsualServings(cleanOnboarding.usualServings),
         healthyGoal: Number(cleanOnboarding.healthyGoal) || 50,
         heightCm: cleanOnboarding.heightCm ? Number(cleanOnboarding.heightCm) : null,
@@ -72,9 +83,11 @@ exports.login = async (req, res) => {
   try {
     const { identifier, password } = req.body;
     const cleanIdentifier = String(identifier || "").trim();
+    const cleanEmailIdentifier = cleanIdentifier.toLowerCase();
 
     const user =
-      (await User.findOne({ email: cleanIdentifier })) ||
+      (await User.findOne({ email: cleanEmailIdentifier })) ||
+      (await User.findOne({ email: new RegExp(`^${cleanIdentifier.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}$`, "i") })) ||
       (await User.findOne({ phone: cleanIdentifier }));
 
     if (!user) return res.status(400).json({ msg: "User not found" });
@@ -240,6 +253,13 @@ exports.updateProfile = async (req, res) => {
       }
     }
 
+    const dietaryPreference = normalizeDietPreference(
+      cleanOnboarding.dietaryPreference ||
+      cleanOnboarding.foodPreference ||
+      req.body.preferences?.diet ||
+      existingUser.preferences?.diet
+    );
+
     const updated = await User.findByIdAndUpdate(
       userId,
       {
@@ -247,7 +267,7 @@ exports.updateProfile = async (req, res) => {
         lastName: req.body.lastName,
         ...(cleanPhone ? { phone: cleanPhone } : {}),
         preferences: {
-          diet: cleanOnboarding.dietaryPreference || req.body.preferences?.diet || existingUser.preferences?.diet || "",
+          diet: dietaryPreference,
           allergies: req.body.preferences?.allergies || existingUser.preferences?.allergies || [],
           cuisines: req.body.preferences?.cuisines || existingUser.preferences?.cuisines || []
         },
@@ -255,7 +275,7 @@ exports.updateProfile = async (req, res) => {
           displayName: cleanOnboarding.displayName || "",
           gender: cleanOnboarding.gender || "",
           ethnicity: cleanOnboarding.ethnicity || "",
-          dietaryPreference: cleanOnboarding.dietaryPreference || "",
+          dietaryPreference,
           usualServings: normalizeUsualServings(cleanOnboarding.usualServings || existingUser.onboarding?.usualServings),
           healthyGoal: Number(cleanOnboarding.healthyGoal) || 50,
           heightCm: cleanOnboarding.heightCm ? Number(cleanOnboarding.heightCm) : null,

@@ -21,7 +21,7 @@ export default function Login() {
     try {
       setLoggingIn(true);
       const res = await axios.post(apiUrl("/api/auth/login"), {
-        identifier,
+        identifier: identifier.trim(),
         password,
       });
 

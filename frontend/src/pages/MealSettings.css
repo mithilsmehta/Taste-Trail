@@ -1,5 +1,5 @@
 .settings-header {
-  border-bottom: 3px solid #ffc107;
+  border-bottom: 3px solid var(--tw-sage);
   padding-bottom: 16px;
 }
 
@@ -9,8 +9,8 @@
 }
 
 .info-card {
-  background: linear-gradient(135deg, #fff9e6 0%, #ffffff 100%);
-  border: 2px solid #ffc107;
+  background: linear-gradient(135deg, var(--tw-sage-soft) 0%, #ffffff 100%);
+  border: 2px solid var(--tw-sage);
   position: sticky;
   top: 20px;
 }
@@ -23,7 +23,7 @@
 }
 
 .form-control:focus, .form-select:focus {
-  border-color: #ffc107;
+  border-color: var(--tw-sage);
   box-shadow: 0 0 0 4px rgba(255, 193, 7, 0.1);
 }
 
@@ -88,8 +88,8 @@
 }
 
 .reminder-mode-option.active {
-  background: #ffc107;
-  border-color: #ffc107;
+  background: var(--tw-sage);
+  border-color: var(--tw-sage);
 }
 
 .reminder-time-grid {
@@ -146,4 +146,37 @@
     height: 46px;
     padding: 10px 28px 10px 10px;
   }
+}
+
+.settings-header {
+  border-bottom-color: var(--tw-border);
+}
+
+.settings-card,
+.info-card,
+.notification-status,
+.notification-toggle,
+.reminder-mode-option {
+  background: var(--tw-surface);
+  border-color: var(--tw-border);
+  border-radius: var(--tw-radius);
+  box-shadow: var(--tw-shadow);
+}
+
+.info-card,
+.reminder-mode-option.active {
+  background: var(--tw-sage-soft);
+  border-color: var(--tw-sage);
+}
+
+.form-control,
+.form-select {
+  border-color: var(--tw-border);
+  border-radius: 14px;
+}
+
+.form-control:focus,
+.form-select:focus {
+  border-color: var(--tw-sage);
+  box-shadow: 0 0 0 4px rgba(95, 143, 103, 0.14);
 }
