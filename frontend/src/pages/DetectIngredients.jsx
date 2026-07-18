@@ -1,5 +1,5 @@
 import { apiUrl } from "../utils/api";
-import { useContext, useEffect, useMemo, useRef, useState } from "react";
+import { useContext, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { AuthContext } from "../context/AuthContext";
 import Navbar from "../components/Navbar";
@@ -27,6 +27,14 @@ const getPreferredServings = (user) => {
   return Math.min(10, Math.max(1, Math.round(servings)));
 };
 
+const getStoredScanHistory = () => {
+  try {
+    return JSON.parse(localStorage.getItem(scanHistoryKey) || "[]");
+  } catch {
+    return [];
+  }
+};
+
 export default function DetectIngredients() {
   const navigate = useNavigate();
   const { user } = useContext(AuthContext);
@@ -39,8 +47,7 @@ export default function DetectIngredients() {
   const [suggestions, setSuggestions] = useState([]);
   const [selectedSuggestion, setSelectedSuggestion] = useState(null);
   const [generatedRecipe, setGeneratedRecipe] = useState(null);
-  const [scanHistory, setScanHistory] = useState([]);
-  const [rejectedItems, setRejectedItems] = useState([]);
+  const [scanHistory, setScanHistory] = useState(getStoredScanHistory);
   const [uncertainItems, setUncertainItems] = useState([]);
   const [notes, setNotes] = useState("");
   const [loadingDetect, setLoadingDetect] = useState(false);
@@ -74,14 +81,6 @@ export default function DetectIngredients() {
     }
     return value;
   };
-
-  useEffect(() => {
-    try {
-      setScanHistory(JSON.parse(localStorage.getItem(scanHistoryKey) || "[]"));
-    } catch {
-      setScanHistory([]);
-    }
-  }, []);
 
   const getDayIndexForDate = (dateKey) => {
     const week = getWeekFromDateKey(getMondayDateKey(dateKey));
@@ -138,7 +137,6 @@ export default function DetectIngredients() {
       setSuggestions([]);
       setSelectedSuggestion(null);
       setGeneratedRecipe(null);
-      setRejectedItems([]);
       setUncertainItems([]);
       setNotes("");
       setError("");
@@ -167,7 +165,6 @@ export default function DetectIngredients() {
     setSuggestions([]);
     setSelectedSuggestion(null);
     setGeneratedRecipe(null);
-    setRejectedItems([]);
     setUncertainItems([]);
     setNotes("");
     setError("");
@@ -206,11 +203,7 @@ export default function DetectIngredients() {
       }
 
       const safeIngredients = filterIngredientsForCurrentMode(data.ingredients || []);
-      const blockedFromResponse = (data.ingredients || [])
-        .filter((item) => isIngredientBlockedByMode(item?.name || item))
-        .map((item) => item?.name || item);
       setIngredients(safeIngredients);
-      setRejectedItems([...(data.rejectedItems || []), ...blockedFromResponse]);
       setUncertainItems((data.uncertainItems || []).filter((item) => !isIngredientBlockedByMode(item?.name || item)));
       setNotes(sanitizeNotesForCurrentMode(data.notes || ""));
       addScanHistory(safeIngredients);
@@ -345,7 +338,6 @@ export default function DetectIngredients() {
         throw new Error(data.msg || "Failed to save recipe");
       }
 
-      alert("Recipe saved!");
     } catch (err) {
       console.error(err);
       alert(err.message || "Failed to save recipe");
@@ -407,7 +399,6 @@ export default function DetectIngredients() {
     setImagePayload(entry.imagePreview || "");
     setIngredients(entry.ingredients || []);
     setUncertainItems([]);
-    setRejectedItems([]);
     setNotes("");
     setSuggestions([]);
     setSelectedSuggestion(null);

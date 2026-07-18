@@ -14,6 +14,13 @@ const defaultTimes = {
   dinner: "20:00"
 };
 
+const mobileTapRemoveMs = 700;
+const mobileDragReadyMs = 2000;
+const mobileOpenRecipeMs = 3000;
+const mobileTapMoveTolerance = 10;
+const mobileHoldMoveTolerance = 28;
+const mobileDragMoveTolerance = 16;
+
 const plannerViewPreferenceKey = "tastewisePlannerView";
 const mobilePlannerNotesKeyPrefix = "tastewisePlannerNotes";
 const monthNames = [
@@ -47,7 +54,7 @@ export default function MealPlanner() {
   const [mealPlans, setMealPlans] = useState(emptyMealPlans);
   const [allMealPlans, setAllMealPlans] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [plannerView] = useState(() => localStorage.getItem(plannerViewPreferenceKey) || "week");
+  const [plannerView, setPlannerView] = useState(() => localStorage.getItem(plannerViewPreferenceKey) || "week");
   const [showRecipeModal, setShowRecipeModal] = useState(false);
   const [showCalendarDayModal, setShowCalendarDayModal] = useState(false);
   const [selectedSlot, setSelectedSlot] = useState(null);
@@ -58,9 +65,13 @@ export default function MealPlanner() {
   const [recipeSearch, setRecipeSearch] = useState("");
   const [mobileDragPlan, setMobileDragPlan] = useState(null);
   const [mobileDragOverSlot, setMobileDragOverSlot] = useState(null);
+  const [mobileDragPosition, setMobileDragPosition] = useState(null);
   const [mobileNotes, setMobileNotes] = useState({});
   const [activeMobileCommentDay, setActiveMobileCommentDay] = useState("");
+  const [addingRecipeIds, setAddingRecipeIds] = useState([]);
   const mobilePressRef = useRef(null);
+  const tempMealPlanCounterRef = useRef(0);
+  const suppressNextAddOpenRef = useRef(false);
 
   useEffect(() => {
     localStorage.setItem(plannerViewPreferenceKey, plannerView);
@@ -158,6 +169,7 @@ export default function MealPlanner() {
   }, [weekStartDate]);
 
   const openRecipeModal = (mealType, dayIndex, planDate) => {
+    if (suppressNextAddOpenRef.current) return;
     setSelectedSlot({ mealType, dayIndex, planDate });
     setRecipeSearch("");
     setShowRecipeModal(true);
@@ -186,7 +198,7 @@ export default function MealPlanner() {
     }
 
     if (exactSavedRecipe) {
-      assignRecipe(exactSavedRecipe);
+      assignRecipe(exactSavedRecipe, selectedSlot, { keepModalOpen: true });
       return;
     }
 
@@ -209,7 +221,7 @@ export default function MealPlanner() {
     };
 
     if (exactSavedRecipe) {
-      assignRecipe(exactSavedRecipe, slot);
+      assignRecipe(exactSavedRecipe, slot, { keepModalOpen: true });
       return;
     }
 
@@ -223,12 +235,33 @@ export default function MealPlanner() {
     setSelectedDate(toDateKey(date));
   };
 
-  const assignRecipe = async (recipe, slotOverride = selectedSlot) => {
+  const assignRecipe = async (recipe, slotOverride = selectedSlot, options = {}) => {
     if (!slotOverride) return;
 
+    tempMealPlanCounterRef.current += 1;
+    const tempMealPlanId = `temp-${recipe._id || "recipe"}-${slotOverride.mealType}-${slotOverride.planDate}-${tempMealPlanCounterRef.current}`;
     try {
       const token = localStorage.getItem("token");
       const { mealType, dayIndex, planDate } = slotOverride;
+      const tempMealPlan = {
+        _id: tempMealPlanId,
+        mealType,
+        dayIndex,
+        planDate,
+        recipe: {
+          id: recipe._id,
+          title: recipe.title,
+          description: recipe.description || "",
+          ingredients: recipe.ingredients || [],
+          steps: recipe.steps || [],
+          image: recipe.image || "",
+          nutrition: recipe.nutrition
+        },
+        time: defaultTimes[mealType]
+      };
+
+      setAddingRecipeIds((currentIds) => [...currentIds, recipe._id || tempMealPlanId]);
+      addPlanToLocalState(tempMealPlan);
 
       const res = await fetch(apiUrl("/api/meal-plans/create"), {
         method: "POST",
@@ -254,19 +287,26 @@ export default function MealPlanner() {
       const data = await res.json();
 
       if (!res.ok) {
+        removePlanFromLocalState(tempMealPlanId);
         alert(data.msg || "Failed to assign recipe");
         return;
       }
 
-      setShowRecipeModal(false);
-      setShowCalendarDayModal(false);
-      setSelectedSlot(null);
-      setRecipeSearch("");
-      loadMealPlans();
-      loadAllMealPlans();
+      removePlanFromLocalState(tempMealPlanId);
+      addPlanToLocalState(data.mealPlan);
+
+      if (!options.keepModalOpen) {
+        setShowRecipeModal(false);
+        setShowCalendarDayModal(false);
+        setSelectedSlot(null);
+        setRecipeSearch("");
+      }
     } catch (err) {
+      removePlanFromLocalState(tempMealPlanId);
       console.error(err);
       alert("Failed to assign recipe");
+    } finally {
+      setAddingRecipeIds((currentIds) => currentIds.filter((id) => id !== (recipe._id || tempMealPlanId)));
     }
   };
 
@@ -274,6 +314,8 @@ export default function MealPlanner() {
     if (!mealPlan) return;
 
     if (!confirm(`Remove "${mealPlan.recipe.title}" from your meal plan?`)) return;
+
+    removePlanFromLocalState(mealPlan._id);
 
     try {
       const token = localStorage.getItem("token");
@@ -285,14 +327,12 @@ export default function MealPlanner() {
       const data = await res.json();
 
       if (!res.ok) {
+        addPlanToLocalState(mealPlan);
         alert(data.msg || "Failed to delete");
         return;
       }
-
-      alert("Meal plan deleted!");
-      loadMealPlans();
-      loadAllMealPlans();
     } catch (err) {
+      addPlanToLocalState(mealPlan);
       console.error(err);
       alert("Failed to delete meal plan");
     }
@@ -300,6 +340,12 @@ export default function MealPlanner() {
 
   const deleteMealPlanQuietly = async (mealPlan) => {
     if (!mealPlan) return;
+
+    suppressNextAddOpenRef.current = true;
+    window.setTimeout(() => {
+      suppressNextAddOpenRef.current = false;
+    }, 350);
+    removePlanFromLocalState(mealPlan._id);
 
     try {
       const token = localStorage.getItem("token");
@@ -310,13 +356,12 @@ export default function MealPlanner() {
 
       if (!res.ok) {
         const data = await res.json();
+        addPlanToLocalState(mealPlan);
         alert(data.msg || "Failed to delete");
         return;
       }
-
-      loadMealPlans();
-      loadAllMealPlans();
     } catch (err) {
+      addPlanToLocalState(mealPlan);
       console.error(err);
       alert("Failed to delete meal plan");
     }
@@ -331,6 +376,70 @@ export default function MealPlanner() {
     const slot = mealPlans[mealType]?.[dayIndex];
     if (Array.isArray(slot)) return slot.filter(Boolean);
     return slot ? [slot] : [];
+  };
+
+  const addPlanToLocalState = (mealPlan) => {
+    if (!mealPlan?.mealType || !Number.isInteger(mealPlan.dayIndex)) return;
+
+    setMealPlans((currentPlans) => ({
+      ...currentPlans,
+      [mealPlan.mealType]: currentPlans[mealPlan.mealType].map((slotPlans, index) => {
+        if (index !== mealPlan.dayIndex) return slotPlans;
+        const plans = Array.isArray(slotPlans) ? slotPlans : slotPlans ? [slotPlans] : [];
+        if (plans.some((plan) => plan._id === mealPlan._id)) {
+          return plans.map((plan) => plan._id === mealPlan._id ? mealPlan : plan);
+        }
+        return [...plans, mealPlan];
+      })
+    }));
+
+    setAllMealPlans((currentPlans) => {
+      if (currentPlans.some((plan) => plan._id === mealPlan._id)) {
+        return currentPlans.map((plan) => plan._id === mealPlan._id ? mealPlan : plan);
+      }
+      return [...currentPlans, mealPlan];
+    });
+  };
+
+  const removePlanFromLocalState = (mealPlanId) => {
+    setMealPlans((currentPlans) => mealTypes.reduce((nextPlans, mealType) => {
+      nextPlans[mealType] = currentPlans[mealType].map((slotPlans) => {
+        const plans = Array.isArray(slotPlans) ? slotPlans : slotPlans ? [slotPlans] : [];
+        return plans.filter((plan) => plan._id !== mealPlanId);
+      });
+      return nextPlans;
+    }, {}));
+
+    setAllMealPlans((currentPlans) => currentPlans.filter((plan) => plan._id !== mealPlanId));
+  };
+
+  const movePlanInLocalState = (mealPlan, target) => {
+    if (!mealPlan || !target) return;
+    const movedPlan = {
+      ...mealPlan,
+      mealType: target.mealType,
+      dayIndex: target.dayIndex,
+      planDate: target.planDate,
+      time: defaultTimes[target.mealType]
+    };
+
+    setMealPlans((currentPlans) => {
+      const withoutMovedPlan = mealTypes.reduce((nextPlans, mealType) => {
+        nextPlans[mealType] = currentPlans[mealType].map((slotPlans) => {
+          const plans = Array.isArray(slotPlans) ? slotPlans : slotPlans ? [slotPlans] : [];
+          return plans.filter((plan) => plan._id !== mealPlan._id);
+        });
+        return nextPlans;
+      }, {});
+
+      withoutMovedPlan[target.mealType] = withoutMovedPlan[target.mealType].map((slotPlans, index) => (
+        index === target.dayIndex ? [...slotPlans, movedPlan] : slotPlans
+      ));
+
+      return withoutMovedPlan;
+    });
+
+    setAllMealPlans((currentPlans) => currentPlans.map((plan) => plan._id === mealPlan._id ? movedPlan : plan));
   };
 
   const updateMobileNote = (dateKey, value) => {
@@ -353,6 +462,7 @@ export default function MealPlanner() {
     mobilePressRef.current = null;
     setMobileDragPlan(null);
     setMobileDragOverSlot(null);
+    setMobileDragPosition(null);
   };
 
   const getDropSlotFromPoint = (clientX, clientY) => {
@@ -365,6 +475,8 @@ export default function MealPlanner() {
     if (mealPlan.mealType === target.mealType && mealPlan.dayIndex === target.dayIndex && mealPlan.planDate === target.planDate) {
       return;
     }
+
+    movePlanInLocalState(mealPlan, target);
 
     try {
       const token = localStorage.getItem("token");
@@ -384,13 +496,22 @@ export default function MealPlanner() {
 
       const data = await res.json();
       if (!res.ok) {
+        movePlanInLocalState({ ...mealPlan, ...target }, {
+          mealType: mealPlan.mealType,
+          dayIndex: mealPlan.dayIndex,
+          planDate: mealPlan.planDate
+        });
         alert(data.msg || "Failed to move meal plan");
         return;
       }
 
-      loadMealPlans();
-      loadAllMealPlans();
+      addPlanToLocalState(data.mealPlan);
     } catch (err) {
+      movePlanInLocalState({ ...mealPlan, ...target }, {
+        mealType: mealPlan.mealType,
+        dayIndex: mealPlan.dayIndex,
+        planDate: mealPlan.planDate
+      });
       console.error(err);
       alert("Failed to move meal plan");
     }
@@ -424,15 +545,21 @@ export default function MealPlanner() {
     pressState.dragTimer = window.setTimeout(() => {
       pressState.dragReady = true;
       setMobileDragPlan(mealPlan);
-    }, 2000);
+      setMobileDragPosition({
+        x: pressState.startX,
+        y: pressState.startY,
+        title: mealPlan.recipe.title,
+        mealType
+      });
+    }, mobileDragReadyMs);
 
     pressState.viewTimer = window.setTimeout(() => {
-      if (!pressState.dragging && !pressState.moved) {
+      if (!pressState.dragging) {
         pressState.opened = true;
         setSelectedPlan({ ...mealPlan, displayDayIndex: dayIndex });
         finishMobilePress();
       }
-    }, 3000);
+    }, mobileOpenRecipeMs);
 
     mobilePressRef.current = pressState;
   };
@@ -442,15 +569,26 @@ export default function MealPlanner() {
     if (!pressState || pressState.pointerId !== event.pointerId || !isMobilePlannerInteraction()) return;
 
     const movement = Math.hypot(event.clientX - pressState.startX, event.clientY - pressState.startY);
-    if (movement > 12) {
+    if (movement > mobileTapMoveTolerance) {
       pressState.moved = true;
     }
 
+    if (!pressState.dragReady && movement > mobileHoldMoveTolerance) {
+      window.clearTimeout(pressState.viewTimer);
+    }
+
     if (!pressState.dragReady) return;
+    if (movement < mobileDragMoveTolerance) return;
 
     event.preventDefault();
     pressState.dragging = true;
     window.clearTimeout(pressState.viewTimer);
+    setMobileDragPosition({
+      x: event.clientX,
+      y: event.clientY,
+      title: pressState.mealPlan.recipe.title,
+      mealType: pressState.mealType
+    });
 
     const slot = getDropSlotFromPoint(event.clientX, event.clientY);
     if (!slot) {
@@ -481,7 +619,7 @@ export default function MealPlanner() {
       return;
     }
 
-    if (!pressState.opened && !pressState.moved && elapsed < 700) {
+    if (!pressState.opened && !pressState.moved && elapsed < mobileTapRemoveMs) {
       deleteMealPlanQuietly(pressState.mealPlan);
     }
 
@@ -588,7 +726,6 @@ export default function MealPlanner() {
             <p className="text-muted mb-0">Save recipes for breakfast, lunch, and dinner across your schedule</p>
           </div>
 
-          {/* Planner view switch kept for later use.
           <div className="planner-view-switch" aria-label="Planner view">
             <button
               className={plannerView === "week" ? "active" : ""}
@@ -603,7 +740,6 @@ export default function MealPlanner() {
               Calendar
             </button>
           </div>
-          */}
 
           {plannerView === "week" && (
             <div className="week-navigation">
@@ -677,6 +813,10 @@ export default function MealPlanner() {
                             <div
                               key={mealPlan._id}
                               className={`planned-recipe ${mobileDragPlan?._id === mealPlan._id ? "mobile-drag-source" : ""}`}
+                              onClick={(event) => {
+                                event.preventDefault();
+                                event.stopPropagation();
+                              }}
                               onPointerDown={(event) => handleMobileRecipePointerDown(event, mealPlan, mealType, dayIndex, day.dateKey)}
                               onPointerMove={handleMobileRecipePointerMove}
                               onPointerUp={handleMobileRecipePointerUp}
@@ -763,6 +903,10 @@ export default function MealPlanner() {
                                 role="button"
                                 tabIndex={0}
                                 aria-label={`${mealPlan.recipe.title}. Tap to remove, hold to open, or hold and drag to move.`}
+                                onClick={(event) => {
+                                  event.preventDefault();
+                                  event.stopPropagation();
+                                }}
                                 onPointerDown={(event) => handleMobileRecipePointerDown(event, mealPlan, mealType, dayIndex, day.dateKey)}
                                 onPointerMove={handleMobileRecipePointerMove}
                                 onPointerUp={handleMobileRecipePointerUp}
@@ -879,7 +1023,9 @@ export default function MealPlanner() {
                 <h4 className="fw-bold mb-0">
                   Select Recipe for {getMealIcon(selectedSlot.mealType)} {selectedSlot.mealType} - {weekDays[selectedSlot.dayIndex].fullLabel}
                 </h4>
-                <button className="btn-close" onClick={() => setShowRecipeModal(false)}></button>
+                <div className="recipe-modal-actions">
+                  <button className="btn-close" onClick={() => setShowRecipeModal(false)}></button>
+                </div>
               </div>
 
               <div className="modal-body-custom">
@@ -895,8 +1041,9 @@ export default function MealPlanner() {
                   <button
                     className="btn btn-success recipe-search-action"
                     onClick={handleSearchAction}
+                    disabled={Boolean(exactSavedRecipe && addingRecipeIds.includes(exactSavedRecipe._id))}
                   >
-                    {exactSavedRecipe ? "Add Saved" : "Generate"}
+                    {exactSavedRecipe && addingRecipeIds.includes(exactSavedRecipe._id) ? "Adding..." : exactSavedRecipe ? "Add Saved" : "Generate"}
                   </button>
                 </div>
 
@@ -919,15 +1066,26 @@ export default function MealPlanner() {
                   </div>
                 ) : (
                   <div className="recipe-list">
-                    {searchedRecipes.map((recipe) => (
-                      <div key={recipe._id} className="recipe-item" onClick={() => assignRecipe(recipe)}>
+                    {searchedRecipes.map((recipe) => {
+                      const isAddingRecipe = addingRecipeIds.includes(recipe._id);
+                      const isAlreadyInSlot = getSlotPlans(selectedSlot.mealType, selectedSlot.dayIndex).some((plan) => plan.recipe?.id === recipe._id);
+                      return (
+                      <div
+                        key={recipe._id}
+                        className={`recipe-item ${isAddingRecipe ? "is-adding" : ""} ${isAlreadyInSlot ? "is-planned" : ""}`}
+                        onClick={() => {
+                          if (isAddingRecipe) return;
+                          assignRecipe(recipe, selectedSlot, { keepModalOpen: true });
+                        }}
+                      >
                         <div className="recipe-card-icon">{getMealIcon(selectedSlot.mealType)}</div>
                         <h5 className="fw-bold mb-1">{recipe.title}</h5>
                         <p className="text-muted small mb-0">
-                          {recipe.ingredients?.length || 0} ingredients
+                          {isAddingRecipe ? "Adding..." : isAlreadyInSlot ? "Added to this slot" : `${recipe.ingredients?.length || 0} ingredients`}
                         </p>
                       </div>
-                    ))}
+                    );
+                    })}
                   </div>
                 )}
               </div>
@@ -1058,6 +1216,18 @@ export default function MealPlanner() {
                 </ol>
               </div>
             </div>
+          </div>
+        )}
+
+        {mobileDragPosition && (
+          <div
+            className={`mobile-drag-ghost ${mobileDragPosition.mealType}`}
+            style={{
+              left: `${mobileDragPosition.x}px`,
+              top: `${mobileDragPosition.y}px`
+            }}
+          >
+            {mobileDragPosition.title}
           </div>
         )}
       </div>

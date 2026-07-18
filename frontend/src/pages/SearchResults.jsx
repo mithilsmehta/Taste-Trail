@@ -6,6 +6,7 @@ import Navbar from "../components/Navbar";
 import { getMondayDateKey, getWeekFromDateKey } from "../utils/weekPlan";
 import { formatIngredientAmount } from "../utils/recipeFormatting";
 import { estimateNutrition } from "../utils/nutritionEstimator";
+import { getUserFoodPreference } from "../utils/foodPreference";
 
 const defaultTimes = {
   breakfast: "08:00",
@@ -22,8 +23,6 @@ const mealOptions = [
 const nonVegetarianPattern = /\b(chicken|mutton|beef|pork|fish|seafood|prawn|shrimp|eggs?|gelatin|bacon|ham|turkey|lamb|keema)\b/i;
 const jainRestrictedPattern = /\b(onions?|garlic|potatoes?|aloo|carrots?|radish|beetroot|beet|turnip|ginger|sweet potato|yam|tapioca|cassava|arbi|colocasia|spring onion|green onion|scallion|leek|shallot)\b/i;
 const veganRestrictedPattern = /\b(milk|curd|yogurt|yoghurt|dahi|paneer|cheese|cream|butter|ghee|honey|mayonnaise|mayo|mozzarella|parmesan|ricotta|mascarpone|malai|buttermilk|whey|casein|milk powder|condensed milk|khoya|mawa|eggs?)\b/i;
-const recipeCacheVersion = "v5";
-
 const getPreferredServings = (user) => {
   const servings = Number(user?.onboarding?.usualServings);
   if (!Number.isFinite(servings)) return 2;
@@ -91,6 +90,7 @@ export default function SearchResults() {
   const savedRecipeId = searchParams.get("savedId");
   const preferredServings = getPreferredServings(user);
   const regionalStyle = getRegionalStyle(user);
+  const foodPreference = getUserFoodPreference(user);
 
   const [loading, setLoading] = useState(false);
   const [recipe, setRecipe] = useState(null);
@@ -151,10 +151,7 @@ export default function SearchResults() {
   };
 
   const getDietMode = () => {
-    const normalizedQuery = String(query || "").toLowerCase();
-    if (/\bjain\b/.test(normalizedQuery)) return "jain";
-    if (/\bvegan\b/.test(normalizedQuery)) return "vegan";
-    return "veg";
+    return foodPreference;
   };
 
   const getDietModeLabel = () => {
@@ -187,7 +184,11 @@ export default function SearchResults() {
     return "Veg recipes block non-veg items.";
   };
 
-  const getRecipeCacheKey = (servingCount = servings) => `tastewiseRecipe:${recipeCacheVersion}:${getDietMode()}:${normalizeTitle(regionalStyle) || "default"}:${normalizeTitle(query)}:${servingCount}`;
+  const clearRecipeBrowserCache = () => {
+    Object.keys(localStorage)
+      .filter((key) => key.startsWith("tastewiseRecipe:"))
+      .forEach((key) => localStorage.removeItem(key));
+  };
 
   const getRecipeText = () => {
     if (!recipe) return "";
@@ -446,26 +447,7 @@ export default function SearchResults() {
     setCustomIngredient("");
 
     try {
-      const cacheKey = getRecipeCacheKey(activeServings);
-      if (forceRegenerate) {
-        localStorage.removeItem(cacheKey);
-      }
-
-      const cachedRecipe = !forceRegenerate ? localStorage.getItem(cacheKey) : null;
-      if (cachedRecipe) {
-        const parsedCachedRecipe = JSON.parse(cachedRecipe);
-        if (!isRecipeSafeForDietMode(parsedCachedRecipe)) {
-          localStorage.removeItem(cacheKey);
-        } else {
-          setOriginalRecipe(parsedCachedRecipe);
-          setRecipe(parsedCachedRecipe);
-          setRecipeSource(parsedCachedRecipe.source || "cached");
-          setHasIngredientChanges(false);
-          setLoading(false);
-          return;
-        }
-      }
-
+      clearRecipeBrowserCache();
       const savedRecipe = forceRegenerate ? null : await getSavedRecipeFromDatabase(activeServings);
       if (savedRecipe) {
         setOriginalRecipe(savedRecipe);
@@ -474,7 +456,6 @@ export default function SearchResults() {
         setRecipeSource("saved");
         setIsSaved(true);
         setHasIngredientChanges(false);
-        localStorage.setItem(cacheKey, JSON.stringify(recipeFromSaved));
         setLoading(false);
         return;
       }
@@ -503,7 +484,6 @@ export default function SearchResults() {
       const parsed = data.recipe;
 
       if (!isRecipeSafeForDietMode(parsed)) {
-        localStorage.removeItem(cacheKey);
         throw new Error(`Generated recipe did not match ${getDietModeLabel()} search rules. ${getModeBlockedText()} Please generate again.`);
       }
       
@@ -512,7 +492,6 @@ export default function SearchResults() {
       setRecipe(parsed);
       setRecipeSource(parsed.source || "aiGenerated");
       setHasIngredientChanges(false);
-      localStorage.setItem(cacheKey, JSON.stringify(parsed));
 
     } catch (err) {
       console.error(err);
@@ -537,7 +516,7 @@ export default function SearchResults() {
     return () => window.clearTimeout(loadTimer);
     // Route changes should reload the recipe; these loaders intentionally own their internal state resets.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [query, savedRecipeId, preferredServings, regionalStyle]);
+  }, [query, savedRecipeId, preferredServings, regionalStyle, foodPreference]);
 
   const regenerateRecipe = () => {
     if (!query || loading) return;
@@ -664,8 +643,6 @@ export default function SearchResults() {
       };
       setRecipe(savedRecipe);
       setOriginalRecipe(savedRecipe);
-      localStorage.setItem(getRecipeCacheKey(), JSON.stringify(savedRecipe));
-      if (!silent) alert("✅ Recipe saved successfully! View it in your Saved Recipes.");
       setSaving(false);
       return true;
 

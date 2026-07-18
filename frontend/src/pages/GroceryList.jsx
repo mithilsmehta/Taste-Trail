@@ -2,114 +2,48 @@ import { API_BASE_URL } from "../utils/api";
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import Navbar from "../components/Navbar";
-import { formatIngredientAmount, mergeIngredientParts, splitIngredientLine } from "../utils/recipeFormatting";
+import { mergeIngredientParts, splitIngredientLine } from "../utils/recipeFormatting";
 import { parseDateKey } from "../utils/weekPlan";
 import "./GroceryList.css";
 
 const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 const validPlanDatePattern = /^\d{4}-\d{2}-\d{2}$/;
+const groceryCustomItemsKey = "tastewiseCustomGroceryItems";
+
+/*
+  Provider search cleanup words.
+  This block supports the disabled Blinkit/Zepto/BigBasket/Instamart order buttons below.
+  Re-enable it when grocery ordering/search links are needed again.
 
 const quantityWords = new Set([
-  "a",
-  "an",
-  "one",
-  "two",
-  "three",
-  "four",
-  "five",
-  "six",
-  "seven",
-  "eight",
-  "nine",
-  "ten"
+  "a", "an", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine", "ten"
 ]);
 
 const units = new Set([
-  "cup",
-  "cups",
-  "teaspoon",
-  "teaspoons",
-  "tsp",
-  "tablespoon",
-  "tablespoons",
-  "tbsp",
-  "gram",
-  "grams",
-  "g",
-  "kg",
-  "kilogram",
-  "kilograms",
-  "ml",
-  "liter",
-  "liters",
-  "litre",
-  "litres",
-  "oz",
-  "ounce",
-  "ounces",
-  "pinch",
-  "pinches",
-  "piece",
-  "pieces",
-  "clove",
-  "cloves",
-  "slice",
-  "slices",
-  "small",
-  "medium",
-  "sized",
-  "large"
+  "cup", "cups", "teaspoon", "teaspoons", "tsp", "tablespoon", "tablespoons", "tbsp",
+  "gram", "grams", "g", "kg", "kilogram", "kilograms", "ml", "liter", "liters",
+  "litre", "litres", "oz", "ounce", "ounces", "pinch", "pinches", "piece", "pieces",
+  "clove", "cloves", "slice", "slices", "small", "medium", "sized", "large"
 ]);
 
 const prepWords = new Set([
-  "chopped",
-  "diced",
-  "sliced",
-  "minced",
-  "grated",
-  "crushed",
-  "finely",
-  "roughly",
-  "thinly",
-  "fresh",
-  "peeled",
-  "optional",
-  "and",
-  "of",
-  "brewed",
-  "strong",
-  "ground",
-  "powdered",
-  "for",
-  "serving",
-  "serve",
-  "served",
-  "servings",
-  "garnish",
-  "to",
-  "taste"
+  "chopped", "diced", "sliced", "minced", "grated", "crushed", "finely", "roughly",
+  "thinly", "fresh", "peeled", "optional", "and", "of", "brewed", "strong", "ground",
+  "powdered", "for", "serving", "serve", "served", "servings", "garnish", "to", "taste"
 ]);
 
 const nonOrderableWords = new Set([
-  "chopped",
-  "sliced",
-  "diced",
-  "minced",
-  "grated",
-  "crushed",
-  "peeled",
-  "serving",
-  "serve",
-  "served",
-  "servings",
-  "garnish",
-  "optional",
-  "taste",
-  "water",
-  "salt"
+  "chopped", "sliced", "diced", "minced", "grated", "crushed", "peeled", "serving",
+  "serve", "served", "servings", "garnish", "optional", "taste", "water", "salt"
 ]);
+*/
 
 const standaloneInstructionPattern = /^(?:to taste|for garnish|for serving|garnish|serving|optional|chopped|sliced|diced|minced|grated|crushed|peeled|peeled and diced|peeled and chopped|peeled and cubed|peeled and grated|thinly sliced|finely chopped|roughly chopped)$/i;
+
+/*
+  Shopping provider configuration.
+  This was used to open ingredient searches in Blinkit, Zepto, BigBasket, and Instamart.
+  It is disabled for now as requested, but kept here for easy reactivation later.
 
 const shoppingProviders = [
   {
@@ -142,15 +76,77 @@ const shoppingProviders = [
     getUrl: (query) => `https://www.swiggy.com/instamart/search?query=${encodeURIComponent(query)}`
   }
 ];
+*/
+
+const categoryTabs = [
+  { id: "all", label: "All" },
+  { id: "vegetables", label: "Vegetables" },
+  { id: "grains", label: "Grains and Pulses" },
+  { id: "snacks", label: "Snacks" }
+];
+
+const categoryPatterns = {
+  vegetables: /\b(cabbage|capsicum|bell pepper|broccoli|lettuce|tomato|cucumber|coriander|cilantro|spinach|palak|methi|cauliflower|peas|beans|gourd|lauki|pumpkin|fruit|chilli|chili|leaves|vegetable|carrot|potato|onion|garlic)\b/i,
+  grains: /\b(flour|wheat|rice|basmati|atta|dal|lentil|moong|chana|rajma|beans|pulses|oats|quinoa|millet|jowar|bajra|ragi|semolina|suji|noodles|pasta)\b/i,
+  snacks: /\b(butter|cheese|paneer|pesto|pepper|masala|snack|chips|bread|buns|dry fruits|nuts|almond|cashew|raisins|sauce|chutney)\b/i
+};
+
+const categoryLabels = {
+  vegetables: "One Dish - Healthy",
+  grains: "Carbs/Roti, Paratha...",
+  snacks: "Pantry Items"
+};
+
+const categoryColorClass = {
+  vegetables: "category-healthy",
+  grains: "category-carbs",
+  snacks: "category-protein"
+};
+
+const reminderOptions = ["Don't repeat", "Every day", "Every week", "Every month", "Every year", "Custom"];
+const earlyAlertOptions = ["No early alert", "10 minutes before", "30 minutes before", "1 hour before"];
+const cleanIngredientUnitsPattern = /\b(cup|cups|teaspoon|teaspoons|tsp|tablespoon|tablespoons|tbsp|gram|grams|g|kg|kilogram|kilograms|ml|liter|liters|litre|litres|oz|ounce|ounces|pinch|pinches|piece|pieces|clove|cloves|slice|slices|small|medium|large|bunch|bunches|sprig|sprigs|can|cans|jar|jars|pint|pints)\b/gi;
+const cleanIngredientPrepPattern = /\b(finely|roughly|thinly|fresh|chopped|diced|sliced|minced|grated|crushed|peeled|cubed|ground|powdered|brewed|strong|granulated|optional|of|and|or|other|for garnish|for serving|to taste|as needed)\b/gi;
+
+const getStoredCustomItems = () => {
+  try {
+    return JSON.parse(localStorage.getItem(groceryCustomItemsKey) || "[]");
+  } catch {
+    return [];
+  }
+};
 
 export default function GroceryList() {
   const navigate = useNavigate();
   const [mealPlans, setMealPlans] = useState([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState("all");
-  const [selectedProvider, setSelectedProvider] = useState("blinkit");
-  const [expandedRecipes, setExpandedRecipes] = useState({});
+  // Provider selection state is disabled with the grocery ordering feature for now.
+  // const [selectedProvider, setSelectedProvider] = useState("blinkit");
   const [checkedItems, setCheckedItems] = useState({});
+  const [customItems, setCustomItems] = useState(getStoredCustomItems);
+  const [customItemName, setCustomItemName] = useState("");
+  const [showCompleted, setShowCompleted] = useState(true);
+  const [sortMode, setSortMode] = useState("new");
+  const [groupByCategory, setGroupByCategory] = useState(false);
+  const [showSettings, setShowSettings] = useState(false);
+  const [showAddPanel, setShowAddPanel] = useState(false);
+  const [showDateList, setShowDateList] = useState(false);
+  const [showReminderSheet, setShowReminderSheet] = useState(false);
+  const [showDateSheet, setShowDateSheet] = useState(false);
+  const [showTimeSheet, setShowTimeSheet] = useState(false);
+  const [showRepeatMenu, setShowRepeatMenu] = useState(false);
+  const [reminderDraft, setReminderDraft] = useState({
+    title: "Grocery reminder",
+    checked: [],
+    allDay: true,
+    dateKey: "",
+    time: "23:00",
+    repeat: "Don't repeat",
+    earlyAlert: "No early alert"
+  });
+  // Provider picker sheet is disabled with Blinkit/Zepto/etc ordering for now.
+  // const [showProviderPanel, setShowProviderPanel] = useState(false);
 
   const loadGroceryList = async () => {
     try {
@@ -183,6 +179,41 @@ export default function GroceryList() {
       [itemId]: !prev[itemId]
     }));
   };
+
+  const toggleManyItems = (items, nextValue = true) => {
+    setCheckedItems(prev => {
+      const updated = { ...prev };
+      items.forEach((item) => {
+        updated[item._sourceId] = nextValue;
+      });
+      return updated;
+    });
+  };
+
+  const saveCustomItems = (items) => {
+    setCustomItems(items);
+    localStorage.setItem(groceryCustomItemsKey, JSON.stringify(items));
+  };
+
+  const addCustomItem = () => {
+    const name = customItemName.trim();
+    if (!name) return;
+
+    saveCustomItems([
+      {
+        _id: `custom-${Date.now()}`,
+        name,
+        createdAt: new Date().toISOString()
+      },
+      ...customItems
+    ]);
+    setCustomItemName("");
+    setShowAddPanel(false);
+  };
+
+  /*
+    Turns an ingredient like "1 cup chopped tomatoes" into "tomato" for provider search URLs.
+    Disabled together with the grocery ordering provider flow.
 
   const getShoppingSearchTerm = (ingredient) => {
     const withoutParentheses = ingredient.replace(/\([^)]*\)/g, " ");
@@ -251,9 +282,43 @@ export default function GroceryList() {
       window.open(webLink, "_blank");
     }
   };
+  */
+
+  const shouldDisplayIngredient = (ingredient) => {
+    const normalizedIngredient = String(ingredient || "").trim();
+    if (!normalizedIngredient) return false;
+    return !standaloneInstructionPattern.test(normalizedIngredient);
+  };
+
+  /*
+    Old grocery display kept quantities such as "1/2 teaspoon" and "2 cups".
+    To restore that later, replace cleanIngredientName(item.name) in the JSX with:
+    formatIngredientAmount(item.name)
+  */
+  const cleanIngredientName = (ingredient) => {
+    const cleaned = String(ingredient || "")
+      .replace(/\([^)]*\)/g, " ")
+      .replace(/[¼½¾⅓⅔]/g, " ")
+      .replace(/\b\d+\s*-\s*\d+\b/g, " ")
+      .replace(/\b\d+(?:\.\d+)?(?:\/\d+)?\b/g, " ")
+      .replace(cleanIngredientUnitsPattern, " ")
+      .replace(cleanIngredientPrepPattern, " ")
+      .replace(/[,+]/g, " ")
+      .replace(/\s+/g, " ")
+      .trim()
+      .replace(/\btomatoes\b/gi, "tomato")
+      .replace(/\bonions\b/gi, "onion")
+      .replace(/\bpotatoes\b/gi, "potato")
+      .replace(/\bbananas\b/gi, "banana")
+      .replace(/\bchilies\b/gi, "chilli")
+      .replace(/\bchillies\b/gi, "chilli");
+
+    if (!cleaned) return String(ingredient || "").trim();
+    return cleaned.charAt(0).toUpperCase() + cleaned.slice(1);
+  };
 
   const getDisplayItems = () => {
-    return mealPlans.flatMap((mealPlan) => {
+    const planItems = mealPlans.flatMap((mealPlan) => {
       const ingredients = mealPlan.recipe?.ingredients || [];
       const parts = mergeIngredientParts(ingredients.flatMap(splitIngredientLine));
 
@@ -265,263 +330,615 @@ export default function GroceryList() {
           _planDate: mealPlan.planDate || "",
           mealType: mealPlan.mealType,
           marked: false,
-          name: part
+          name: part,
+          displayName: cleanIngredientName(part)
         }));
     });
+
+    const manualItems = customItems.map((item, index) => ({
+      _displayId: item._id,
+      _sourceId: item._id,
+      _recipeId: "manual",
+      _recipeTitle: "Added manually",
+      _planDate: "",
+      mealType: "manual",
+      marked: false,
+      name: item.name,
+      displayName: cleanIngredientName(item.name),
+      manualIndex: index
+    }));
+
+    return [...manualItems, ...planItems];
+  };
+
+  const getItemCategory = (item) => {
+    const name = String(item.displayName || item.name || "");
+    if (categoryPatterns.vegetables.test(name)) return "vegetables";
+    if (categoryPatterns.grains.test(name)) return "grains";
+    if (categoryPatterns.snacks.test(name)) return "snacks";
+    return "snacks";
   };
 
   const getFilteredItems = () => {
     const displayItems = getDisplayItems();
     if (filter === "all") return displayItems;
-    return displayItems.filter(item => item.mealType === filter);
+    return displayItems.filter((item) => getItemCategory(item) === filter);
   };
 
   const getMealTypeCount = (mealType) => {
-    return getDisplayItems().filter((item) => item.mealType === mealType).length;
-  };
-
-  const getMealIcon = (mealType) => {
-    const icons = {
-      breakfast: "🥣",
-      lunch: "🍱",
-      dinner: "🍽️"
-    };
-    return icons[mealType];
+    return getDisplayItems().filter((item) => getItemCategory(item) === mealType).length;
   };
 
   const formatPlanDate = (dateKey) => {
-    if (!dateKey) return "";
+    if (!dateKey || dateKey === "manual") return "";
     const date = parseDateKey(dateKey);
     return `${date.getDate()} ${monthNames[date.getMonth()]} ${date.getFullYear()}`;
   };
 
-  const groupByMealAndRecipe = (items) => {
-    const grouped = {
-      breakfast: {},
-      lunch: {},
-      dinner: {}
+  const toDateKey = (date) => {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, "0");
+    const day = String(date.getDate()).padStart(2, "0");
+    return `${year}-${month}-${day}`;
+  };
+
+  const todayKey = toDateKey(new Date());
+
+  const formatShortDate = (dateKey) => {
+    if (!dateKey || dateKey === "manual") return "Added manually";
+    const date = parseDateKey(dateKey);
+    return date.toLocaleDateString("en-US", {
+      weekday: "short",
+      day: "numeric",
+      month: "short"
+    });
+  };
+
+  const getCalendarDays = () => {
+    const baseDate = reminderDraft.dateKey ? parseDateKey(reminderDraft.dateKey) : new Date();
+    const start = new Date(baseDate.getFullYear(), baseDate.getMonth(), 1);
+    const firstDay = start.getDay();
+    const days = [];
+
+    for (let index = 0; index < firstDay; index += 1) {
+      days.push(null);
+    }
+
+    const totalDays = new Date(baseDate.getFullYear(), baseDate.getMonth() + 1, 0).getDate();
+    for (let day = 1; day <= totalDays; day += 1) {
+      days.push(new Date(baseDate.getFullYear(), baseDate.getMonth(), day));
+    }
+
+    return {
+      label: baseDate.toLocaleDateString("en-US", { month: "long", year: "numeric" }),
+      days
     };
+  };
 
-    items.forEach(item => {
-      if (!grouped[item.mealType]) return;
+  const groupItemsByDate = (items) => {
+    const groups = {};
 
-      if (!grouped[item.mealType][item._recipeId]) {
-        grouped[item.mealType][item._recipeId] = {
-          id: item._recipeId,
-          title: item._recipeTitle,
-          mealType: item.mealType,
-          planDate: item._planDate,
+    items.forEach((item) => {
+      const dateKey = item._planDate || "manual";
+      if (!groups[dateKey]) groups[dateKey] = {};
+
+      const category = getItemCategory(item);
+      const recipeKey = groupByCategory ? `${dateKey}-${category}` : `${item._recipeId}-${item._recipeTitle}`;
+      if (!groups[dateKey][recipeKey]) {
+        groups[dateKey][recipeKey] = {
+          id: recipeKey,
+          title: groupByCategory ? categoryTabs.find((tab) => tab.id === category)?.label || "Other" : item._recipeTitle,
+          category,
           items: []
         };
       }
 
-      grouped[item.mealType][item._recipeId].items.push(item);
+      groups[dateKey][recipeKey].items.push(item);
     });
 
-    return grouped;
+    return Object.entries(groups)
+      .sort(([dateA], [dateB]) => {
+        if (dateA === "manual") return -1;
+        if (dateB === "manual") return 1;
+        return dateA.localeCompare(dateB);
+      })
+      .map(([dateKey, recipes]) => ({
+        dateKey,
+        recipes: Object.values(recipes)
+      }));
   };
 
-  const toggleRecipe = (recipeId) => {
-    setExpandedRecipes(prev => ({
+  const getDateRows = () => {
+    const keys = [...new Set(mealPlans.map((plan) => plan.planDate).filter(Boolean))].sort();
+
+    if (keys.length > 0) {
+      return keys.map((dateKey) => ({
+        dateKey,
+        count: mealPlans.filter((plan) => plan.planDate === dateKey).length
+      }));
+    }
+
+    return Array.from({ length: 7 }, (_, index) => {
+      const date = new Date();
+      date.setDate(date.getDate() + index);
+      return { dateKey: toDateKey(date), count: 0 };
+    });
+  };
+
+  const updateReminderDate = (offsetDays) => {
+    const date = new Date();
+    date.setDate(date.getDate() + offsetDays);
+    setReminderDraft(prev => ({ ...prev, dateKey: toDateKey(date), allDay: true }));
+  };
+
+  const shiftReminderMonth = (offset) => {
+    const baseDate = reminderDraft.dateKey ? parseDateKey(reminderDraft.dateKey) : new Date();
+    baseDate.setMonth(baseDate.getMonth() + offset);
+    setReminderDraft(prev => ({ ...prev, dateKey: toDateKey(baseDate) }));
+  };
+
+  const toggleReminderChecklist = (index) => {
+    setReminderDraft(prev => ({
       ...prev,
-      [recipeId]: !prev[recipeId]
+      checked: prev.checked.includes(index)
+        ? prev.checked.filter((item) => item !== index)
+        : [...prev.checked, index]
     }));
+  };
+
+  const getReminderTasks = (items) => {
+    const pendingNames = [...new Set(items.map((item) => item.displayName || item.name).filter(Boolean))];
+    const recipeNames = [...new Set(items.map((item) => item._recipeTitle).filter((title) => title && title !== "Added manually"))];
+    const pantryItems = pendingNames.filter((name) => getItemCategory({ displayName: name }) !== "vegetables").slice(0, 4);
+    const freshItems = pendingNames.filter((name) => getItemCategory({ displayName: name }) === "vegetables").slice(0, 4);
+
+    return [
+      `Review ${pendingNames.length || 0} ingredients${recipeNames.length ? ` from ${recipeNames.slice(0, 2).join(", ")}` : ""}`,
+      pantryItems.length ? `Check pantry for ${pantryItems.join(", ")}` : "Check pantry before shopping",
+      freshItems.length ? `Buy missing fresh items: ${freshItems.join(", ")}` : "Buy missing grocery items"
+    ];
   };
 
   if (loading) {
     return (
-      <>
-        <Navbar />
-        <div className="container mt-5 text-center">
-          <div className="spinner-border text-warning" role="status">
+      <div className="grocery-app-shell loading">
+        <div className="grocery-loading">
+          <div className="spinner-border" role="status">
             <span className="visually-hidden">Loading...</span>
           </div>
-          <p className="text-muted mt-3">Loading your grocery list...</p>
+          <p>Loading your grocery list...</p>
         </div>
-      </>
+      </div>
     );
   }
 
   const filteredItems = getFilteredItems();
-  const groupedItems = groupByMealAndRecipe(filteredItems);
-  const displayItemCount = getDisplayItems().length;
+  const sortedItems = [...filteredItems].sort((a, b) => {
+    if (sortMode === "name") return String(a.name).localeCompare(String(b.name));
+    return (a.manualIndex ?? 9999) - (b.manualIndex ?? 9999);
+  });
+  const activeItems = sortedItems.filter((item) => !checkedItems[item._sourceId]);
+  const completedItems = sortedItems.filter((item) => checkedItems[item._sourceId]);
+  const dateGroups = groupItemsByDate(activeItems);
+  const dateRows = getDateRows();
+  const calendar = getCalendarDays();
+  const reminderTasks = getReminderTasks(activeItems);
+  const reminderDateLabel = reminderDraft.dateKey === todayKey
+    ? "Today"
+    : reminderDraft.dateKey
+      ? formatShortDate(reminderDraft.dateKey)
+      : "Today";
+  // Active provider lookup is disabled with the grocery ordering feature for now.
+  // const activeProvider = shoppingProviders.find((provider) => provider.id === selectedProvider) || shoppingProviders[0];
 
   return (
     <>
       <Navbar />
-      <div className="container mt-4 mb-5">
-        <button 
-          className="btn btn-outline-secondary mb-4"
-          onClick={() => navigate("/home")}
-        >
-          ← Back to Home
-        </button>
-
-        <div className="grocery-header mb-4">
-          <h2 className="fw-bold">🛒 Grocery List</h2>
-          <p className="text-muted">
-            {filteredItems.length} item{filteredItems.length !== 1 ? 's' : ''} in your list
-          </p>
-        </div>
-
-        {/* Filter Buttons */}
-        <div className="provider-picker mb-4">
+      <div className="grocery-app-shell">
+        <header className="grocery-topbar">
+          <button type="button" className="grocery-icon-btn back" onClick={() => navigate("/home")} aria-label="Back to home">
+            ‹
+          </button>
           <div>
-            <h5 className="fw-bold mb-1">Shopping Provider</h5>
-            <p className="text-muted mb-0">Choose where ingredient order buttons should search.</p>
+            <h1>Grocery list</h1>
+            <p>{activeItems.length} open • {completedItems.length} completed</p>
           </div>
-          <div className="provider-options">
-            {shoppingProviders.map((provider) => (
+          <div className="grocery-header-actions">
+            <button type="button" className="grocery-icon-btn" onClick={() => setShowDateList(true)} aria-label="Open date ingredient list">
+              ≡
+            </button>
+            <button type="button" className="grocery-icon-btn" onClick={() => setShowReminderSheet(true)} aria-label="Open grocery reminder">
+              ◷
+            </button>
+            {/*
+              Provider picker button.
+              This opened the Blinkit/Zepto/BigBasket/Instamart selection sheet.
+              Disabled for now as requested.
+
+            <button type="button" className="grocery-icon-btn" onClick={() => setShowProviderPanel(true)} aria-label="Choose order provider">
+              ▰
+            </button>
+            */}
+            <button type="button" className="grocery-icon-btn" onClick={() => setShowSettings(true)} aria-label="Open grocery settings">
+              ⚙
+            </button>
+          </div>
+        </header>
+
+      <main className="grocery-mobile-screen">
+        <nav className="grocery-category-tabs" aria-label="Grocery categories">
+          {categoryTabs.map((tab) => (
+            <button
+              key={tab.id}
+              type="button"
+              className={filter === tab.id ? "active" : ""}
+              onClick={() => setFilter(tab.id)}
+            >
+              {tab.label}{tab.id !== "all" ? ` ${getMealTypeCount(tab.id)}` : ""}
+            </button>
+          ))}
+        </nav>
+
+        {activeItems.length === 0 ? (
+          <section className="grocery-empty-state">
+            <strong>No grocery items yet</strong>
+            <span>Add recipes to your meal planner or use the plus button to add an item.</span>
+          </section>
+        ) : (
+          <section className="grocery-date-list">
+            {dateGroups.map((dateGroup) => (
+              <article key={dateGroup.dateKey} className="grocery-date-section">
+                <div className="grocery-date-heading">
+                  <h2>{formatShortDate(dateGroup.dateKey)}</h2>
+                  {dateGroup.dateKey === todayKey && <span>Today</span>}
+                  <button type="button" onClick={() => setShowReminderSheet(true)} aria-label={`Reminder for ${formatShortDate(dateGroup.dateKey)}`}>
+                    ⋮
+                  </button>
+                </div>
+
+                <div className="grocery-task-card date-card">
+                  {dateGroup.recipes.map((recipeGroup) => (
+                    <article key={recipeGroup.id} className="grocery-recipe-chip-block">
+                      <div className="grocery-recipe-chip-heading">
+                        <span className={`grocery-category-pill ${categoryColorClass[recipeGroup.category]}`}>
+                          {categoryLabels[recipeGroup.category]}
+                        </span>
+                        <strong>{recipeGroup.title}</strong>
+                        <button
+                          type="button"
+                          onClick={() => toggleManyItems(recipeGroup.items, true)}
+                          aria-label={`Mark all ${recipeGroup.title} ingredients complete`}
+                        >
+                          ✓ All
+                        </button>
+                      </div>
+                      <div className="grocery-ingredient-chips">
+                        {recipeGroup.items.map((item) => (
+                          <button
+                            key={item._displayId}
+                          type="button"
+                          className="grocery-chip"
+                          onClick={() => toggleMark(item._sourceId)}
+                        >
+                            {item.displayName}
+                          </button>
+                        ))}
+                      </div>
+                    </article>
+                  ))}
+                </div>
+              </article>
+            ))}
+          </section>
+        )}
+
+        {showCompleted && completedItems.length > 0 && (
+          <section className="grocery-completed">
+            <span className="completed-pill">Completed tasks</span>
+            <h2>{formatPlanDate(completedItems[0]._planDate) || "Checked items"}</h2>
+            <div className="grocery-task-card completed-card">
+              {completedItems.map((item) => (
+                <button
+                  key={item._displayId}
+                  type="button"
+                  className="completed-item"
+                  onClick={() => toggleMark(item._sourceId)}
+                >
+                  <span>✓</span>
+                  <del>{item.displayName}</del>
+                </button>
+              ))}
+            </div>
+          </section>
+        )}
+      </main>
+
+      <button type="button" className="grocery-fab" onClick={() => setShowAddPanel(true)} aria-label="Add grocery item">
+        +
+      </button>
+
+      {showSettings && (
+        <div className="grocery-sheet-backdrop" onClick={() => setShowSettings(false)}>
+          <section className="grocery-settings-sheet" onClick={(event) => event.stopPropagation()}>
+            <label className="grocery-toggle-row">
+              <span>Show completed tasks</span>
+              <input
+                type="checkbox"
+                checked={showCompleted}
+                onChange={(event) => setShowCompleted(event.target.checked)}
+              />
+            </label>
+
+            <h2>Order of tasks</h2>
+            <div className="settings-list">
+              <button type="button" onClick={() => setSortMode("new")}>
+                <span>New</span>
+                {sortMode === "new" && <strong>✓</strong>}
+              </button>
+              <button type="button" onClick={() => setSortMode("name")}>
+                <span>Name</span>
+                {sortMode === "name" && <strong>✓</strong>}
+              </button>
+              <label>
+                <span>Group by category</span>
+                <input
+                  type="checkbox"
+                  checked={groupByCategory}
+                  onChange={(event) => setGroupByCategory(event.target.checked)}
+                />
+              </label>
+            </div>
+          </section>
+        </div>
+      )}
+
+      {showAddPanel && (
+        <div className="grocery-sheet-backdrop" onClick={() => setShowAddPanel(false)}>
+          <section className="grocery-settings-sheet add-sheet" onClick={(event) => event.stopPropagation()}>
+            <h2>Add grocery item</h2>
+            <input
+              value={customItemName}
+              onChange={(event) => setCustomItemName(event.target.value)}
+              onKeyDown={(event) => {
+                if (event.key === "Enter") addCustomItem();
+              }}
+              placeholder="Ingredient name"
+              autoFocus
+            />
+            <button type="button" className="sheet-primary-btn" onClick={addCustomItem}>Add item</button>
+          </section>
+        </div>
+      )}
+
+      {showDateList && (
+        <div className="grocery-sheet-backdrop align-top" onClick={() => setShowDateList(false)}>
+          <section className="grocery-date-sheet" onClick={(event) => event.stopPropagation()}>
+            <header className="grocery-sheet-titlebar">
+              <button type="button" onClick={() => setShowDateList(false)} aria-label="Close select ingredients">‹</button>
+              <h2>Select Ingredients</h2>
+            </header>
+
+            <div className="grocery-simple-date-list">
+              {dateRows.map((row) => (
+                <button
+                  key={row.dateKey}
+                  type="button"
+                  className="grocery-simple-date-row"
+                  onClick={() => setShowDateList(false)}
+                >
+                  <span>{formatShortDate(row.dateKey)}</span>
+                  {row.dateKey === todayKey && <strong>Today</strong>}
+                  <small>{row.count ? `${row.count} recipes` : "No recipes"}</small>
+                  <em>⋮</em>
+                </button>
+              ))}
+            </div>
+          </section>
+        </div>
+      )}
+
+      {showReminderSheet && (
+        <div className="grocery-sheet-backdrop" onClick={() => setShowReminderSheet(false)}>
+          <section className="grocery-reminder-sheet" onClick={(event) => event.stopPropagation()}>
+            <div className="sheet-handle" />
+            <input
+              className="reminder-title-input"
+              value={reminderDraft.title}
+              onChange={(event) => setReminderDraft(prev => ({ ...prev, title: event.target.value }))}
+              placeholder="Reminder title"
+            />
+
+            <div className="reminder-checklist">
+              {reminderTasks.map((item, index) => (
+                <button key={item} type="button" onClick={() => toggleReminderChecklist(index)}>
+                  <span className={reminderDraft.checked.includes(index) ? "checked" : ""} />
+                  {item}
+                </button>
+              ))}
+            </div>
+
+            <div className="reminder-selected-chip">
+              <span>{reminderDateLabel}{!reminderDraft.allDay ? `, ${reminderDraft.time}` : ""}</span>
               <button
-                key={provider.id}
-                className={`provider-option ${provider.colorClass} ${selectedProvider === provider.id ? "active" : ""}`}
-                onClick={() => setSelectedProvider(provider.id)}
+                type="button"
+                onClick={() => setReminderDraft(prev => ({ ...prev, dateKey: "", time: "23:00" }))}
+                aria-label="Clear reminder schedule"
               >
-                <span>{provider.icon}</span>
-                {provider.name}
+                −
+              </button>
+            </div>
+
+            <button type="button" className="reminder-save-btn" onClick={() => setShowReminderSheet(false)} aria-label="Save reminder">
+              ✓
+            </button>
+
+            <div className="reminder-icon-row" aria-label="Reminder tools">
+              <button type="button" className="active">✓</button>
+              <button type="button" onClick={() => setShowDateSheet(true)}>▦</button>
+              <button type="button" onClick={() => setReminderDraft(prev => ({ ...prev, earlyAlert: earlyAlertOptions[1] }))}>◉</button>
+              <button type="button" onClick={() => setShowTimeSheet(true)}>◷</button>
+              <button type="button" onClick={() => setShowRepeatMenu(true)}>≡</button>
+            </div>
+
+            <div className="reminder-options">
+              <label className="reminder-option-row">
+                <span>◷</span>
+                <strong>All day</strong>
+                <input
+                  type="checkbox"
+                  checked={reminderDraft.allDay}
+                  onChange={(event) => setReminderDraft(prev => ({ ...prev, allDay: event.target.checked }))}
+                />
+              </label>
+
+              <div className="reminder-chip-row">
+                <button type="button" onClick={() => updateReminderDate(0)}>Today</button>
+                <button type="button" onClick={() => updateReminderDate(1)}>Tomorrow</button>
+                <button type="button" onClick={() => updateReminderDate(3)}>3 days from now</button>
+                <button type="button" onClick={() => updateReminderDate(7)}>1 week</button>
+              </div>
+
+              <div className="reminder-chip-row">
+                <button type="button" onClick={() => setShowDateSheet(true)}>Set date</button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setReminderDraft(prev => ({ ...prev, allDay: false }));
+                    setShowTimeSheet(true);
+                  }}
+                >
+                  Set time
+                </button>
+                {["07:00", "15:00", "23:00"].map((time) => (
+                  <button key={time} type="button" onClick={() => setReminderDraft(prev => ({ ...prev, time, allDay: false }))}>
+                    {time}
+                  </button>
+                ))}
+              </div>
+
+              <button
+                type="button"
+                className="reminder-option-row muted"
+                onClick={() => {
+                  const currentIndex = earlyAlertOptions.indexOf(reminderDraft.earlyAlert);
+                  const nextIndex = (currentIndex + 1) % earlyAlertOptions.length;
+                  setReminderDraft(prev => ({ ...prev, earlyAlert: earlyAlertOptions[nextIndex] }));
+                }}
+              >
+                <span>♧</span>
+                <strong>{reminderDraft.earlyAlert}</strong>
+              </button>
+
+              <button type="button" className="reminder-option-row muted" onClick={() => setShowRepeatMenu(true)}>
+                <span>↻</span>
+                <strong>{reminderDraft.repeat}</strong>
+              </button>
+            </div>
+          </section>
+        </div>
+      )}
+
+      {showDateSheet && (
+        <div className="grocery-sheet-backdrop nested" onClick={() => setShowDateSheet(false)}>
+          <section className="grocery-picker-sheet" onClick={(event) => event.stopPropagation()}>
+            <h2>Set date</h2>
+            <div className="calendar-heading">
+              <button type="button" onClick={() => shiftReminderMonth(-1)}>‹</button>
+              <strong>{calendar.label}</strong>
+              <button type="button" onClick={() => shiftReminderMonth(1)}>›</button>
+            </div>
+            <div className="calendar-grid">
+              {["SUN", "MON", "TUE", "WED", "THU", "FRI", "SAT"].map((day) => <span key={day}>{day}</span>)}
+              {calendar.days.map((day, index) => {
+                const key = day ? toDateKey(day) : `empty-${index}`;
+                return (
+                  <button
+                    key={key}
+                    type="button"
+                    disabled={!day}
+                    className={day && reminderDraft.dateKey === toDateKey(day) ? "selected" : ""}
+                    onClick={() => day && setReminderDraft(prev => ({ ...prev, dateKey: toDateKey(day) }))}
+                  >
+                    {day ? day.getDate() : ""}
+                  </button>
+                );
+              })}
+            </div>
+            <div className="picker-actions">
+              <button type="button" onClick={() => setShowDateSheet(false)}>Cancel</button>
+              <button type="button" onClick={() => setShowDateSheet(false)}>Done</button>
+            </div>
+          </section>
+        </div>
+      )}
+
+      {showTimeSheet && (
+        <div className="grocery-sheet-backdrop nested" onClick={() => setShowTimeSheet(false)}>
+          <section className="grocery-picker-sheet" onClick={(event) => event.stopPropagation()}>
+            <h2>Set time</h2>
+            <input
+              className="time-picker-input"
+              type="time"
+              value={reminderDraft.time}
+              onChange={(event) => setReminderDraft(prev => ({ ...prev, time: event.target.value, allDay: false }))}
+            />
+            <div className="picker-actions">
+              <button type="button" onClick={() => setShowTimeSheet(false)}>Cancel</button>
+              <button type="button" onClick={() => setShowTimeSheet(false)}>Done</button>
+            </div>
+          </section>
+        </div>
+      )}
+
+      {showRepeatMenu && (
+        <div className="grocery-sheet-backdrop nested" onClick={() => setShowRepeatMenu(false)}>
+          <section className="grocery-repeat-menu" onClick={(event) => event.stopPropagation()}>
+            {reminderOptions.map((option) => (
+              <button
+                key={option}
+                type="button"
+                onClick={() => {
+                  setReminderDraft(prev => ({ ...prev, repeat: option }));
+                  setShowRepeatMenu(false);
+                }}
+              >
+                <span>{option}</span>
+                {reminderDraft.repeat === option && <strong>✓</strong>}
               </button>
             ))}
-          </div>
+          </section>
         </div>
+      )}
 
-        {/* Filter Buttons */}
-        <div className="filter-buttons mb-4">
-          <button
-            className={`btn ${filter === "all" ? "btn-warning" : "btn-outline-warning"} me-2`}
-            onClick={() => setFilter("all")}
-          >
-            All ({displayItemCount})
-          </button>
-          <button
-            className={`btn ${filter === "breakfast" ? "btn-warning" : "btn-outline-warning"} me-2`}
-            onClick={() => setFilter("breakfast")}
-          >
-            🥣 Breakfast ({getMealTypeCount("breakfast")})
-          </button>
-          <button
-            className={`btn ${filter === "lunch" ? "btn-warning" : "btn-outline-warning"} me-2`}
-            onClick={() => setFilter("lunch")}
-          >
-            🍱 Lunch ({getMealTypeCount("lunch")})
-          </button>
-          <button
-            className={`btn ${filter === "dinner" ? "btn-warning" : "btn-outline-warning"}`}
-            onClick={() => setFilter("dinner")}
-          >
-            🍽️ Dinner ({getMealTypeCount("dinner")})
-          </button>
+      {/*
+        Shopping provider selection sheet.
+        This rendered Blinkit, Zepto, BigBasket, and Instamart choices.
+        Disabled for now as requested.
+
+      {showProviderPanel && (
+        <div className="grocery-sheet-backdrop" onClick={() => setShowProviderPanel(false)}>
+          <section className="grocery-settings-sheet add-sheet" onClick={(event) => event.stopPropagation()}>
+            <h2>Order ingredients on</h2>
+            <div className="provider-options">
+              {shoppingProviders.map((provider) => (
+                <button
+                  key={provider.id}
+                  className={`provider-option ${provider.colorClass} ${selectedProvider === provider.id ? "active" : ""}`}
+                  onClick={() => {
+                    setSelectedProvider(provider.id);
+                    setShowProviderPanel(false);
+                  }}
+                >
+                  <span>{provider.icon}</span>
+                  {provider.name}
+                </button>
+              ))}
+            </div>
+          </section>
         </div>
-
-        {/* Empty State */}
-        {filteredItems.length === 0 && (
-          <div className="empty-state text-center py-5">
-            <div className="empty-icon mb-3">🛒</div>
-            <h4 className="fw-bold mb-2">No Items in Grocery List</h4>
-            <p className="text-muted mb-4">Add meal plans to generate your grocery list</p>
-            <button 
-              className="btn btn-warning px-4"
-              onClick={() => navigate("/home")}
-            >
-              Go to Home
-            </button>
-          </div>
-        )}
-
-        {/* Grocery Items by Meal Type */}
-        {filteredItems.length > 0 && (
-          <div className="grocery-sections">
-            {Object.entries(groupedItems).map(([mealType, recipesById]) => {
-              const recipeGroups = Object.values(recipesById);
-              if (recipeGroups.length === 0) return null;
-              const mealItemCount = recipeGroups.reduce((total, recipeGroup) => total + recipeGroup.items.length, 0);
-
-              return (
-                <div key={mealType} className="meal-section mb-4">
-                  <h4 className="fw-bold mb-3 text-capitalize">
-                    {getMealIcon(mealType)} {mealType}
-                    <span className="meal-count">{recipeGroups.length} recipe{recipeGroups.length !== 1 ? "s" : ""} • {mealItemCount} items</span>
-                  </h4>
-
-                  <div className="recipe-grocery-list">
-                    {recipeGroups.map((recipeGroup) => {
-                      const expanded = expandedRecipes[recipeGroup.id] ?? false;
-
-                      return (
-                        <div key={recipeGroup.id} className="recipe-grocery-group">
-                          <button
-                            className="recipe-grocery-header"
-                            onClick={() => toggleRecipe(recipeGroup.id)}
-                          >
-                            <div>
-                              <span className="recipe-grocery-title">{recipeGroup.title}</span>
-                              <span className="recipe-grocery-meta">
-                                {recipeGroup.items.length} ingredient{recipeGroup.items.length !== 1 ? "s" : ""}
-                                {recipeGroup.planDate ? ` • ${formatPlanDate(recipeGroup.planDate)}` : ""}
-                              </span>
-                            </div>
-                            <span className={`recipe-chevron ${expanded ? "expanded" : ""}`}>⌄</span>
-                          </button>
-
-                          {expanded && (
-                            <div className="grocery-items">
-                              {recipeGroup.items.map((item) => {
-                                const orderable = isOrderableIngredient(item.name);
-                                const provider = shoppingProviders.find((provider) => provider.id === selectedProvider);
-
-                                return (
-                                  <div key={item._displayId} className={`grocery-item ${checkedItems[item._sourceId] ? 'marked' : ''}`}>
-                                    <div className="item-left">
-                                      <input
-                                        type="checkbox"
-                                        className="form-check-input me-3"
-                                        checked={Boolean(checkedItems[item._sourceId])}
-                                        onChange={() => toggleMark(item._sourceId)}
-                                      />
-                                      <span className={checkedItems[item._sourceId] ? 'text-decoration-line-through text-muted' : ''}>
-                                        {formatIngredientAmount(item.name)}
-                                      </span>
-                                    </div>
-
-                                    {orderable ? (
-                                      <button
-                                        className="btn btn-blinkit btn-sm"
-                                        onClick={() => openShoppingProvider(item.name)}
-                                        title={`Search ${getShoppingSearchTerm(item.name)} on ${provider?.name}`}
-                                      >
-                                        {provider?.icon}
-                                        {" "}Order on {provider?.name}
-                                      </button>
-                                    ) : (
-                                      <span className="not-orderable-note">No order needed</span>
-                                    )}
-                                  </div>
-                                );
-                              })}
-                            </div>
-                          )}
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        )}
-
-        {/* Quick Actions */}
-        {filteredItems.length > 0 && (
-          <div className="quick-actions mt-5">
-            <button
-              className="btn btn-outline-dark btn-lg"
-              onClick={() => navigate("/home")}
-            >
-              🏠 Back to Home
-            </button>
-          </div>
-        )}
+      )}
+      */}
       </div>
-
     </>
   );
 }

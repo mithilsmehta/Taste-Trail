@@ -458,6 +458,12 @@
   border-bottom: 1px solid #e0e0e0;
 }
 
+.recipe-modal-actions {
+  align-items: center;
+  display: flex;
+  gap: 10px;
+}
+
 .modal-body-custom {
   padding: 20px 24px;
   overflow-y: auto;
@@ -530,6 +536,57 @@
   background: var(--tw-sage-soft);
   transform: translateY(-3px);
   box-shadow: 0 10px 24px rgba(0, 0, 0, 0.08);
+}
+
+.recipe-item.is-adding,
+.recipe-item.is-planned {
+  border-color: rgba(95, 143, 103, 0.52);
+  background: var(--tw-sage-soft);
+}
+
+.recipe-item.is-adding {
+  cursor: wait;
+  opacity: 0.72;
+}
+
+.mobile-drag-ghost {
+  background: var(--tw-surface);
+  border: 1px solid rgba(95, 143, 103, 0.34);
+  border-radius: 12px;
+  box-shadow: 0 16px 34px rgba(48, 44, 35, 0.2);
+  color: var(--tw-ink);
+  font-size: 0.95rem;
+  font-weight: 850;
+  left: 0;
+  max-width: min(220px, 62vw);
+  padding: 10px 12px 10px 18px;
+  pointer-events: none;
+  position: fixed;
+  top: 0;
+  transform: translate(-18px, -50%);
+  z-index: 10000;
+}
+
+.mobile-drag-ghost::before {
+  border-radius: 999px;
+  bottom: 9px;
+  content: "";
+  left: 8px;
+  position: absolute;
+  top: 9px;
+  width: 3px;
+}
+
+.mobile-drag-ghost.breakfast::before {
+  background: #d9b94f;
+}
+
+.mobile-drag-ghost.lunch::before {
+  background: #6c87d9;
+}
+
+.mobile-drag-ghost.dinner::before {
+  background: #d96d67;
 }
 
 .recipe-card-icon {

@@ -1,10 +1,10 @@
 import { API_BASE_URL } from "../utils/api";
-import { useContext, useState, useEffect } from "react";
+import { useCallback, useContext, useState, useEffect } from "react";
 import { AuthContext } from "../context/AuthContext";
 import axios from "axios";
 import toast from "react-hot-toast";
 import Navbar from "../components/Navbar";
-import { foodPreferenceOptions } from "../utils/foodPreference";
+import { foodPreferenceOptions, getFoodPreferenceLabel } from "../utils/foodPreference";
 
 const indianStates = [
   "Andhra Pradesh",
@@ -48,10 +48,12 @@ const calculateBmi = (heightCm, weightKg) => {
 };
 
 const getStoredFoodPreference = (profileUser = {}) =>
-  profileUser?.onboarding?.foodPreference ||
-  profileUser?.onboarding?.dietaryPreference ||
-  profileUser?.preferences?.diet ||
-  "Veg";
+  getFoodPreferenceLabel(
+    profileUser?.onboarding?.foodPreference ||
+    profileUser?.onboarding?.dietaryPreference ||
+    profileUser?.preferences?.diet ||
+    "Veg"
+  );
 
 export default function Profile() {
   const { user, setUser } = useContext(AuthContext);
@@ -77,7 +79,7 @@ export default function Profile() {
   const [password, setPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
 
-  const syncProfileFields = (profileUser = user) => {
+  const syncProfileFields = useCallback((profileUser = user) => {
     setFirstName(profileUser?.firstName || "");
     setLastName(profileUser?.lastName || "");
     setPhone(profileUser?.phone || "");
@@ -90,12 +92,16 @@ export default function Profile() {
       heightCm: profileUser?.onboarding?.heightCm || "",
       weightKg: profileUser?.onboarding?.weightKg || ""
     });
-  };
+  }, [user]);
 
   // ⭐⭐⭐ Sync UI whenever user updates ⭐⭐⭐
   useEffect(() => {
-    syncProfileFields(user);
-  }, [user]);
+    const syncTimer = window.setTimeout(() => {
+      syncProfileFields(user);
+    }, 0);
+
+    return () => window.clearTimeout(syncTimer);
+  }, [syncProfileFields, user]);
 
   useEffect(() => {
     localStorage.setItem(plannerViewPreferenceKey, plannerView);
@@ -182,6 +188,7 @@ const handleProfileUpdate = async (e) => {
       setPassword("");
       setNewPassword("");
     } catch (err) {
+      console.error(err);
       toast.error("Error changing password");
     }
   };

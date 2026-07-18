@@ -19,6 +19,18 @@ const normalizeUsualServings = (value) => {
   return Math.min(10, Math.max(1, Math.round(servings)));
 };
 
+const normalizeHealthGoal = (value, fallback = 50) => {
+  const goal = Number(value);
+  if (!Number.isFinite(goal)) return fallback;
+  return Math.min(100, Math.max(0, Math.round(goal)));
+};
+
+const normalizeNullableNumber = (value) => {
+  if (value === "" || value === null || value === undefined) return null;
+  const numberValue = Number(value);
+  return Number.isFinite(numberValue) ? numberValue : null;
+};
+
 const normalizeDietPreference = (value) => {
   const normalized = String(value || "").trim().toLowerCase();
   if (normalized === "jain") return "jain";
@@ -62,12 +74,13 @@ exports.register = async (req, res) => {
         displayName: cleanOnboarding.displayName || "",
         gender: cleanOnboarding.gender || "",
         ethnicity: cleanOnboarding.ethnicity || "",
+        foodPreference: dietaryPreference,
         dietaryPreference,
         usualServings: normalizeUsualServings(cleanOnboarding.usualServings),
-        healthyGoal: Number(cleanOnboarding.healthyGoal) || 50,
-        heightCm: cleanOnboarding.heightCm ? Number(cleanOnboarding.heightCm) : null,
-        weightKg: cleanOnboarding.weightKg ? Number(cleanOnboarding.weightKg) : null,
-        bmi: cleanOnboarding.bmi ? Number(cleanOnboarding.bmi) : null
+        healthyGoal: normalizeHealthGoal(cleanOnboarding.healthyGoal),
+        heightCm: normalizeNullableNumber(cleanOnboarding.heightCm),
+        weightKg: normalizeNullableNumber(cleanOnboarding.weightKg),
+        bmi: normalizeNullableNumber(cleanOnboarding.bmi)
       }
     });
 
@@ -240,6 +253,11 @@ exports.updateProfile = async (req, res) => {
     const userId = req.params.id;
     const cleanPhone = String(req.body.phone || "").trim();
     const cleanOnboarding = req.body.onboarding || {};
+
+    if (String(req.user.id) !== String(userId) && req.user.role !== "admin") {
+      return res.status(403).json({ message: "You can only update your own profile" });
+    }
+
     const existingUser = await User.findById(userId);
 
     if (!existingUser) {
@@ -257,30 +275,36 @@ exports.updateProfile = async (req, res) => {
       cleanOnboarding.dietaryPreference ||
       cleanOnboarding.foodPreference ||
       req.body.preferences?.diet ||
-      existingUser.preferences?.diet
+      existingUser.preferences?.diet ||
+      existingUser.onboarding?.dietaryPreference ||
+      existingUser.onboarding?.foodPreference
     );
+
+    const previousOnboarding = existingUser.onboarding || {};
+    const previousPreferences = existingUser.preferences || {};
 
     const updated = await User.findByIdAndUpdate(
       userId,
       {
-        firstName: req.body.firstName,
-        lastName: req.body.lastName,
+        firstName: req.body.firstName || existingUser.firstName,
+        lastName: req.body.lastName || existingUser.lastName,
         ...(cleanPhone ? { phone: cleanPhone } : {}),
         preferences: {
           diet: dietaryPreference,
-          allergies: req.body.preferences?.allergies || existingUser.preferences?.allergies || [],
-          cuisines: req.body.preferences?.cuisines || existingUser.preferences?.cuisines || []
+          allergies: req.body.preferences?.allergies || previousPreferences.allergies || [],
+          cuisines: req.body.preferences?.cuisines || previousPreferences.cuisines || []
         },
         onboarding: {
-          displayName: cleanOnboarding.displayName || "",
-          gender: cleanOnboarding.gender || "",
-          ethnicity: cleanOnboarding.ethnicity || "",
+          displayName: cleanOnboarding.displayName ?? previousOnboarding.displayName ?? "",
+          gender: cleanOnboarding.gender ?? previousOnboarding.gender ?? "",
+          ethnicity: cleanOnboarding.ethnicity ?? previousOnboarding.ethnicity ?? "",
+          foodPreference: dietaryPreference,
           dietaryPreference,
-          usualServings: normalizeUsualServings(cleanOnboarding.usualServings || existingUser.onboarding?.usualServings),
-          healthyGoal: Number(cleanOnboarding.healthyGoal) || 50,
-          heightCm: cleanOnboarding.heightCm ? Number(cleanOnboarding.heightCm) : null,
-          weightKg: cleanOnboarding.weightKg ? Number(cleanOnboarding.weightKg) : null,
-          bmi: cleanOnboarding.bmi ? Number(cleanOnboarding.bmi) : null
+          usualServings: normalizeUsualServings(cleanOnboarding.usualServings ?? previousOnboarding.usualServings),
+          healthyGoal: normalizeHealthGoal(cleanOnboarding.healthyGoal ?? previousOnboarding.healthyGoal),
+          heightCm: normalizeNullableNumber(cleanOnboarding.heightCm ?? previousOnboarding.heightCm),
+          weightKg: normalizeNullableNumber(cleanOnboarding.weightKg ?? previousOnboarding.weightKg),
+          bmi: normalizeNullableNumber(cleanOnboarding.bmi ?? previousOnboarding.bmi)
         }
       },
       { new: true }

@@ -5,10 +5,10 @@ import { apiUrl } from "../utils/api";
 import { getMondayDateKey, getWeekFromDateKey, toDateKey } from "../utils/weekPlan";
 import "./Home.css";
 import Navbar from "../components/Navbar";
-import fridgeIdeaOne from "../assets/img1.jpg";
-import fridgeIdeaTwo from "../assets/img2.jpg";
-import fridgeIdeaThree from "../assets/img3.jpg";
-import fridgeIdeaFour from "../assets/img4.jpg";
+import fridgeIdeaOne from "../assets/img1.webp";
+import fridgeIdeaTwo from "../assets/img2.webp";
+import fridgeIdeaThree from "../assets/img3.webp";
+import fridgeIdeaFour from "../assets/img4.webp";
 
 const popularSearches = [
   "Paneer Tikka",
@@ -277,7 +277,7 @@ export default function Home() {
                       className={`fridge-slide ${index === activeFridgeIdea ? "active" : ""}`}
                       key={idea.title}
                     >
-                      <img src={idea.image} alt="" />
+                      <img src={idea.image} alt="" loading="lazy" decoding="async" fetchPriority="low" />
                       <strong>{idea.title}</strong>
                     </span>
                   ))}

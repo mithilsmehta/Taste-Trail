@@ -89,48 +89,17 @@ const normalizeDietMode = (value) => {
   return "veg";
 };
 
-const getDietModeFromQuery = (query) => {
-  const normalized = String(query || "").toLowerCase();
-  if (/\bjain\b/.test(normalized)) return "jain";
-  if (/\bvegan\b/.test(normalized)) return "vegan";
-  return "veg";
+const stripDietWords = (value) => {
+  return String(value || "")
+    .replace(/\b(jain|vegan|veg|vegetarian)\b/gi, " ")
+    .replace(/\s+/g, " ")
+    .trim();
 };
 
 const getDietModeLabel = (dietMode) => {
   if (dietMode === "jain") return "Jain";
   if (dietMode === "vegan") return "Vegan";
   return "Veg";
-};
-
-const recipeMemoryCache = new Map();
-const recipeMemoryCacheTtlMs = Number(process.env.RECIPE_MEMORY_CACHE_TTL_MS) || 15 * 60 * 1000;
-
-const getRecipeMemoryCacheKey = ({ query, regionalStyle, dietMode, servings }) => {
-  return [
-    normalizeRecipeQuery(query),
-    normalizeRegionalStyle(regionalStyle).toLowerCase(),
-    dietMode,
-    servings
-  ].join("|");
-};
-
-const getRecipeFromMemoryCache = (cacheKey) => {
-  const cached = recipeMemoryCache.get(cacheKey);
-  if (!cached) return null;
-
-  if (cached.expiresAt <= Date.now()) {
-    recipeMemoryCache.delete(cacheKey);
-    return null;
-  }
-
-  return cached.recipe;
-};
-
-const saveRecipeToMemoryCache = (cacheKey, recipe) => {
-  recipeMemoryCache.set(cacheKey, {
-    recipe,
-    expiresAt: Date.now() + recipeMemoryCacheTtlMs
-  });
 };
 
 const getOpenRouterApiKey = () => {
@@ -272,6 +241,18 @@ const getRecipeSafetyText = (recipe = {}) => {
   ].join(" ");
 };
 
+const getDietSafetyIssue = (recipe = {}, dietMode = "veg") => {
+  const recipeText = getRecipeSafetyText(recipe);
+  if (isNonVegetarian(recipeText)) return "non-vegetarian content";
+  if (dietMode === "jain" && isJainRestricted(recipeText)) {
+    return "onion, garlic, ginger, potato, carrot, or another Jain-restricted root vegetable";
+  }
+  if (dietMode === "vegan" && isVeganRestricted(recipeText)) {
+    return "dairy, honey, eggs, or another animal product";
+  }
+  return "";
+};
+
 const getRecipeAccuracyIssue = (query, recipe = {}) => {
   const normalizedQuery = String(query || "").toLowerCase();
   const recipeName = String(recipe.name || recipe.title || "").toLowerCase();
@@ -310,7 +291,7 @@ const getRecipeAccuracyIssue = (query, recipe = {}) => {
 
 const createJainRecipe = ({ query, servings, ingredients, steps }) => {
   return {
-    name: getStoredRecipeName(query),
+    name: getDietSpecificRecipeName(query, "jain"),
     ingredients,
     steps,
     servings
@@ -814,7 +795,7 @@ const normalizeRegionalStyle = (value) => {
 };
 
 const normalizeRecipeQuery = (value) => {
-  return String(value || "")
+  return stripDietWords(value)
     .toLowerCase()
     .replace(/\([^)]*\)/g, " ")
     .replace(/\b(recipe|style|styled|authentic|traditional|homestyle|home style)\b/gi, " ")
@@ -825,6 +806,18 @@ const normalizeRecipeQuery = (value) => {
 const getUserRegionalStyle = async (userId) => {
   const user = await User.findById(userId).select("onboarding.ethnicity").lean();
   return normalizeRegionalStyle(user?.onboarding?.ethnicity);
+};
+
+const getUserDietMode = async (userId) => {
+  const user = await User.findById(userId)
+    .select("preferences.diet onboarding.dietaryPreference onboarding.foodPreference")
+    .lean();
+
+  return normalizeDietMode(
+    user?.preferences?.diet ||
+    user?.onboarding?.dietaryPreference ||
+    user?.onboarding?.foodPreference
+  );
 };
 
 const getRegionalStyleRules = (regionalStyle) => {
@@ -854,7 +847,7 @@ const toTitleCase = (value) => {
 
 const getCleanDishName = (query, generatedName = "") => {
   const source = String(query || generatedName || "").trim();
-  const cleaned = source
+  const cleaned = stripDietWords(source)
     .replace(/\([^)]*\)/g, " ")
     .split(/\s[-–—]\s/)[0]
     .replace(/\b(recipe|style|styled|authentic|traditional|homestyle|home style)\b/gi, " ")
@@ -868,11 +861,62 @@ const getStoredRecipeName = (query, generatedName = "") => {
   return getCleanDishName(query, generatedName);
 };
 
+const getDietSpecificRecipeName = (query, dietMode = "veg", generatedName = "") => {
+  const baseName = getStoredRecipeName(query, generatedName);
+  if (dietMode === "jain" && !/^jain\b/i.test(baseName)) return `Jain ${baseName}`;
+  if (dietMode === "vegan" && !/^vegan\b/i.test(baseName)) return `Vegan ${baseName}`;
+  return baseName;
+};
+
+const getRecipeLookupTitles = (query, dietMode = "veg") => {
+  const candidates = [
+    getDietSpecificRecipeName(query, dietMode),
+    getStoredRecipeName(query),
+    getStoredRecipeName(stripDietWords(query))
+  ].filter(Boolean);
+
+  return [...new Set(candidates)];
+};
+
+const getSavedRecipeForUser = async ({ userId, query, regionalStyle, dietMode }) => {
+  const titles = getRecipeLookupTitles(query, dietMode);
+  if (!titles.length) return null;
+
+  const baseQuery = {
+    userId,
+    regionalStyle,
+    dietMode
+  };
+
+  let recipe = await SavedRecipe.findOne({
+    ...baseQuery,
+    title: { $in: titles }
+  }).sort({ updatedAt: -1, createdAt: -1 }).lean();
+
+  if (!recipe) {
+    const titlePatterns = titles.map((title) => new RegExp(`^${title.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}$`, "i"));
+    recipe = await SavedRecipe.findOne({
+      ...baseQuery,
+      title: { $in: titlePatterns }
+    }).sort({ updatedAt: -1, createdAt: -1 }).lean();
+  }
+
+  if (!recipe) return null;
+
+  const safetyIssue = getDietSafetyIssue(recipe, dietMode);
+  if (safetyIssue) {
+    console.warn(`Skipped saved recipe "${recipe.title}" because it contains ${safetyIssue}.`);
+    return null;
+  }
+
+  return recipe;
+};
+
 const getRecipeDescription = (query, recipe = {}) => {
   const provided = String(recipe.description || "").replace(/\s+/g, " ").trim();
   if (provided) return provided.slice(0, 220);
 
-  const name = getStoredRecipeName(query, recipe.name || recipe.title || "This recipe");
+  const name = getDietSpecificRecipeName(query, recipe.dietMode || "veg", recipe.name || recipe.title || "This recipe");
   const text = [query, name, ...(Array.isArray(recipe.ingredients) ? recipe.ingredients : [])].join(" ").toLowerCase();
 
   if (/\bpaneer\b/.test(text)) {
@@ -934,9 +978,9 @@ const saveGeneratedRecipeToPool = async ({ userId, query, regionalStyle, dietMod
   const normalizedQuery = normalizeRecipeQuery(query);
   if (!normalizedQuery || !regionalStyle) return;
 
-  const storedName = getStoredRecipeName(query, recipe.name);
+  const storedName = getDietSpecificRecipeName(query, dietMode, recipe.name);
   const enhancedRecipe = enhanceRecipe({ ...recipe, name: storedName, title: storedName, servings });
-  const description = getRecipeDescription(query, recipe);
+  const description = getRecipeDescription(query, { ...recipe, dietMode, name: storedName });
 
   await GeneratedRecipe.create({
     userId,
@@ -962,25 +1006,44 @@ router.post("/generate", authMiddleware, async (req, res) => {
     const servings = Number(req.body.servings) || 2;
     const forceRegenerate = Boolean(req.body.forceRegenerate);
     const regionalStyle = await getUserRegionalStyle(req.user.id);
+    const dietMode = await getUserDietMode(req.user.id);
 
     if (!query) {
       return res.status(400).json({ msg: "Recipe query is required" });
     }
 
-    const dietMode = getDietModeFromQuery(query);
-    const memoryCacheKey = getRecipeMemoryCacheKey({ query, regionalStyle, dietMode, servings });
-
     if (!forceRegenerate) {
-      const cachedRecipe = getRecipeFromMemoryCache(memoryCacheKey);
-      if (cachedRecipe && !getRecipeAccuracyIssue(query, cachedRecipe)) {
-        return res.json({ recipe: enhanceRecipe({ ...cachedRecipe, source: "serverCache" }) });
+      const savedRecipe = await getSavedRecipeForUser({
+        userId: req.user.id,
+        query,
+        regionalStyle,
+        dietMode
+      });
+
+      if (savedRecipe) {
+        const savedResponseRecipe = {
+          name: getDietSpecificRecipeName(query, dietMode, savedRecipe.title),
+          description: savedRecipe.description || getRecipeDescription(query, { ...savedRecipe, dietMode }),
+          ingredients: Array.isArray(savedRecipe.ingredients) ? savedRecipe.ingredients : [],
+          steps: Array.isArray(savedRecipe.steps) ? savedRecipe.steps : [],
+          servings: savedRecipe.servings || servings,
+          nutrition: savedRecipe.nutrition,
+          healthScore: savedRecipe.healthScore,
+          healthLabel: savedRecipe.healthLabel,
+          dietMode,
+          regionalStyle,
+          source: "saved",
+          savedRecipeId: savedRecipe._id
+        };
+
+        return res.json({ recipe: enhanceRecipe(savedResponseRecipe) });
       }
 
       const sharedRecipe = await getSharedRegionalRecipe({ query, regionalStyle, dietMode, servings });
       if (sharedRecipe) {
         const sharedResponseRecipe = {
-          name: getStoredRecipeName(query, sharedRecipe.name),
-          description: getRecipeDescription(query, sharedRecipe),
+          name: getDietSpecificRecipeName(query, dietMode, sharedRecipe.name),
+          description: getRecipeDescription(query, { ...sharedRecipe, dietMode }),
           ingredients: Array.isArray(sharedRecipe.ingredients) ? sharedRecipe.ingredients : [],
           steps: Array.isArray(sharedRecipe.steps) ? sharedRecipe.steps : [],
           servings: sharedRecipe.servings || servings,
@@ -992,14 +1055,18 @@ router.post("/generate", authMiddleware, async (req, res) => {
           source: "sharedRegional",
           sharedRecipeId: sharedRecipe._id
         };
+        const sharedSafetyIssue = getDietSafetyIssue(sharedResponseRecipe, dietMode);
+        if (sharedSafetyIssue) {
+          console.warn("Skipped shared recipe because of safety issue:", sharedSafetyIssue);
+        } else {
         const sharedAccuracyIssue = getRecipeAccuracyIssue(query, sharedResponseRecipe);
         if (!sharedAccuracyIssue) {
           const enhancedSharedRecipe = enhanceRecipe(sharedResponseRecipe);
-          saveRecipeToMemoryCache(memoryCacheKey, enhancedSharedRecipe);
           return res.json({ recipe: enhancedSharedRecipe });
         }
 
         console.warn("Skipped shared recipe because of accuracy issue:", sharedAccuracyIssue);
+        }
       }
     }
 
@@ -1011,7 +1078,7 @@ router.post("/generate", authMiddleware, async (req, res) => {
       });
       const responseRecipe = {
         ...quickJainFallback,
-        description: getRecipeDescription(query, quickJainFallback),
+        description: getRecipeDescription(query, { ...quickJainFallback, dietMode }),
         nutrition: enhancedFallbackRecipe.nutrition,
         healthScore: enhancedFallbackRecipe.healthScore,
         healthLabel: enhancedFallbackRecipe.healthLabel,
@@ -1020,7 +1087,6 @@ router.post("/generate", authMiddleware, async (req, res) => {
         source: "jainFallback"
       };
 
-      saveRecipeToMemoryCache(memoryCacheKey, responseRecipe);
       return res.json({ recipe: responseRecipe });
     }
 
@@ -1032,6 +1098,7 @@ STRICT JAIN MODE ACTIVE:
 - NEVER use meat, seafood, fish, chicken, eggs, gelatin, animal stock, lard, bacon, ham, or any non-vegetarian ingredient.
 - For searches like "diet recipe", "healthy recipe", or any generic recipe request, still make the recipe strictly Jain by default.
 - If the requested dish normally uses restricted ingredients, create a Jain-friendly version and name it clearly.
+- For dishes like pav bhaji, biryani, pulao, chole, paneer sabji, noodles, pasta, pizza, sandwiches, and sabji, create the real Jain version of that dish. Do not copy the regular recipe and do not include onion, garlic, potato, carrot, ginger, beetroot, radish, or any root vegetable.
 - For "mix veg", "mixed veg", "mixed vegetable sabji", or similar generic vegetable recipes in Jain mode, use only non-root Jain-safe vegetables such as cauliflower, capsicum, cabbage, green peas, French beans, tomatoes, bottle gourd, ridge gourd, or paneer. Do not use onion, garlic, ginger, potato, carrot, beetroot, radish, or any root vegetable.
 - Keep the recipe faithful to the requested dish. Do not add unrelated substitutes like raw banana, cabbage, cauliflower, or hing unless they are normal for that exact dish.
 - For paneer dishes, paneer must remain the main ingredient. Do not replace paneer with raw banana or unrelated vegetables.
@@ -1061,9 +1128,9 @@ ${dietRules}
 ${getRegionalStyleRules(regionalStyle)}
 ${retryNote}
 
-Generate a detailed recipe for ${servings} servings: ${query}
+Generate a detailed ${getDietModeLabel(dietMode)} recipe for ${servings} servings: ${query}
 Accuracy rules:
-- The JSON "name" must be exactly "${getStoredRecipeName(query)}". Keep the state/region only in the separate "regionalStyle" app field, not in the recipe name.
+- The JSON "name" must be exactly "${getDietSpecificRecipeName(query, dietMode)}". Keep the state/region only in the separate "regionalStyle" app field, not in the recipe name.
 - Do not add descriptions like "steamed savory cake", "Maharashtrian-style", subtitles, or alternate names to the name.
 - Add a JSON "description" with one or two short lines under 170 characters. Make it recipe-specific and playful: a fun fact, light joke, or sarcastic newsroom-style comment. Do not mention real current political/news events or any person.
 - Generate the real, recognizable recipe for the requested dish, not a random variation.
@@ -1115,20 +1182,9 @@ Rewrite from scratch. Keep the requested dish authentic, remove every restricted
 If this is a mixed vegetable dish in Jain mode, use cauliflower, capsicum, cabbage, green peas, French beans, tomatoes, bottle gourd, ridge gourd, or paneer only.`;
       const result = await generateRecipeText(buildPrompt(retryNote));
       const candidate = extractJson(result);
-      const recipeText = getRecipeSafetyText(candidate);
-
-      if (isNonVegetarian(recipeText)) {
-        blockedReason = "non-vegetarian content";
-        continue;
-      }
-
-      if (dietMode === "jain" && isJainRestricted(recipeText)) {
-        blockedReason = "onion, garlic, ginger, potato, carrot, or another Jain-restricted root vegetable";
-        continue;
-      }
-
-      if (dietMode === "vegan" && isVeganRestricted(recipeText)) {
-        blockedReason = "dairy, honey, eggs, or another animal product";
+      const safetyIssue = getDietSafetyIssue(candidate, dietMode);
+      if (safetyIssue) {
+        blockedReason = safetyIssue;
         continue;
       }
 
@@ -1151,6 +1207,7 @@ If this is a mixed vegetable dish in Jain mode, use cauliflower, capsicum, cabba
         });
         const responseRecipe = {
           ...fallbackRecipe,
+          description: getRecipeDescription(query, { ...fallbackRecipe, dietMode }),
           nutrition: enhancedFallbackRecipe.nutrition,
           healthScore: enhancedFallbackRecipe.healthScore,
           healthLabel: enhancedFallbackRecipe.healthLabel,
@@ -1158,8 +1215,6 @@ If this is a mixed vegetable dish in Jain mode, use cauliflower, capsicum, cabba
           regionalStyle,
           source: "jainFallback"
         };
-
-        saveRecipeToMemoryCache(memoryCacheKey, responseRecipe);
 
         return res.json({
           recipe: responseRecipe
@@ -1175,8 +1230,8 @@ If this is a mixed vegetable dish in Jain mode, use cauliflower, capsicum, cabba
       });
     }
 
-    const displayName = getStoredRecipeName(query, recipe.name);
-    const description = getRecipeDescription(query, recipe);
+    const displayName = getDietSpecificRecipeName(query, dietMode, recipe.name);
+    const description = getRecipeDescription(query, { ...recipe, dietMode, name: displayName });
     const enhancedGeneratedRecipe = enhanceRecipe({
       name: displayName,
       title: displayName,
@@ -1212,8 +1267,6 @@ If this is a mixed vegetable dish in Jain mode, use cauliflower, capsicum, cabba
       console.error("Failed to save generated recipe to shared pool:", poolErr);
     }
 
-    saveRecipeToMemoryCache(memoryCacheKey, responseRecipe);
-
     res.json({
       recipe: responseRecipe
     });
@@ -1228,9 +1281,9 @@ router.post("/save", authMiddleware, async (req, res) => {
   try {
     const { title, ingredients, steps, image, nutrition, healthScore, healthLabel, servings } = req.body;
     const regionalStyle = await getUserRegionalStyle(req.user.id);
-    const dietMode = getDietModeFromQuery(title);
-    const storedTitle = getStoredRecipeName(title);
-    const description = getRecipeDescription(title, { description: req.body.description, ingredients, steps });
+    const dietMode = await getUserDietMode(req.user.id);
+    const storedTitle = getDietSpecificRecipeName(title, dietMode);
+    const description = getRecipeDescription(title, { description: req.body.description, ingredients, steps, dietMode, title: storedTitle });
     const enhancedRecipe = enhanceRecipe({ title: storedTitle, description, ingredients, steps, image, nutrition, healthScore, healthLabel, servings });
     const recipeText = getRecipeSafetyText({ title: storedTitle, ingredients, steps });
 
@@ -1247,14 +1300,15 @@ router.post("/save", authMiddleware, async (req, res) => {
     }
 
     // Check if recipe already exists for this user
-    const existing = await SavedRecipe.findOne({ 
-      userId: req.user.id, 
-      title: storedTitle,
+    const existing = await SavedRecipe.findOne({
+      userId: req.user.id,
+      title: { $in: getRecipeLookupTitles(title, dietMode) },
       regionalStyle,
       dietMode
-    });
+    }).sort({ updatedAt: -1, createdAt: -1 });
 
     if (existing) {
+      existing.title = storedTitle;
       existing.ingredients = Array.isArray(ingredients) ? ingredients : [];
       existing.steps = Array.isArray(steps) ? steps : [];
       existing.regionalStyle = regionalStyle;
@@ -1301,14 +1355,13 @@ router.get("/find", authMiddleware, async (req, res) => {
     }
 
     const regionalStyle = await getUserRegionalStyle(req.user.id);
-    const dietMode = getDietModeFromQuery(title);
-    const storedTitle = getStoredRecipeName(title);
-    const recipe = await SavedRecipe.findOne({
+    const dietMode = await getUserDietMode(req.user.id);
+    const recipe = await getSavedRecipeForUser({
       userId: req.user.id,
-      title: storedTitle,
       regionalStyle,
+      query: title,
       dietMode
-    }).lean();
+    });
 
     if (!recipe) {
       return res.status(404).json({ msg: "Recipe not found" });
