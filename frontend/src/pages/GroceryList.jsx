@@ -94,7 +94,7 @@ const categoryPatterns = {
 const categoryLabels = {
   vegetables: "One Dish - Healthy",
   grains: "Carbs/Roti, Paratha...",
-  snacks: "Pantry Items"
+  snacks: "Kitchen Staples"
 };
 
 const categoryColorClass = {
@@ -105,6 +105,9 @@ const categoryColorClass = {
 
 const reminderOptions = ["Don't repeat", "Every day", "Every week", "Every month", "Every year", "Custom"];
 const earlyAlertOptions = ["No early alert", "10 minutes before", "30 minutes before", "1 hour before"];
+const timeHours = Array.from({ length: 24 }, (_, index) => String(index).padStart(2, "0"));
+const timeMinutes = Array.from({ length: 12 }, (_, index) => String(index * 5).padStart(2, "0"));
+const customRepeatOptions = ["Every 2 days", "Every 3 days", "Every weekday", "Every weekend"];
 const cleanIngredientUnitsPattern = /\b(cup|cups|teaspoon|teaspoons|tsp|tablespoon|tablespoons|tbsp|gram|grams|g|kg|kilogram|kilograms|ml|liter|liters|litre|litres|oz|ounce|ounces|pinch|pinches|piece|pieces|clove|cloves|slice|slices|small|medium|large|bunch|bunches|sprig|sprigs|can|cans|jar|jars|pint|pints)\b/gi;
 const cleanIngredientPrepPattern = /\b(finely|roughly|thinly|fresh|chopped|diced|sliced|minced|grated|crushed|peeled|cubed|ground|powdered|brewed|strong|granulated|optional|of|and|or|other|for garnish|for serving|to taste|as needed)\b/gi;
 
@@ -136,6 +139,7 @@ export default function GroceryList() {
   const [showDateSheet, setShowDateSheet] = useState(false);
   const [showTimeSheet, setShowTimeSheet] = useState(false);
   const [showRepeatMenu, setShowRepeatMenu] = useState(false);
+  const [showCustomRepeat, setShowCustomRepeat] = useState(false);
   const [reminderDraft, setReminderDraft] = useState({
     title: "Grocery reminder",
     checked: [],
@@ -143,6 +147,7 @@ export default function GroceryList() {
     dateKey: "",
     time: "23:00",
     repeat: "Don't repeat",
+    customRepeat: "Every 2 days",
     earlyAlert: "No early alert"
   });
   // Provider picker sheet is disabled with Blinkit/Zepto/etc ordering for now.
@@ -486,16 +491,33 @@ export default function GroceryList() {
     }));
   };
 
+  const setReminderTimePart = (part, value) => {
+    const [hour, minute] = reminderDraft.time.split(":");
+    setReminderDraft(prev => ({
+      ...prev,
+      allDay: false,
+      time: part === "hour" ? `${value}:${minute || "00"}` : `${hour || "23"}:${value}`
+    }));
+  };
+
   const getReminderTasks = (items) => {
     const pendingNames = [...new Set(items.map((item) => item.displayName || item.name).filter(Boolean))];
-    const recipeNames = [...new Set(items.map((item) => item._recipeTitle).filter((title) => title && title !== "Added manually"))];
     const pantryItems = pendingNames.filter((name) => getItemCategory({ displayName: name }) !== "vegetables").slice(0, 4);
     const freshItems = pendingNames.filter((name) => getItemCategory({ displayName: name }) === "vegetables").slice(0, 4);
 
     return [
-      `Review ${pendingNames.length || 0} ingredients${recipeNames.length ? ` from ${recipeNames.slice(0, 2).join(", ")}` : ""}`,
-      pantryItems.length ? `Check pantry for ${pantryItems.join(", ")}` : "Check pantry before shopping",
-      freshItems.length ? `Buy missing fresh items: ${freshItems.join(", ")}` : "Buy missing grocery items"
+      {
+        title: "Ingredients",
+        detail: pendingNames.length ? `${pendingNames.length} items to review` : "Nothing pending"
+      },
+      {
+        title: "Pantry",
+        detail: pantryItems.length ? pantryItems.join(", ") : "Check basics before shopping"
+      },
+      {
+        title: "Missing items",
+        detail: freshItems.length ? freshItems.join(", ") : "Add items from your recipes"
+      }
     ];
   };
 
@@ -523,6 +545,7 @@ export default function GroceryList() {
   const dateRows = getDateRows();
   const calendar = getCalendarDays();
   const reminderTasks = getReminderTasks(activeItems);
+  const [selectedHour, selectedMinute] = reminderDraft.time.split(":");
   const reminderDateLabel = reminderDraft.dateKey === todayKey
     ? "Today"
     : reminderDraft.dateKey
@@ -545,10 +568,10 @@ export default function GroceryList() {
           </div>
           <div className="grocery-header-actions">
             <button type="button" className="grocery-icon-btn" onClick={() => setShowDateList(true)} aria-label="Open date ingredient list">
-              ≡
+              ☰
             </button>
             <button type="button" className="grocery-icon-btn" onClick={() => setShowReminderSheet(true)} aria-label="Open grocery reminder">
-              ◷
+              ⏰
             </button>
             {/*
               Provider picker button.
@@ -560,7 +583,7 @@ export default function GroceryList() {
             </button>
             */}
             <button type="button" className="grocery-icon-btn" onClick={() => setShowSettings(true)} aria-label="Open grocery settings">
-              ⚙
+              ⚙︎
             </button>
           </div>
         </header>
@@ -750,9 +773,10 @@ export default function GroceryList() {
 
             <div className="reminder-checklist">
               {reminderTasks.map((item, index) => (
-                <button key={item} type="button" onClick={() => toggleReminderChecklist(index)}>
-                  <span className={reminderDraft.checked.includes(index) ? "checked" : ""} />
-                  {item}
+                <button key={item.title} type="button" onClick={() => toggleReminderChecklist(index)}>
+                  <span className={reminderDraft.checked.includes(index) ? "checked" : ""}>✓</span>
+                  <strong>{item.title}</strong>
+                  <small>{item.detail}</small>
                 </button>
               ))}
             </div>
@@ -773,11 +797,11 @@ export default function GroceryList() {
             </button>
 
             <div className="reminder-icon-row" aria-label="Reminder tools">
-              <button type="button" className="active">✓</button>
-              <button type="button" onClick={() => setShowDateSheet(true)}>▦</button>
-              <button type="button" onClick={() => setReminderDraft(prev => ({ ...prev, earlyAlert: earlyAlertOptions[1] }))}>◉</button>
-              <button type="button" onClick={() => setShowTimeSheet(true)}>◷</button>
-              <button type="button" onClick={() => setShowRepeatMenu(true)}>≡</button>
+              <button type="button" className="active" aria-label="Checklist">✓</button>
+              <button type="button" onClick={() => setShowDateSheet(true)} aria-label="Set date">▦</button>
+              <button type="button" onClick={() => setReminderDraft(prev => ({ ...prev, earlyAlert: earlyAlertOptions[1] }))} aria-label="Early alert">◉</button>
+              <button type="button" onClick={() => setShowTimeSheet(true)} aria-label="Set time">◷</button>
+              <button type="button" onClick={() => setShowRepeatMenu(true)} aria-label="Repeat">↻</button>
             </div>
 
             <div className="reminder-options">
@@ -825,13 +849,13 @@ export default function GroceryList() {
                   setReminderDraft(prev => ({ ...prev, earlyAlert: earlyAlertOptions[nextIndex] }));
                 }}
               >
-                <span>♧</span>
+                <span>◉</span>
                 <strong>{reminderDraft.earlyAlert}</strong>
               </button>
 
               <button type="button" className="reminder-option-row muted" onClick={() => setShowRepeatMenu(true)}>
                 <span>↻</span>
-                <strong>{reminderDraft.repeat}</strong>
+                <strong>{reminderDraft.repeat === "Custom" ? reminderDraft.customRepeat : reminderDraft.repeat}</strong>
               </button>
             </div>
           </section>
@@ -876,12 +900,33 @@ export default function GroceryList() {
         <div className="grocery-sheet-backdrop nested" onClick={() => setShowTimeSheet(false)}>
           <section className="grocery-picker-sheet" onClick={(event) => event.stopPropagation()}>
             <h2>Set time</h2>
-            <input
-              className="time-picker-input"
-              type="time"
-              value={reminderDraft.time}
-              onChange={(event) => setReminderDraft(prev => ({ ...prev, time: event.target.value, allDay: false }))}
-            />
+            <div className="time-scroll-picker" aria-label="Set reminder time">
+              <div className="time-scroll-column">
+                {timeHours.map((hour) => (
+                  <button
+                    key={hour}
+                    type="button"
+                    className={selectedHour === hour ? "selected" : ""}
+                    onClick={() => setReminderTimePart("hour", hour)}
+                  >
+                    {hour}
+                  </button>
+                ))}
+              </div>
+              <strong>:</strong>
+              <div className="time-scroll-column">
+                {timeMinutes.map((minute) => (
+                  <button
+                    key={minute}
+                    type="button"
+                    className={selectedMinute === minute ? "selected" : ""}
+                    onClick={() => setReminderTimePart("minute", minute)}
+                  >
+                    {minute}
+                  </button>
+                ))}
+              </div>
+            </div>
             <div className="picker-actions">
               <button type="button" onClick={() => setShowTimeSheet(false)}>Cancel</button>
               <button type="button" onClick={() => setShowTimeSheet(false)}>Done</button>
@@ -899,11 +944,37 @@ export default function GroceryList() {
                 type="button"
                 onClick={() => {
                   setReminderDraft(prev => ({ ...prev, repeat: option }));
-                  setShowRepeatMenu(false);
+                  if (option === "Custom") {
+                    setShowRepeatMenu(false);
+                    setShowCustomRepeat(true);
+                  } else {
+                    setShowRepeatMenu(false);
+                  }
                 }}
               >
                 <span>{option}</span>
                 {reminderDraft.repeat === option && <strong>✓</strong>}
+              </button>
+            ))}
+          </section>
+        </div>
+      )}
+
+      {showCustomRepeat && (
+        <div className="grocery-sheet-backdrop nested" onClick={() => setShowCustomRepeat(false)}>
+          <section className="grocery-repeat-menu custom-repeat-menu" onClick={(event) => event.stopPropagation()}>
+            <h2>Custom repeat</h2>
+            {customRepeatOptions.map((option) => (
+              <button
+                key={option}
+                type="button"
+                onClick={() => {
+                  setReminderDraft(prev => ({ ...prev, repeat: "Custom", customRepeat: option }));
+                  setShowCustomRepeat(false);
+                }}
+              >
+                <span>{option}</span>
+                {reminderDraft.customRepeat === option && <strong>✓</strong>}
               </button>
             ))}
           </section>

@@ -70,11 +70,12 @@
 
 .grocery-icon-btn {
   align-items: center;
-  background: transparent;
-  border: 0;
+  background: var(--grocery-surface);
+  border: 1px solid var(--grocery-line);
+  border-radius: 999px;
   color: var(--grocery-accent);
   display: inline-flex;
-  font-size: 2rem;
+  font-size: 1.25rem;
   font-weight: 900;
   height: 48px;
   justify-content: center;
@@ -83,6 +84,8 @@
 }
 
 .grocery-icon-btn.back {
+  background: transparent;
+  border: 0;
   font-size: 3rem;
   line-height: 0.8;
 }
@@ -94,7 +97,7 @@
 }
 
 .grocery-header-actions .grocery-icon-btn {
-  font-size: 1.55rem;
+  font-size: 1.08rem;
 }
 
 .grocery-mobile-screen {
@@ -587,7 +590,9 @@
 
 .grocery-reminder-sheet {
   border-radius: 28px 28px 0 0;
-  max-width: 680px;
+  max-height: min(86vh, 760px);
+  max-width: 560px;
+  overflow-y: auto;
   padding: 14px 22px 28px;
   position: relative;
 }
@@ -604,40 +609,67 @@
   background: transparent;
   border: 0;
   color: var(--grocery-ink);
-  font-size: 1.45rem;
+  font-size: 1.36rem;
   font-weight: 850;
   outline: 0;
-  width: min(100%, 440px);
+  width: calc(100% - 72px);
 }
 
 .reminder-checklist {
   display: grid;
-  gap: 12px;
-  margin: 22px 0 42px;
+  gap: 10px;
+  margin: 22px 0 24px;
 }
 
 .reminder-checklist button {
-  align-items: center;
+  align-items: start;
   background: transparent;
   border: 0;
   color: var(--grocery-ink);
-  display: flex;
-  gap: 12px;
-  font-size: 1.06rem;
+  display: grid;
+  gap: 3px 12px;
+  grid-template-columns: 28px minmax(0, 1fr);
+  justify-items: start;
+  font-size: 1rem;
   font-weight: 800;
   padding: 0;
+  text-align: left;
+  width: 100%;
 }
 
 .reminder-checklist span {
+  align-items: center;
   border: 2px solid rgba(95, 143, 103, 0.35);
   border-radius: 999px;
+  color: transparent;
+  display: inline-flex;
+  font-size: 0.78rem;
+  font-weight: 900;
   height: 24px;
+  justify-content: center;
+  margin-top: 2px;
   width: 24px;
 }
 
 .reminder-checklist span.checked {
   background: var(--grocery-accent);
   box-shadow: inset 0 0 0 5px var(--grocery-surface);
+  color: var(--grocery-accent);
+}
+
+.reminder-checklist strong {
+  color: var(--grocery-ink);
+  font-size: 1.02rem;
+  line-height: 1.18;
+}
+
+.reminder-checklist small {
+  color: var(--grocery-muted);
+  font-size: 0.88rem;
+  font-weight: 750;
+  grid-column: 2;
+  line-height: 1.3;
+  overflow-wrap: anywhere;
 }
 
 .reminder-selected-chip {
@@ -681,25 +713,25 @@
   justify-content: center;
   position: absolute;
   right: 22px;
-  top: 176px;
+  top: 70px;
   width: 56px;
 }
 
 .reminder-icon-row {
   display: flex;
-  gap: 18px;
+  gap: 12px;
   justify-content: space-between;
-  margin-bottom: 22px;
+  margin-bottom: 20px;
 }
 
 .reminder-icon-row button {
   align-items: center;
-  background: var(--grocery-ink);
-  border: 0;
+  background: var(--grocery-surface-2);
+  border: 1px solid var(--grocery-line);
   border-radius: 999px;
-  color: #fff;
+  color: var(--grocery-accent);
   display: inline-flex;
-  font-size: 1rem;
+  font-size: 1.05rem;
   font-weight: 900;
   height: 48px;
   justify-content: center;
@@ -707,6 +739,8 @@
 }
 
 .reminder-icon-row button.active {
+  background: var(--grocery-ink);
+  border-color: var(--grocery-ink);
   color: var(--grocery-accent-2);
 }
 
@@ -733,7 +767,7 @@
 
 .reminder-option-row span {
   color: var(--grocery-muted);
-  font-size: 1.25rem;
+  font-size: 1rem;
   font-weight: 900;
 }
 
@@ -866,11 +900,60 @@
   text-align: center;
 }
 
+.time-scroll-picker {
+  align-items: center;
+  display: grid;
+  gap: 16px;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  margin: 0 auto;
+  max-width: 300px;
+}
+
+.time-scroll-picker > strong {
+  color: var(--grocery-ink);
+  font-size: 2rem;
+}
+
+.time-scroll-column {
+  background: var(--grocery-surface-2);
+  border: 1px solid var(--grocery-line);
+  border-radius: 18px;
+  display: grid;
+  gap: 6px;
+  max-height: 214px;
+  overflow-y: auto;
+  padding: 8px;
+  scroll-snap-type: y mandatory;
+}
+
+.time-scroll-column button {
+  background: transparent;
+  border: 0;
+  border-radius: 12px;
+  color: var(--grocery-muted);
+  font-size: 1.35rem;
+  font-weight: 850;
+  min-height: 44px;
+  scroll-snap-align: center;
+}
+
+.time-scroll-column button.selected {
+  background: var(--grocery-accent);
+  color: #fff;
+}
+
 .grocery-repeat-menu {
   border-radius: 22px;
   display: grid;
   max-width: 360px;
   overflow: hidden;
+}
+
+.grocery-repeat-menu h2 {
+  font-size: 1.15rem;
+  font-weight: 900;
+  margin: 0;
+  padding: 18px 20px 10px;
 }
 
 .grocery-repeat-menu button {
@@ -893,6 +976,10 @@
 
 .grocery-repeat-menu strong {
   color: #4e93f8;
+}
+
+.custom-repeat-menu {
+  max-width: 420px;
 }
 
 .grocery-toggle-row,
@@ -1108,16 +1195,30 @@
   }
 
   .reminder-save-btn {
-    top: 172px;
+    top: 62px;
   }
 
   .reminder-icon-row {
-    gap: 10px;
+    gap: 8px;
   }
 
   .reminder-icon-row button {
-    height: 42px;
-    width: 42px;
+    height: 40px;
+    width: 40px;
+  }
+
+  .grocery-reminder-sheet {
+    border-radius: 24px 24px 0 0;
+    max-height: 90vh;
+    padding: 12px 16px 24px;
+  }
+
+  .reminder-title-input {
+    font-size: 1.2rem;
+  }
+
+  .reminder-chip-row {
+    padding-left: 0;
   }
 
   .grocery-fab {
