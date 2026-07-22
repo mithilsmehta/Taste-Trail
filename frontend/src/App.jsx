@@ -20,6 +20,7 @@ const MealPlanner = lazy(() => import("./pages/MealPlanner"));
 const GroceryList = lazy(() => import("./pages/GroceryList"));
 const MealSettings = lazy(() => import("./pages/MealSettings"));
 const DetectIngredients = lazy(() => import("./pages/DetectIngredients"));
+const LegalPage = lazy(() => import("./pages/LegalPage"));
 
 function PageLoader() {
   return (
@@ -64,6 +65,10 @@ export default function App() {
           <Route path="/register" element={<Register />} />
           <Route path="/forgot-password" element={<ForgotPassword />} />
           <Route path="/reset-password/:token" element={<ResetPassword />} />
+          <Route path="/privacy-policy" element={<LegalPage />} />
+          <Route path="/terms" element={<LegalPage />} />
+          <Route path="/contact" element={<LegalPage />} />
+          <Route path="/about" element={<LegalPage />} />
 
           {/* Protected Routes */}
           <Route

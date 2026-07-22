@@ -1,6 +1,7 @@
 import { API_BASE_URL } from "../utils/api";
 import { useCallback, useContext, useState, useEffect } from "react";
 import { AuthContext } from "../context/AuthContext";
+import { Link } from "react-router-dom";
 import axios from "axios";
 import toast from "react-hot-toast";
 import Navbar from "../components/Navbar";
@@ -455,11 +456,49 @@ const handleProfileUpdate = async (e) => {
         </div>
       </div>
 
+      <div className="row g-4 mt-1">
+        <div className="col-12">
+          <div className="card shadow p-4">
+            <h4 className="fw-semibold mb-2">Legal & Support</h4>
+            <p className="text-muted mb-3">
+              App information, privacy details, and support pages.
+            </p>
+            <div className="profile-legal-links">
+              <Link to="/privacy-policy">Privacy Policy</Link>
+              <Link to="/terms">Terms</Link>
+              <Link to="/contact">Contact</Link>
+              <Link to="/about">About</Link>
+            </div>
+          </div>
+        </div>
+      </div>
+
       <style>{`
         .profile-planner-toggle {
           display: grid;
           grid-template-columns: repeat(2, minmax(0, 1fr));
           gap: 12px;
+        }
+
+        .profile-legal-links {
+          display: flex;
+          flex-wrap: wrap;
+          gap: 10px;
+        }
+
+        .profile-legal-links a {
+          background: var(--tw-surface);
+          border: 1px solid var(--tw-border);
+          border-radius: 999px;
+          color: var(--tw-sage);
+          font-weight: 850;
+          padding: 10px 14px;
+          text-decoration: none;
+        }
+
+        .profile-legal-links a:hover {
+          background: var(--tw-sage-soft);
+          color: var(--tw-sage);
         }
 
         .profile-card-title-row {
@@ -550,6 +589,11 @@ const handleProfileUpdate = async (e) => {
           }
 
           .profile-planner-toggle {
+            grid-template-columns: 1fr;
+          }
+
+          .profile-legal-links {
+            display: grid;
             grid-template-columns: 1fr;
           }
         }
