@@ -6,6 +6,7 @@ import axios from "axios";
 import toast from "react-hot-toast";
 import Navbar from "../components/Navbar";
 import { foodPreferenceOptions, getFoodPreferenceLabel } from "../utils/foodPreference";
+import { getSubscription } from "../utils/subscription";
 
 const indianStates = [
   "Andhra Pradesh",
@@ -170,6 +171,7 @@ const handleProfileUpdate = async (e) => {
   };
 
   const bmi = calculateBmi(onboarding.heightCm, onboarding.weightKg);
+  const subscription = getSubscription(user);
 
   const handlePasswordChange = async (e) => {
     e.preventDefault();
@@ -432,6 +434,26 @@ const handleProfileUpdate = async (e) => {
       <div className="row g-4 mt-1">
         <div className="col-12">
           <div className="card shadow p-4">
+            <div className="profile-premium-card">
+              <div>
+                <h4 className="fw-semibold mb-1">Tastewise Premium</h4>
+                <p className="text-muted mb-0">
+                  {subscription.isPremium
+                    ? "Premium is active. Ads are hidden for your account."
+                    : "Free account. Premium will remove ads and unlock more cooking tools."}
+                </p>
+              </div>
+              <Link to="/premium">
+                {subscription.isPremium ? "View Plan" : "View Premium"}
+              </Link>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div className="row g-4 mt-1">
+        <div className="col-12">
+          <div className="card shadow p-4">
             <h4 className="fw-semibold mb-2">Meal Planner View</h4>
             <p className="text-muted mb-3">
               Choose which planner layout opens by default.
@@ -478,6 +500,23 @@ const handleProfileUpdate = async (e) => {
           display: grid;
           grid-template-columns: repeat(2, minmax(0, 1fr));
           gap: 12px;
+        }
+
+        .profile-premium-card {
+          align-items: center;
+          display: flex;
+          gap: 16px;
+          justify-content: space-between;
+        }
+
+        .profile-premium-card a {
+          background: var(--tw-sage);
+          border-radius: 999px;
+          color: #fff;
+          flex: 0 0 auto;
+          font-weight: 900;
+          padding: 11px 16px;
+          text-decoration: none;
         }
 
         .profile-legal-links {
@@ -590,6 +629,15 @@ const handleProfileUpdate = async (e) => {
 
           .profile-planner-toggle {
             grid-template-columns: 1fr;
+          }
+
+          .profile-premium-card {
+            align-items: stretch;
+            display: grid;
+          }
+
+          .profile-premium-card a {
+            text-align: center;
           }
 
           .profile-legal-links {

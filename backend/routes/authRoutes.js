@@ -4,6 +4,7 @@ const {
   login,
   forgotPassword,
   resetPassword,
+  getProfile,
   updateProfile,
   changePassword
 } = require("../controllers/authController.js");
@@ -19,6 +20,7 @@ router.post("/forgot-password", forgotPassword);
 router.post("/reset-password", resetPassword);
 
 // PROTECTED ROUTES
+router.get("/me", authMiddleware, getProfile);
 router.put("/update-profile/:id", authMiddleware, updateProfile);
 router.put("/change-password/:id", authMiddleware, changePassword);
 

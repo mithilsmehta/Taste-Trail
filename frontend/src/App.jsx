@@ -21,6 +21,7 @@ const GroceryList = lazy(() => import("./pages/GroceryList"));
 const MealSettings = lazy(() => import("./pages/MealSettings"));
 const DetectIngredients = lazy(() => import("./pages/DetectIngredients"));
 const LegalPage = lazy(() => import("./pages/LegalPage"));
+const Premium = lazy(() => import("./pages/Premium"));
 
 function PageLoader() {
   return (
@@ -85,6 +86,15 @@ export default function App() {
             element={
               <ProtectedRoute>
                 <Profile />
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/premium"
+            element={
+              <ProtectedRoute>
+                <Premium />
               </ProtectedRoute>
             }
           />

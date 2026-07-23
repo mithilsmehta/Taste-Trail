@@ -2,6 +2,7 @@ import { apiUrl } from "../utils/api";
 import { useContext, useEffect, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { AuthContext } from "../context/AuthContext";
+import AdSlot from "../components/AdSlot";
 import Navbar from "../components/Navbar";
 import { getMondayDateKey, getWeekFromDateKey } from "../utils/weekPlan";
 import { formatIngredientAmount } from "../utils/recipeFormatting";
@@ -179,7 +180,7 @@ export default function SearchResults() {
   };
 
   const getModeBlockedText = () => {
-    if (getDietMode() === "jain") return "Jain search blocks non-veg items, onion, garlic, ginger, potato, carrot, and root vegetables.";
+    if (getDietMode() === "jain") return "Jain search blocks non-veg items, onion, garlic, ginger, potato, carrot, and root vegetables. Potato-based dishes should use Jain-safe substitutes like raw banana.";
     if (getDietMode() === "vegan") return "Vegan search blocks non-veg items, dairy, honey, eggs, and animal products.";
     return "Veg recipes block non-veg items.";
   };
@@ -1020,6 +1021,8 @@ export default function SearchResults() {
                 📚 View Saved Recipes
               </button>
             </div>
+
+            <AdSlot placement="search-bottom" label="Sponsored" />
           </div>
         )}
       </div>

@@ -311,6 +311,7 @@ const getJainFallbackRecipe = (query, servings, options = {}) => {
   const isSandwich = /\b(sandwich|toast)\b/.test(normalizedQuery);
   const isManchurian = /\bmanchurian\b/.test(normalizedQuery);
   const isDosaOrIdli = /\b(dosa|idli|uttapam|uthappam)\b/.test(normalizedQuery);
+  const isMasalaDosa = /\bmasala\s+dosa\b/.test(normalizedQuery);
   const isKhamanOrDhokla = /\b(khaman|dhokla)\b/.test(normalizedQuery);
   const isPoha = /\bpoha\b/.test(normalizedQuery);
   const isCholeOrChana = /\b(chole|chana|chickpea|chickpeas)\b/.test(normalizedQuery);
@@ -582,6 +583,43 @@ const getJainFallbackRecipe = (query, servings, options = {}) => {
         "Simmer the sauce for 3-4 minutes until glossy.",
         "Add the fried balls and toss gently until coated.",
         "Garnish with fresh coriander and serve hot."
+      ]
+    });
+  }
+
+  if (isMasalaDosa) {
+    return createJainRecipe({
+      query,
+      servings,
+      ingredients: [
+        "1 cup parboiled rice",
+        "1/3 cup urad dal",
+        "1/4 teaspoon fenugreek seeds",
+        "1/2 teaspoon salt",
+        "Oil for cooking",
+        "2 cups raw banana, peeled and mashed",
+        "1/2 cup green peas",
+        "1 medium tomato, finely chopped",
+        "2 tablespoons oil",
+        "1 teaspoon mustard seeds",
+        "8 curry leaves",
+        "2 green chillies, finely chopped",
+        "1/2 teaspoon turmeric powder",
+        "1 teaspoon coriander powder",
+        "1/2 teaspoon cumin powder",
+        "1 tablespoon lemon juice",
+        "2 tablespoons chopped fresh coriander",
+        "1/2 cup coconut chutney"
+      ],
+      steps: [
+        "Soak rice, urad dal, and fenugreek seeds separately for 5-6 hours.",
+        "Grind into a smooth batter, mix with salt, and ferment overnight.",
+        "Steam or boil raw banana until tender, then mash it lightly.",
+        "Heat oil in a pan and crackle mustard seeds with curry leaves and green chillies.",
+        "Add tomato and cook until soft, then add green peas, turmeric powder, coriander powder, cumin powder, and salt.",
+        "Add mashed raw banana and mix until the masala becomes thick and spoonable.",
+        "Finish the masala with lemon juice and fresh coriander.",
+        "Spread dosa batter on a hot tawa, drizzle oil, add the raw banana masala, fold, and serve with coconut chutney."
       ]
     });
   }
@@ -1098,9 +1136,10 @@ STRICT JAIN MODE ACTIVE:
 - NEVER use meat, seafood, fish, chicken, eggs, gelatin, animal stock, lard, bacon, ham, or any non-vegetarian ingredient.
 - For searches like "diet recipe", "healthy recipe", or any generic recipe request, still make the recipe strictly Jain by default.
 - If the requested dish normally uses restricted ingredients, create a Jain-friendly version and name it clearly.
+- If the requested dish normally uses potato filling, such as masala dosa, replace potato with raw banana or another Jain-safe equivalent and keep the dish recognizable.
 - For dishes like pav bhaji, biryani, pulao, chole, paneer sabji, noodles, pasta, pizza, sandwiches, and sabji, create the real Jain version of that dish. Do not copy the regular recipe and do not include onion, garlic, potato, carrot, ginger, beetroot, radish, or any root vegetable.
 - For "mix veg", "mixed veg", "mixed vegetable sabji", or similar generic vegetable recipes in Jain mode, use only non-root Jain-safe vegetables such as cauliflower, capsicum, cabbage, green peas, French beans, tomatoes, bottle gourd, ridge gourd, or paneer. Do not use onion, garlic, ginger, potato, carrot, beetroot, radish, or any root vegetable.
-- Keep the recipe faithful to the requested dish. Do not add unrelated substitutes like raw banana, cabbage, cauliflower, or hing unless they are normal for that exact dish.
+- Keep the recipe faithful to the requested dish. Do not add unrelated substitutes like raw banana, cabbage, cauliflower, or hing unless they are normal for that exact dish or are replacing a blocked potato/root filling.
 - For paneer dishes, paneer must remain the main ingredient. Do not replace paneer with raw banana or unrelated vegetables.
 - Hing/asafoetida is not a default Jain replacement for onion or garlic. Use it only in dishes where it is traditionally normal, such as some dals or kadhis.
 - Do not add hing/asafoetida to paneer tikka, paneer sabji, paneer curry, paneer masala, paneer bhurji, grilled paneer starters, or tandoori-style paneer unless the user explicitly asks for hing.

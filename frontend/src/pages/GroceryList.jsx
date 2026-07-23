@@ -1,6 +1,7 @@
 import { API_BASE_URL } from "../utils/api";
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import AdSlot from "../components/AdSlot";
 import Navbar from "../components/Navbar";
 import { mergeIngredientParts, splitIngredientLine } from "../utils/recipeFormatting";
 import { parseDateKey } from "../utils/weekPlan";
@@ -674,6 +675,8 @@ export default function GroceryList() {
             </div>
           </section>
         )}
+
+        <AdSlot placement="grocery-bottom" label="Sponsored" />
       </main>
 
       <button type="button" className="grocery-fab" onClick={() => setShowAddPanel(true)} aria-label="Add grocery item">

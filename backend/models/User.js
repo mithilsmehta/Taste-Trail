@@ -31,6 +31,15 @@ const userSchema = new mongoose.Schema({
     bmi: { type: Number, default: null }
   },
 
+  subscription: {
+    isPremium: { type: Boolean, default: false },
+    status: { type: String, default: "free" },
+    plan: { type: String, default: null },
+    provider: { type: String, default: null },
+    premiumExpiresAt: { type: Date, default: null },
+    playPurchaseToken: { type: String, default: null }
+  },
+
   role: { type: String, default: "user" }
 });
 

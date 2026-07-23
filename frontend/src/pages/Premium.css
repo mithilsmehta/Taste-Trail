@@ -1,0 +1,157 @@
+.premium-shell {
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.72), rgba(247, 244, 234, 0) 320px),
+    var(--tw-cream);
+  color: var(--tw-ink);
+  min-height: 100vh;
+  padding: 118px 18px 44px;
+}
+
+.premium-hero,
+.premium-benefits,
+.premium-plans,
+.premium-footer-action {
+  margin: 0 auto;
+  max-width: 980px;
+}
+
+.premium-hero {
+  display: grid;
+  gap: 12px;
+  margin-bottom: 28px;
+}
+
+.premium-hero p {
+  color: var(--tw-sage);
+  font-size: 0.88rem;
+  font-weight: 900;
+  letter-spacing: 0.18em;
+  margin: 0;
+  text-transform: uppercase;
+}
+
+.premium-hero h1 {
+  color: var(--tw-ink);
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: clamp(2.45rem, 7vw, 4.4rem);
+  font-weight: 500;
+  line-height: 1;
+  margin: 0;
+}
+
+.premium-hero span {
+  color: var(--tw-muted);
+  font-size: 1.05rem;
+  font-weight: 750;
+}
+
+.premium-benefits {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  margin-bottom: 28px;
+}
+
+.premium-benefits article,
+.premium-plans article {
+  background: var(--tw-surface);
+  border: 1px solid var(--tw-border);
+  border-radius: 16px;
+  box-shadow: var(--tw-shadow);
+}
+
+.premium-benefits article {
+  display: grid;
+  gap: 9px;
+  padding: 18px;
+}
+
+.premium-benefits span {
+  align-items: center;
+  background: var(--tw-sage-soft);
+  border-radius: 999px;
+  color: var(--tw-sage);
+  display: inline-flex;
+  font-weight: 900;
+  height: 32px;
+  justify-content: center;
+  width: 32px;
+}
+
+.premium-benefits strong {
+  color: var(--tw-ink);
+  font-size: 0.96rem;
+  line-height: 1.35;
+}
+
+.premium-plans {
+  display: grid;
+  gap: 14px;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.premium-plans article {
+  display: grid;
+  gap: 12px;
+  padding: 22px;
+}
+
+.premium-plans h2 {
+  color: var(--tw-ink);
+  font-size: 1.22rem;
+  font-weight: 900;
+  margin: 0;
+}
+
+.premium-plans strong {
+  color: var(--tw-sage);
+  font-size: 1.05rem;
+}
+
+.premium-plans p {
+  color: var(--tw-muted);
+  font-weight: 700;
+  line-height: 1.45;
+  margin: 0;
+}
+
+.premium-plans button,
+.premium-footer-action a {
+  background: var(--tw-sage);
+  border: 0;
+  border-radius: 999px;
+  color: #fff;
+  font-weight: 900;
+  padding: 12px 14px;
+  text-align: center;
+  text-decoration: none;
+}
+
+.premium-plans button:disabled {
+  cursor: not-allowed;
+  opacity: 0.72;
+}
+
+.premium-footer-action {
+  display: flex;
+  justify-content: center;
+  margin-top: 28px;
+}
+
+@media (max-width: 900px) {
+  .premium-benefits,
+  .premium-plans {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 575.98px) {
+  .premium-shell {
+    padding-top: 92px;
+  }
+
+  .premium-benefits,
+  .premium-plans {
+    grid-template-columns: 1fr;
+  }
+}

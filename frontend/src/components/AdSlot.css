@@ -1,0 +1,44 @@
+.ad-slot {
+  align-items: center;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.7), rgba(239, 246, 235, 0.72)),
+    var(--tw-sage-soft);
+  border: 1px dashed rgba(95, 143, 103, 0.42);
+  border-radius: 14px;
+  color: var(--tw-sage);
+  display: grid;
+  gap: 2px;
+  justify-items: center;
+  margin: 18px auto;
+  min-height: 86px;
+  padding: 14px;
+  text-align: center;
+  width: min(100%, 860px);
+}
+
+.ad-slot span {
+  color: var(--tw-muted);
+  font-size: 0.76rem;
+  font-weight: 850;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.ad-slot strong {
+  color: var(--tw-sage);
+  font-size: 1rem;
+  font-weight: 900;
+}
+
+.ad-slot-home-bottom,
+.ad-slot-grocery-bottom,
+.ad-slot-search-bottom {
+  margin-bottom: 34px;
+}
+
+@media (max-width: 575.98px) {
+  .ad-slot {
+    border-radius: 12px;
+    min-height: 74px;
+  }
+}

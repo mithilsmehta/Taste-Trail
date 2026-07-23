@@ -5,6 +5,7 @@ import { apiUrl } from "../utils/api";
 import { getMondayDateKey, getWeekFromDateKey, toDateKey } from "../utils/weekPlan";
 import "./Home.css";
 import Navbar from "../components/Navbar";
+import AdSlot from "../components/AdSlot";
 import fridgeIdeaOne from "../assets/img1.webp";
 import fridgeIdeaTwo from "../assets/img2.webp";
 import fridgeIdeaThree from "../assets/img3.webp";
@@ -477,6 +478,8 @@ export default function Home() {
           </div>
           <Link to="/saved">Open cookbook</Link>
         </section>
+
+        <AdSlot placement="home-bottom" label="Sponsored" />
       </main>
 
       <nav className="home-mobile-nav" aria-label="Home shortcuts">
