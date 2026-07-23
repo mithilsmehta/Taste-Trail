@@ -6,7 +6,13 @@ export default defineConfig({
   plugins: [
     react(),
     VitePWA({
-      registerType: 'autoUpdate'
+      registerType: 'autoUpdate',
+      workbox: {
+        navigateFallbackDenylist: [
+          /^\/assetlinks\.json$/,
+          /^\/\.well-known\/assetlinks\.json$/
+        ]
+      }
     })
   ]
 })
