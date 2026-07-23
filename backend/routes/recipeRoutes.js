@@ -305,6 +305,7 @@ const getJainFallbackRecipe = (query, servings, options = {}) => {
   const isHakkaNoodles = /\b(hakka|noodles?|chow\s*mein|chowmein)\b/.test(normalizedQuery);
   const isBiryaniOrPulao = /\b(biryani|pulao|pulav|fried\s*rice|rice)\b/.test(normalizedQuery);
   const isPaneerTikka = /\bpaneer\s*tikka\b/.test(normalizedQuery);
+  const isPaneerBhurji = /\bpaneer\s*bhurji\b/.test(normalizedQuery);
   const isPaneerDish = /\bpaneer\b/.test(normalizedQuery);
   const isPizza = /\bpizza\b/.test(normalizedQuery);
   const isPasta = /\bpasta\b/.test(normalizedQuery);
@@ -409,6 +410,37 @@ const getJainFallbackRecipe = (query, servings, options = {}) => {
         "Thread paneer and vegetables onto skewers or arrange them on a hot tawa.",
         "Cook on medium-high heat, brushing with butter, until the paneer is lightly charred on all sides.",
         "Serve hot with lemon wedges and fresh coriander."
+      ]
+    });
+  }
+
+  if (isPaneerBhurji) {
+    return createJainRecipe({
+      query,
+      servings,
+      ingredients: [
+        "250g paneer, crumbled",
+        "2 medium tomatoes, finely chopped",
+        "1/2 cup chopped capsicum",
+        "2 tablespoons thick curd",
+        "1 tablespoon cashew paste",
+        "1 tablespoon ghee or oil",
+        "1 teaspoon cumin seeds",
+        "1 teaspoon coriander powder",
+        "1/2 teaspoon turmeric powder",
+        "1 teaspoon Kashmiri red chilli powder",
+        "1/2 teaspoon garam masala",
+        "1/2 teaspoon salt",
+        "2 tablespoons chopped fresh coriander",
+        "1 tablespoon lemon juice"
+      ],
+      steps: [
+        "Heat ghee or oil in a pan over medium heat and let cumin seeds sizzle.",
+        "Add chopped tomatoes and cook until soft and glossy.",
+        "Add capsicum, coriander powder, turmeric powder, chilli powder, garam masala, and salt.",
+        "Whisk curd with cashew paste, lower the heat, and stir it into the masala.",
+        "Add crumbled paneer and toss gently for 3-4 minutes so it stays soft.",
+        "Finish with fresh coriander and lemon juice, then serve hot with roti or paratha."
       ]
     });
   }

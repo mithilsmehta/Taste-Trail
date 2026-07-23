@@ -185,6 +185,87 @@ export default function SearchResults() {
     return "Veg recipes block non-veg items.";
   };
 
+  const buildClientJainFallbackRecipe = (searchQuery, servingCount = servings) => {
+    const normalizedQuery = normalizeTitle(searchQuery);
+    const safeServings = Math.max(1, Number(servingCount) || 2);
+    let fallbackRecipe = null;
+
+    if (/\bpaneer\s+bhurji\b/.test(normalizedQuery)) {
+      fallbackRecipe = {
+        name: "Jain Paneer Bhurji",
+        description: "Soft crumbled paneer, bright tomato masala, and capsicum make this a quick tawa-style favorite.",
+        ingredients: [
+          "250g paneer, crumbled",
+          "2 medium tomatoes, finely chopped",
+          "1/2 cup chopped capsicum",
+          "2 tablespoons thick curd",
+          "1 tablespoon cashew paste",
+          "1 tablespoon ghee or oil",
+          "1 teaspoon cumin seeds",
+          "1 teaspoon coriander powder",
+          "1/2 teaspoon turmeric powder",
+          "1 teaspoon Kashmiri red chilli powder",
+          "1/2 teaspoon garam masala",
+          "1/2 teaspoon salt",
+          "2 tablespoons chopped fresh coriander",
+          "1 tablespoon lemon juice"
+        ],
+        steps: [
+          "Heat ghee or oil in a pan over medium heat and let cumin seeds sizzle.",
+          "Add chopped tomatoes and cook until soft and glossy.",
+          "Add capsicum, coriander powder, turmeric powder, chilli powder, garam masala, and salt.",
+          "Whisk curd with cashew paste, lower the heat, and stir it into the masala.",
+          "Add crumbled paneer and toss gently for 3-4 minutes so it stays soft.",
+          "Finish with fresh coriander and lemon juice, then serve hot with roti or paratha."
+        ]
+      };
+    }
+
+    if (!fallbackRecipe && /\bmasala\s+dosa\b/.test(normalizedQuery)) {
+      fallbackRecipe = {
+        name: "Jain Masala Dosa",
+        description: "Crisp dosa with a comforting raw banana filling, built for Jain food preference without losing the classic feel.",
+        ingredients: [
+          "2 cups dosa batter",
+          "2 medium raw bananas, boiled and mashed",
+          "1/2 cup green peas",
+          "1/2 cup chopped capsicum",
+          "1 medium tomato, finely chopped",
+          "1 tablespoon oil",
+          "1 teaspoon cumin seeds",
+          "1/2 teaspoon turmeric powder",
+          "1 teaspoon coriander powder",
+          "1 teaspoon Kashmiri red chilli powder",
+          "1/2 teaspoon salt",
+          "2 tablespoons chopped fresh coriander"
+        ],
+        steps: [
+          "Heat oil in a pan and let cumin seeds sizzle.",
+          "Add tomato, capsicum, and green peas, then cook until tender.",
+          "Add mashed raw banana, turmeric powder, coriander powder, chilli powder, and salt.",
+          "Cook the filling for 4-5 minutes, then finish with fresh coriander.",
+          "Spread dosa batter on a hot tawa and cook until crisp.",
+          "Place the filling inside, fold the dosa, and serve hot."
+        ]
+      };
+    }
+
+    if (!fallbackRecipe) return null;
+
+    const nutrition = estimateNutrition(fallbackRecipe.ingredients, safeServings);
+    const healthScore = estimateRecipeHealth(fallbackRecipe);
+
+    return {
+      ...fallbackRecipe,
+      servings: safeServings,
+      nutrition,
+      healthScore,
+      healthLabel: getHealthLabel(healthScore),
+      dietMode: "jain",
+      source: "clientJainFallback"
+    };
+  };
+
   const clearRecipeBrowserCache = () => {
     Object.keys(localStorage)
       .filter((key) => key.startsWith("tastewiseRecipe:"))
@@ -479,12 +560,33 @@ export default function SearchResults() {
       const data = await res.json();
 
       if (!res.ok) {
+        const clientFallback = getDietMode() === "jain" ? buildClientJainFallbackRecipe(query, activeServings) : null;
+        const message = String(data.msg || "");
+        if (clientFallback && /\b(jain|restricted|blocked|safety|root)\b/i.test(message)) {
+          setOriginalRecipe(clientFallback);
+          setRecipe(clientFallback);
+          setRecipeSource(clientFallback.source);
+          setHasIngredientChanges(false);
+          setLoading(false);
+          return;
+        }
+
         throw new Error(data.msg || "Failed to generate recipe");
       }
 
       const parsed = data.recipe;
 
       if (!isRecipeSafeForDietMode(parsed)) {
+        const clientFallback = getDietMode() === "jain" ? buildClientJainFallbackRecipe(query, activeServings) : null;
+        if (clientFallback) {
+          setOriginalRecipe(clientFallback);
+          setRecipe(clientFallback);
+          setRecipeSource(clientFallback.source);
+          setHasIngredientChanges(false);
+          setLoading(false);
+          return;
+        }
+
         throw new Error(`Generated recipe did not match ${getDietModeLabel()} search rules. ${getModeBlockedText()} Please generate again.`);
       }
       

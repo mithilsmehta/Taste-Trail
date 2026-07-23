@@ -42,10 +42,12 @@
 
 - `backend/routes/recipeRoutes.js`
   - Added a dedicated Jain Masala Dosa fallback that uses raw banana masala instead of potato.
+  - Added a dedicated Jain Paneer Bhurji fallback with paneer, tomato, capsicum, curd, cashew paste, and Jain-safe spices.
   - Updated Jain prompt rules so raw banana is used only when replacing blocked potato/root fillings, not randomly in every Jain recipe.
 
 - `frontend/src/pages/SearchResults.jsx`
   - Clarified the Jain blocked-ingredient message to explain potato dishes should use Jain-safe substitutes like raw banana.
+  - Added client-side Jain fallback recovery for Paneer Bhurji and Masala Dosa so users do not see a blocked-ingredient error for these common searches.
 
 ## Current Behavior
 
@@ -54,6 +56,7 @@
 - No real ad units are inserted yet, so this is safe while AdSense review is pending.
 - No real billing is connected yet.
 - Jain Masala Dosa should generate directly with a Jain-safe raw banana filling instead of failing because of potato/root-vegetable rules.
+- Jain Paneer Bhurji should generate with a safe paneer masala and no unrelated raw banana substitute.
 
 ## Next Steps
 
