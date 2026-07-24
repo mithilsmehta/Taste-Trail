@@ -1,4 +1,5 @@
 import { createContext, useState, useEffect } from "react";
+import { apiUrl } from "../utils/api";
 
 export const AuthContext = createContext();
 
@@ -38,6 +39,22 @@ export function AuthProvider({ children }) {
     localStorage.removeItem("token");
   };
 
+  const refreshUser = async () => {
+    const activeToken = localStorage.getItem("token") || token;
+    if (!activeToken) return null;
+
+    const res = await fetch(apiUrl("/api/auth/me"), {
+      headers: { Authorization: `Bearer ${activeToken}` }
+    });
+
+    if (!res.ok) return null;
+
+    const freshUser = await res.json();
+    setUser(freshUser);
+    localStorage.setItem("user", JSON.stringify(freshUser));
+    return freshUser;
+  };
+
   return (
     <AuthContext.Provider
       value={{
@@ -47,6 +64,7 @@ export function AuthProvider({ children }) {
         setToken,  
         login,
         logout,
+        refreshUser,
       }}
     >
       {children}

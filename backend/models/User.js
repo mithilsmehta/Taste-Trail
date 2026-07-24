@@ -37,7 +37,10 @@ const userSchema = new mongoose.Schema({
     plan: { type: String, default: null },
     provider: { type: String, default: null },
     premiumExpiresAt: { type: Date, default: null },
-    playPurchaseToken: { type: String, default: null }
+    playProductId: { type: String, default: null },
+    playBasePlanId: { type: String, default: null },
+    playPurchaseToken: { type: String, default: null },
+    lastVerifiedAt: { type: Date, default: null }
   },
 
   role: { type: String, default: "user" }

@@ -66,6 +66,9 @@ app.use("/api/settings", settingsRoutes);
 const visionRoutes = require("./routes/visionRoutes");
 app.use("/api/vision", visionRoutes);
 
+const subscriptionRoutes = require("./routes/subscriptionRoutes");
+app.use("/api/subscriptions", subscriptionRoutes);
+
 // Admin dashboard is disabled for now.
 // Uncomment these lines when you want to enable the admin API again.
 // const adminRoutes = require("./routes/adminRoutes");

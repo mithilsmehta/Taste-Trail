@@ -6,7 +6,7 @@ import axios from "axios";
 import toast from "react-hot-toast";
 import Navbar from "../components/Navbar";
 import { foodPreferenceOptions, getFoodPreferenceLabel } from "../utils/foodPreference";
-import { getSubscription } from "../utils/subscription";
+import { formatPremiumDate, getSubscription } from "../utils/subscription";
 
 const indianStates = [
   "Andhra Pradesh",
@@ -439,7 +439,7 @@ const handleProfileUpdate = async (e) => {
                 <h4 className="fw-semibold mb-1">Tastewise Premium</h4>
                 <p className="text-muted mb-0">
                   {subscription.isPremium
-                    ? "Premium is active. Ads are hidden for your account."
+                    ? `Premium is active${subscription.plan ? ` on ${subscription.plan.replace(/_/g, " ")}` : ""}${subscription.premiumExpiresAt ? ` until ${formatPremiumDate(subscription.premiumExpiresAt)}` : ""}. Ads are hidden for your account.`
                     : "Free account. Premium will remove ads and unlock more cooking tools."}
                 </p>
               </div>
