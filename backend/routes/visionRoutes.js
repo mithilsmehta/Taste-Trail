@@ -52,8 +52,39 @@ const jainRestrictedWords = [
   "shallot"
 ];
 
+const veganRestrictedWords = [
+  "milk",
+  "curd",
+  "yogurt",
+  "yoghurt",
+  "dahi",
+  "paneer",
+  "cheese",
+  "cream",
+  "butter",
+  "ghee",
+  "honey",
+  "mayonnaise",
+  "mayo",
+  "mozzarella",
+  "parmesan",
+  "ricotta",
+  "mascarpone",
+  "malai",
+  "buttermilk",
+  "whey",
+  "casein",
+  "milk powder",
+  "condensed milk",
+  "khoya",
+  "mawa"
+];
+
 const normalizeDietMode = (value) => {
-  return String(value || "").toLowerCase() === "jain" ? "jain" : "veg";
+  const normalized = String(value || "").trim().toLowerCase();
+  if (normalized === "jain") return "jain";
+  if (normalized === "vegan") return "vegan";
+  return "veg";
 };
 
 const getDietRules = (dietMode) => {
@@ -68,6 +99,17 @@ JAIN MODE ACTIVE:
 - Keep recipes faithful to the requested dish. Do not add unrelated substitutes like raw banana, cabbage, cauliflower, or hing unless they are normal for that dish or strictly needed to replace a blocked ingredient.
 - For paneer dishes, paneer must remain the main ingredient. Do not replace paneer with raw banana or unrelated vegetables.
 - Use hing only when it is traditionally appropriate or clearly needed for Jain flavoring; do not add hing by default.
+`;
+  }
+
+  if (dietMode === "vegan") {
+    return `
+VEGAN MODE ACTIVE:
+- Detect, suggest, and generate ONLY vegan food.
+- Do not include milk, curd, yogurt, paneer, cheese, cream, butter, ghee, honey, mayonnaise, whey, casein, milk powder, condensed milk, khoya, mawa, eggs, or other animal products.
+- Put visible vegan-restricted items in rejectedItems and do not include them in ingredients or uncertainItems.
+- Never include meat, seafood, fish, chicken, eggs, gelatin, animal stock, lard, bacon, ham, or non-vegetarian ingredients.
+- Use plant-based alternatives only when they naturally fit the requested dish.
 `;
   }
 
@@ -87,6 +129,18 @@ const normalizeRegionalStyle = (value) => {
 const getUserRegionalStyle = async (userId) => {
   const user = await User.findById(userId).select("onboarding.ethnicity").lean();
   return normalizeRegionalStyle(user?.onboarding?.ethnicity);
+};
+
+const getUserDietMode = async (userId) => {
+  const user = await User.findById(userId)
+    .select("preferences.diet onboarding.dietaryPreference onboarding.foodPreference")
+    .lean();
+
+  return normalizeDietMode(
+    user?.preferences?.diet ||
+    user?.onboarding?.dietaryPreference ||
+    user?.onboarding?.foodPreference
+  );
 };
 
 const getRegionalStyleRules = (regionalStyle) => {
@@ -247,8 +301,18 @@ const isJainRestricted = (value) => {
   });
 };
 
+const isVeganRestricted = (value) => {
+  const normalized = String(value || "").toLowerCase();
+  return veganRestrictedWords.some((word) => {
+    const escaped = word.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    return new RegExp(`\\b${escaped}\\b`, "i").test(normalized);
+  });
+};
+
 const isBlockedByDiet = (value, dietMode) => {
-  return isNonVegetarian(value) || (dietMode === "jain" && isJainRestricted(value));
+  return isNonVegetarian(value) ||
+    (dietMode === "jain" && isJainRestricted(value)) ||
+    (dietMode === "vegan" && isVeganRestricted(value));
 };
 
 const cleanIngredients = (ingredients = [], dietMode = "veg") => {
@@ -340,7 +404,7 @@ const getClientErrorMessage = (err) => {
 router.post("/detect-ingredients", authMiddleware, async (req, res) => {
   try {
     const { image } = req.body;
-    const dietMode = normalizeDietMode(req.body.dietMode);
+    const dietMode = await getUserDietMode(req.user.id);
     const inlineData = parseImage(image);
 
     const prompt = `
@@ -415,8 +479,8 @@ Format exactly:
         }))
         .filter((item) => item.name && !isBlockedByDiet(item.name, dietMode))
       : [];
-    const notes = dietMode === "jain" && isJainRestricted(parsed.notes)
-      ? "Jain mode removed restricted ingredients from this scan."
+    const notes = isBlockedByDiet(parsed.notes, dietMode)
+      ? `${dietMode === "jain" ? "Jain" : dietMode === "vegan" ? "Vegan" : "Veg"} mode removed restricted ingredients from this scan.`
       : (parsed.notes || "");
 
     await VisionScan.create({
@@ -439,15 +503,16 @@ Format exactly:
 
 router.post("/suggest-recipes", authMiddleware, async (req, res) => {
   try {
-    const dietMode = normalizeDietMode(req.body.dietMode);
+    const dietMode = await getUserDietMode(req.user.id);
     const regionalStyle = await getUserRegionalStyle(req.user.id);
     const ingredients = cleanIngredients(req.body.ingredients || [], dietMode).map((item) => item.name);
     if (ingredients.length === 0) {
-      return res.status(400).json({ msg: `Add at least one ${dietMode === "jain" ? "Jain-friendly" : "vegetarian"} ingredient` });
+      const dietLabel = dietMode === "jain" ? "Jain-friendly" : dietMode === "vegan" ? "vegan" : "vegetarian";
+      return res.status(400).json({ msg: `Add at least one ${dietLabel} ingredient` });
     }
 
     const result = await generateContentWithFallback(`
-Suggest ${dietMode === "jain" ? "Jain vegetarian" : "vegetarian"} recipes using these ingredients: ${ingredients.join(", ")}.
+Suggest ${dietMode === "jain" ? "Jain vegetarian" : dietMode === "vegan" ? "vegan" : "vegetarian"} recipes using these ingredients: ${ingredients.join(", ")}.
 ${getDietRules(dietMode)}
 ${getRegionalStyleRules(regionalStyle)}
 Rules:
@@ -476,7 +541,7 @@ Format:
 
 router.post("/generate-recipe", authMiddleware, async (req, res) => {
   try {
-    const dietMode = normalizeDietMode(req.body.dietMode);
+    const dietMode = await getUserDietMode(req.user.id);
     const regionalStyle = await getUserRegionalStyle(req.user.id);
     const ingredients = cleanIngredients(req.body.ingredients || [], dietMode).map((item) => item.name);
     const recipeName = String(req.body.recipeName || "").trim();
@@ -487,7 +552,7 @@ router.post("/generate-recipe", authMiddleware, async (req, res) => {
     }
 
     const result = await generateContentWithFallback(`
-Generate a detailed ${dietMode === "jain" ? "Jain vegetarian" : "vegetarian"} recipe.
+Generate a detailed ${dietMode === "jain" ? "Jain vegetarian" : dietMode === "vegan" ? "vegan" : "vegetarian"} recipe.
 Recipe: ${recipeName}
 Available ingredients: ${ingredients.join(", ")}
 ${getDietRules(dietMode)}
@@ -518,14 +583,18 @@ Format:
 `);
 
     const recipe = extractJson(result.response.text());
-    const groceryText = [recipe.name, ...(recipe.ingredients || [])].join(" ");
+    const recipeText = [
+      recipe.name,
+      ...(recipe.ingredients || []),
+      ...(recipe.steps || [])
+    ].join(" ");
 
     if ([recipe.name, ...(recipe.ingredients || []), ...(recipe.steps || [])].some(isNonVegetarian)) {
       return res.status(422).json({ msg: "Generated recipe was blocked because it included non-vegetarian content." });
     }
 
-    if (dietMode === "jain" && isJainRestricted(groceryText)) {
-      return res.status(422).json({ msg: "Generated recipe was blocked because it included ingredients that are not allowed in Jain mode." });
+    if (isBlockedByDiet(recipeText, dietMode)) {
+      return res.status(422).json({ msg: `Generated recipe included ingredients that are not allowed in ${dietMode} mode.` });
     }
 
     const displayName = getDisplayRecipeName(recipeName, regionalStyle, recipe.name);

@@ -3,6 +3,11 @@ import { useContext, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { AuthContext } from "../context/AuthContext";
 import Navbar from "../components/Navbar";
+import {
+  getFoodPreferenceBlockedText,
+  getUserFoodPreference,
+  isTextAllowedForFoodPreference
+} from "../utils/foodPreference";
 import { getMondayDateKey, getWeekFromDateKey } from "../utils/weekPlan";
 import "./DetectIngredients.css";
 
@@ -19,7 +24,6 @@ const mealOptions = [
 ];
 
 const scanHistoryKey = "tastewiseIngredientScans";
-const nonVegetarianPattern = /\b(chicken|mutton|beef|pork|fish|seafood|prawn|shrimp|eggs?|gelatin|bacon|ham|turkey|lamb|keema)\b/i;
 
 const getPreferredServings = (user) => {
   const servings = Number(user?.onboarding?.usualServings);
@@ -64,11 +68,11 @@ export default function DetectIngredients() {
   });
 
   const token = localStorage.getItem("token");
+  const dietMode = getUserFoodPreference(user);
   const ingredientNames = useMemo(() => ingredients.map((item) => item.name), [ingredients]);
 
   const isIngredientBlockedByMode = (name) => {
-    const value = String(name || "");
-    return nonVegetarianPattern.test(value);
+    return !isTextAllowedForFoodPreference(name, dietMode);
   };
 
   const filterIngredientsForCurrentMode = (items = []) => {
@@ -76,8 +80,8 @@ export default function DetectIngredients() {
   };
 
   const sanitizeNotesForCurrentMode = (value = "") => {
-    if (nonVegetarianPattern.test(value)) {
-      return "Veg mode removed non-vegetarian items from this scan.";
+    if (!isTextAllowedForFoodPreference(value, dietMode)) {
+      return `${getFoodPreferenceBlockedText(dietMode)} Restricted items were removed from this scan.`;
     }
     return value;
   };
@@ -194,7 +198,7 @@ export default function DetectIngredients() {
           "Content-Type": "application/json",
           Authorization: `Bearer ${token}`
         },
-        body: JSON.stringify({ image: imagePayload })
+        body: JSON.stringify({ image: imagePayload, dietMode })
       });
       const data = await res.json();
 
@@ -227,7 +231,7 @@ export default function DetectIngredients() {
     const normalizedName = String(name || "").trim();
     if (!normalizedName) return;
     if (isIngredientBlockedByMode(normalizedName)) {
-      setError(`Vegetarian recipes block "${normalizedName}".`);
+      setError(`${getFoodPreferenceBlockedText(dietMode)} "${normalizedName}" cannot be added.`);
       return;
     }
 
@@ -261,7 +265,7 @@ export default function DetectIngredients() {
           "Content-Type": "application/json",
           Authorization: `Bearer ${token}`
         },
-        body: JSON.stringify({ ingredients })
+        body: JSON.stringify({ ingredients, dietMode })
       });
       const data = await res.json();
 
@@ -294,6 +298,7 @@ export default function DetectIngredients() {
         body: JSON.stringify({
           recipeName: suggestion.name,
           ingredients,
+          dietMode,
           servings: getPreferredServings(user)
         })
       });
@@ -417,7 +422,10 @@ export default function DetectIngredients() {
         <section className="detect-header">
           <div>
             <h1>Ingredient Scanner</h1>
-            <p>Upload a food photo, review detected vegetarian ingredients, and generate recipe ideas.</p>
+            <p>
+              Upload a food photo, review ingredients allowed by your{" "}
+              <strong>{dietMode}</strong> preference, and generate recipe ideas.
+            </p>
           </div>
           {/* <button className="btn btn-dark" onClick={() => navigate("/grocery-list")}>
             🛒 Grocery List
