@@ -17,6 +17,18 @@ const allowedOrigins = [
   process.env.FRONTEND_URL
 ].filter(Boolean);
 
+const isTastewiseOrigin = (origin = "") => {
+  try {
+    const url = new URL(origin);
+    return url.protocol === "https:" && (
+      url.hostname === "tastewise.in" ||
+      url.hostname.endsWith(".tastewise.in")
+    );
+  } catch {
+    return false;
+  }
+};
+
 const isDevLanOrigin = (origin = "") => {
   if (process.env.NODE_ENV === "production") return false;
 
@@ -34,7 +46,12 @@ const isDevLanOrigin = (origin = "") => {
 
 app.use(cors({
   origin(origin, callback) {
-    if (!origin || allowedOrigins.includes(origin) || isDevLanOrigin(origin)) {
+    if (
+      !origin ||
+      allowedOrigins.includes(origin) ||
+      isTastewiseOrigin(origin) ||
+      isDevLanOrigin(origin)
+    ) {
       callback(null, true);
       return;
     }
