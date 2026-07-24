@@ -1,18 +1,37 @@
 {
-  "routes": [
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "redirects": [
     {
-      "src": "/\\.well-known/assetlinks\\.json",
-      "headers": {
-        "Content-Type": "application/json"
-      },
-      "dest": "/assetlinks.json"
+      "source": "/:path*",
+      "has": [
+        {
+          "type": "host",
+          "value": "taste-trail-eight.vercel.app"
+        }
+      ],
+      "destination": "https://tastewise.in/:path*",
+      "permanent": true
+    }
+  ],
+  "headers": [
+    {
+      "source": "/.well-known/assetlinks.json",
+      "headers": [
+        {
+          "key": "Content-Type",
+          "value": "application/json"
+        }
+      ]
+    }
+  ],
+  "rewrites": [
+    {
+      "source": "/.well-known/assetlinks.json",
+      "destination": "/assetlinks.json"
     },
     {
-      "handle": "filesystem"
-    },
-    {
-      "src": "/(.*)",
-      "dest": "/index.html"
+      "source": "/(.*)",
+      "destination": "/index.html"
     }
   ]
 }
