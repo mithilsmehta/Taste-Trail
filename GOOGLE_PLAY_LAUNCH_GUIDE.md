@@ -45,12 +45,37 @@ Do not use `half_yearly`; Google Play base-plan IDs allow hyphens, not underscor
 
 ## 3. Connect Google Play Developer API
 
-1. Open or create the Google Cloud project linked to the Play Console account.
-2. Enable **Google Play Android Developer API**.
-3. Create a service account dedicated to Tastewise billing.
-4. In Play Console API access/users and permissions, grant that service account the minimum permissions needed to view purchases and manage subscriptions/orders.
-5. Create a JSON key only if the current integration requires one.
-6. Store the JSON as a Render secret. Never add it to GitHub.
+### A. Create the Google Cloud project and service account
+
+1. Open **Google Cloud Console → project selector → New project**.
+2. Name it `Tastewise Google Play` and create it. Record its **Project ID**.
+3. Open **APIs & Services → Library**.
+4. Search for and enable **Google Play Android Developer API**.
+5. Open **IAM & Admin → Service Accounts → Create service account**.
+6. Use:
+   - Name: `tastewise-play-billing`
+   - ID: `tastewise-play-billing`
+7. Finish creating the account. A broad Google Cloud project role is not required.
+8. Open the new service account → **Keys → Add key → Create new key → JSON**.
+9. Download the JSON once and keep it private. Never put it in the repository.
+
+### B. Give the service account access in Play Console
+
+1. Copy the service account email. It ends with `.iam.gserviceaccount.com`.
+2. Open **Play Console → Users and permissions → Invite new users**.
+3. Paste the service account email.
+4. Give it access to the Tastewise app.
+5. Grant:
+   - **View app information (read-only)**
+   - **View financial data**
+   - **Manage orders and subscriptions**
+6. Send/save the invitation. Service-account access does not require opening an email.
+
+### C. Put the credentials in Render
+
+1. Open **Render Dashboard → TasteWise backend service → Environment**.
+2. Add each variable below separately.
+3. For `GOOGLE_PLAY_SERVICE_ACCOUNT_JSON`, paste the entire downloaded JSON as one environment-variable value. Render stores it as a secret.
 
 Set these Render environment variables:
 
@@ -69,20 +94,76 @@ After saving variables, redeploy the Render backend.
 
 ## 4. Configure Real-time Developer Notifications
 
-1. In Google Cloud Pub/Sub, create a topic for Tastewise Google Play billing.
-2. Grant the Google Play notification service permission to publish to the topic.
-3. Configure that topic in Play Console under Real-time developer notifications.
-4. Create a Pub/Sub push subscription.
-5. Set the push URL to:
+Use the same Google Cloud project created in section 3.
 
-```text
-https://<your-render-api>/api/subscriptions/google-play-rtdn?token=<GOOGLE_PLAY_RTDN_SECRET>
+### A. Generate and store the webhook secret
+
+1. On your Mac, run:
+
+```bash
+openssl rand -hex 32
 ```
 
-6. Send a test notification from Play Console.
-7. Confirm the endpoint returns a successful 2xx response.
+2. Copy the resulting 64-character value.
+3. Open **Render → TasteWise backend → Environment**.
+4. Set `GOOGLE_PLAY_RTDN_SECRET` to that value.
+5. Save the changes. Do not put the value in GitHub or screenshots.
+
+### B. Create the Pub/Sub topic
+
+1. Open **Google Cloud Console → Pub/Sub → Topics**.
+2. Confirm the `Tastewise Google Play` project is selected.
+3. Click **Create topic**.
+4. Topic ID: `tastewise-google-play-rtdn`.
+5. Create the topic.
+6. Open the topic → **Permissions → Add principal**.
+7. Principal:
+
+```text
+google-play-developer-notifications@system.gserviceaccount.com
+```
+
+8. Role: **Pub/Sub Publisher**.
+9. Save.
+
+The resulting topic name will be:
+
+```text
+projects/YOUR_GOOGLE_CLOUD_PROJECT_ID/topics/tastewise-google-play-rtdn
+```
+
+### C. Connect the topic in Play Console
+
+1. Open **Play Console → Tastewise → Monetize with Play → Monetization setup**.
+2. Find **Real-time developer notifications**.
+3. Enable notifications.
+4. Paste the full topic name from the previous step.
+5. Select notifications for subscriptions and voided purchases, or all available notification types.
+6. Click **Send test message**.
+7. Save the configuration.
+
+### D. Create the push subscription
+
+1. Return to **Google Cloud Console → Pub/Sub → Subscriptions**.
+2. Click **Create subscription**.
+3. Subscription ID: `tastewise-google-play-rtdn-push`.
+4. Select the topic `tastewise-google-play-rtdn`.
+5. Delivery type: **Push**.
+6. Push endpoint:
+
+```text
+https://tastewise-842n.onrender.com/api/subscriptions/google-play-rtdn?token=YOUR_64_CHARACTER_SECRET
+```
+
+7. Leave authentication disabled because this endpoint authenticates using the private token.
+8. Keep the default acknowledgement deadline and retry settings.
+9. Create the subscription.
+10. Return to Play Console and send another test message.
+11. Open **Render → Logs** and confirm there is no `Google Play RTDN failed` message.
 
 Use the same long secret in the URL and Render. Treat it like a password and rotate it if exposed.
+
+Opening the webhook URL in a browser sends a GET request. The browser status response only confirms configuration presence. Google Cloud delivers real notifications using POST.
 
 ## 5. Prepare the Android TWA
 

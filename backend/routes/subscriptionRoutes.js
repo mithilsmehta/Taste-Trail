@@ -117,6 +117,19 @@ const getSafeUser = async (userId) => {
   return User.findById(userId).select("-password");
 };
 
+router.get("/google-play-rtdn", (req, res) => {
+  res.json({
+    ok: true,
+    endpoint: "Google Play real-time developer notifications",
+    accepts: "POST requests from Google Cloud Pub/Sub",
+    configured: {
+      packageName: Boolean(process.env.GOOGLE_PLAY_PACKAGE_NAME),
+      serviceAccount: Boolean(process.env.GOOGLE_PLAY_SERVICE_ACCOUNT_JSON),
+      notificationSecret: Boolean(process.env.GOOGLE_PLAY_RTDN_SECRET)
+    }
+  });
+});
+
 router.post("/google-play-rtdn", async (req, res) => {
   if (!hasValidRtdnSecret(req)) {
     return res.status(401).json({ msg: "Invalid notification secret" });
