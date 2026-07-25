@@ -6,6 +6,7 @@ import {
   fetchPremiumPlans,
   fetchSubscriptionStatus,
   formatPremiumDate,
+  getGooglePlaySubscriptionManagementUrl,
   getSubscription,
   isGooglePlayCheckoutAvailable,
   startGooglePlayCheckout,
@@ -16,7 +17,7 @@ import "./Premium.css";
 const fallbackPlans = [
   { id: "premium_1_month", productId: "tastewise_premium", basePlanId: "monthly", label: "1 Month", price: "₹99", badge: "Starter", note: "Renews monthly unless cancelled." },
   { id: "premium_3_month", productId: "tastewise_premium", basePlanId: "quarterly", label: "3 Months", price: "₹249", badge: "Flexible", note: "Renews every 3 months unless cancelled." },
-  { id: "premium_6_month", productId: "tastewise_premium", basePlanId: "half_yearly", label: "6 Months", price: "₹449", badge: "Popular", note: "Renews every 6 months unless cancelled." },
+  { id: "premium_6_month", productId: "tastewise_premium", basePlanId: "half-yearly", label: "6 Months", price: "₹449", badge: "Popular", note: "Renews every 6 months unless cancelled." },
   { id: "premium_12_month", productId: "tastewise_premium", basePlanId: "yearly", label: "12 Months", price: "₹799", badge: "Best Value", note: "Renews yearly unless cancelled." }
 ];
 
@@ -36,6 +37,7 @@ export default function Premium() {
   const [purchaseLoading, setPurchaseLoading] = useState("");
   const [loading, setLoading] = useState(true);
   const subscription = getSubscription(user);
+  const manageSubscriptionUrl = getGooglePlaySubscriptionManagementUrl(subscription);
 
   const activePlan = useMemo(() => {
     return plans.find((plan) => (
@@ -131,7 +133,11 @@ export default function Premium() {
             <strong>{subscription.isPremium ? "Premium account" : "Free account"}</strong>
             <p>
               {subscription.isPremium
-                ? "Ads are hidden for this account while Premium is active."
+                ? subscription.status === "grace_period"
+                  ? "Premium remains active during the Google Play payment grace period."
+                  : subscription.status === "canceled"
+                    ? "Renewal is cancelled, but Premium remains active until the displayed expiry date."
+                    : "Ads are hidden for this account while Premium is active."
                 : "Checkout is locked until Google Play Billing products and verification are connected."}
             </p>
           </div>
@@ -186,6 +192,11 @@ export default function Premium() {
         </section>
 
         <div className="premium-footer-action">
+          {subscription.provider === "google_play" && (
+            <a href={manageSubscriptionUrl} target="_blank" rel="noreferrer">
+              Manage subscription in Google Play
+            </a>
+          )}
           <Link to="/profile">Back to Profile</Link>
         </div>
       </main>

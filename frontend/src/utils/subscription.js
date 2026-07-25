@@ -13,11 +13,26 @@ export const getSubscription = (user = {}) => {
     provider: subscription.provider || null,
     playProductId: subscription.playProductId || null,
     playBasePlanId: subscription.playBasePlanId || null,
-    premiumExpiresAt: subscription.premiumExpiresAt || null
+    premiumExpiresAt: subscription.premiumExpiresAt || null,
+    autoRenewing: Boolean(subscription.autoRenewing),
+    cancelReason: subscription.cancelReason || null,
+    googlePlayState: subscription.googlePlayState || null
   };
 };
 
 export const shouldShowAds = (user = {}) => !getSubscription(user).isPremium;
+
+export const getGooglePlaySubscriptionManagementUrl = (subscription = {}) => {
+  const packageName = import.meta.env.VITE_GOOGLE_PLAY_PACKAGE_NAME ||
+    "app.vercel.taste_trail_eight.twa";
+  const params = new URLSearchParams({ package: packageName });
+
+  if (subscription.playProductId) {
+    params.set("sku", subscription.playProductId);
+  }
+
+  return `https://play.google.com/store/account/subscriptions?${params.toString()}`;
+};
 
 export const formatPremiumDate = (value) => {
   if (!value) return "";

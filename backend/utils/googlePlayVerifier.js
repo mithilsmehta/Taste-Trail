@@ -2,10 +2,10 @@ const crypto = require("crypto");
 
 const TOKEN_URL = "https://oauth2.googleapis.com/token";
 const ANDROID_PUBLISHER_SCOPE = "https://www.googleapis.com/auth/androidpublisher";
-const ACTIVE_SUBSCRIPTION_STATES = new Set([
+const ENTITLED_SUBSCRIPTION_STATES = new Set([
   "SUBSCRIPTION_STATE_ACTIVE",
   "SUBSCRIPTION_STATE_IN_GRACE_PERIOD",
-  "SUBSCRIPTION_STATE_ON_HOLD"
+  "SUBSCRIPTION_STATE_CANCELED"
 ]);
 
 let cachedAccessToken = null;
@@ -99,7 +99,27 @@ const googlePlayRequest = async (path, options = {}) => {
   return data;
 };
 
-const verifyGooglePlaySubscription = async ({ purchaseToken, expectedProductId, expectedBasePlanId }) => {
+const getSubscriptionStatus = (subscriptionState) => {
+  const statuses = {
+    SUBSCRIPTION_STATE_PENDING: "pending",
+    SUBSCRIPTION_STATE_ACTIVE: "active",
+    SUBSCRIPTION_STATE_PAUSED: "paused",
+    SUBSCRIPTION_STATE_IN_GRACE_PERIOD: "grace_period",
+    SUBSCRIPTION_STATE_ON_HOLD: "account_hold",
+    SUBSCRIPTION_STATE_CANCELED: "canceled",
+    SUBSCRIPTION_STATE_EXPIRED: "expired",
+    SUBSCRIPTION_STATE_PENDING_PURCHASE_CANCELED: "canceled"
+  };
+
+  return statuses[subscriptionState] || "unknown";
+};
+
+const verifyGooglePlaySubscription = async ({
+  purchaseToken,
+  expectedProductId,
+  expectedBasePlanId,
+  requireEntitlement = true
+}) => {
   const packageName = process.env.GOOGLE_PLAY_PACKAGE_NAME;
   if (!packageName) throw new Error("GOOGLE_PLAY_PACKAGE_NAME is missing");
 
@@ -121,9 +141,9 @@ const verifyGooglePlaySubscription = async ({ purchaseToken, expectedProductId, 
 
   const expiresAt = matchedLineItem.expiryTime ? new Date(matchedLineItem.expiryTime) : null;
   const hasFutureAccess = expiresAt ? expiresAt.getTime() > Date.now() : false;
-  const isActiveState = ACTIVE_SUBSCRIPTION_STATES.has(purchase.subscriptionState);
+  const hasEntitlement = hasFutureAccess && ENTITLED_SUBSCRIPTION_STATES.has(purchase.subscriptionState);
 
-  if (!hasFutureAccess || !isActiveState) {
+  if (requireEntitlement && !hasEntitlement) {
     throw new Error("Google Play purchase is not active");
   }
 
@@ -131,7 +151,13 @@ const verifyGooglePlaySubscription = async ({ purchaseToken, expectedProductId, 
     purchase,
     lineItem: matchedLineItem,
     expiresAt,
+    hasEntitlement,
+    status: getSubscriptionStatus(purchase.subscriptionState),
     subscriptionState: purchase.subscriptionState,
+    autoRenewing: Boolean(matchedLineItem.autoRenewingPlan?.autoRenewEnabled),
+    cancelReason: purchase.canceledStateContext
+      ? Object.keys(purchase.canceledStateContext)[0] || "canceled"
+      : null,
     acknowledgementState: purchase.acknowledgementState,
     orderId: purchase.latestOrderId || null
   };
@@ -152,5 +178,6 @@ const acknowledgeGooglePlaySubscription = async ({ productId, purchaseToken }) =
 
 module.exports = {
   acknowledgeGooglePlaySubscription,
+  getSubscriptionStatus,
   verifyGooglePlaySubscription
 };

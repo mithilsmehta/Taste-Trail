@@ -40,10 +40,23 @@ const userSchema = new mongoose.Schema({
     playProductId: { type: String, default: null },
     playBasePlanId: { type: String, default: null },
     playPurchaseToken: { type: String, default: null },
+    googlePlayState: { type: String, default: null },
+    autoRenewing: { type: Boolean, default: false },
+    cancelReason: { type: String, default: null },
     lastVerifiedAt: { type: Date, default: null }
   },
 
   role: { type: String, default: "user" }
 });
+
+userSchema.index(
+  { "subscription.playPurchaseToken": 1 },
+  {
+    unique: true,
+    partialFilterExpression: {
+      "subscription.playPurchaseToken": { $type: "string" }
+    }
+  }
+);
 
 module.exports = mongoose.model("User", userSchema);

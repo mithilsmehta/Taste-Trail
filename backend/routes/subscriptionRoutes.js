@@ -1,5 +1,7 @@
 const express = require("express");
+const crypto = require("crypto");
 const User = require("../models/User");
+const GooglePlayNotification = require("../models/GooglePlayNotification");
 const authMiddleware = require("../middleware/authMiddleware");
 const {
   addMonths,
@@ -18,6 +20,41 @@ const canVerifyGooglePlay = () => Boolean(
   process.env.GOOGLE_PLAY_PACKAGE_NAME &&
   process.env.GOOGLE_PLAY_SERVICE_ACCOUNT_JSON
 );
+
+const hasValidRtdnSecret = (req) => {
+  const expected = String(process.env.GOOGLE_PLAY_RTDN_SECRET || "");
+  const received = String(req.query.token || req.get("x-rtdn-secret") || "");
+  if (!expected || !received || expected.length !== received.length) return false;
+  return crypto.timingSafeEqual(Buffer.from(expected), Buffer.from(received));
+};
+
+const parsePubSubNotification = (body = {}) => {
+  const message = body.message || {};
+  if (!message.messageId || !message.data) {
+    throw new Error("Invalid Pub/Sub message");
+  }
+
+  const payload = JSON.parse(Buffer.from(message.data, "base64").toString("utf8"));
+  return { message, payload };
+};
+
+const applyGooglePlayVerification = (user, plan, purchaseToken, verification) => {
+  user.subscription = {
+    ...user.subscription?.toObject?.(),
+    isPremium: verification.hasEntitlement,
+    status: verification.status,
+    plan: plan.id,
+    provider: "google_play",
+    premiumExpiresAt: verification.expiresAt,
+    playProductId: plan.productId,
+    playBasePlanId: plan.basePlanId,
+    playPurchaseToken: purchaseToken,
+    googlePlayState: verification.subscriptionState,
+    autoRenewing: verification.autoRenewing,
+    cancelReason: verification.cancelReason,
+    lastVerifiedAt: new Date()
+  };
+};
 
 const syncGooglePlaySubscription = async (user) => {
   const subscription = user.subscription || {};
@@ -38,16 +75,16 @@ const syncGooglePlaySubscription = async (user) => {
     const verification = await verifyGooglePlaySubscription({
       purchaseToken: subscription.playPurchaseToken,
       expectedProductId: plan.productId,
-      expectedBasePlanId: plan.basePlanId
+      expectedBasePlanId: plan.basePlanId,
+      requireEntitlement: false
     });
 
-    user.subscription.isPremium = true;
-    user.subscription.status = "active";
-    user.subscription.plan = plan.id;
-    user.subscription.premiumExpiresAt = verification.expiresAt;
-    user.subscription.playProductId = plan.productId;
-    user.subscription.playBasePlanId = plan.basePlanId;
-    user.subscription.lastVerifiedAt = new Date();
+    applyGooglePlayVerification(
+      user,
+      plan,
+      subscription.playPurchaseToken,
+      verification
+    );
     await user.save();
     return true;
   } catch {
@@ -79,6 +116,80 @@ const getSafeUser = async (userId) => {
 
   return User.findById(userId).select("-password");
 };
+
+router.post("/google-play-rtdn", async (req, res) => {
+  if (!hasValidRtdnSecret(req)) {
+    return res.status(401).json({ msg: "Invalid notification secret" });
+  }
+
+  let notificationRecord;
+
+  try {
+    const { message, payload } = parsePubSubNotification(req.body);
+    const subscriptionNotification = payload.subscriptionNotification;
+
+    if (payload.packageName !== process.env.GOOGLE_PLAY_PACKAGE_NAME) {
+      return res.status(400).json({ msg: "Unexpected Android package" });
+    }
+
+    if (!subscriptionNotification?.purchaseToken || !subscriptionNotification?.subscriptionId) {
+      return res.status(204).end();
+    }
+
+    try {
+      notificationRecord = await GooglePlayNotification.create({
+        messageId: message.messageId,
+        notificationType: subscriptionNotification.notificationType,
+        purchaseToken: subscriptionNotification.purchaseToken,
+        subscriptionId: subscriptionNotification.subscriptionId,
+        status: "ignored"
+      });
+    } catch (error) {
+      if (error?.code === 11000) return res.status(204).end();
+      throw error;
+    }
+
+    const user = await User.findOne({
+      "subscription.playPurchaseToken": subscriptionNotification.purchaseToken
+    });
+
+    if (!user) {
+      return res.status(204).end();
+    }
+
+    const verification = await verifyGooglePlaySubscription({
+      purchaseToken: subscriptionNotification.purchaseToken,
+      expectedProductId: subscriptionNotification.subscriptionId,
+      requireEntitlement: false
+    });
+    const basePlanId = verification.lineItem?.offerDetails?.basePlanId;
+    const plan = getPremiumPlan(basePlanId);
+
+    if (!plan || plan.productId !== subscriptionNotification.subscriptionId) {
+      throw new Error("Notification does not match a configured Premium plan");
+    }
+
+    applyGooglePlayVerification(
+      user,
+      plan,
+      subscriptionNotification.purchaseToken,
+      verification
+    );
+    await user.save();
+
+    notificationRecord.status = "processed";
+    notificationRecord.processedAt = new Date();
+    await notificationRecord.save();
+
+    return res.status(204).end();
+  } catch (error) {
+    if (notificationRecord?._id) {
+      await GooglePlayNotification.deleteOne({ _id: notificationRecord._id }).catch(() => {});
+    }
+    console.error("Google Play RTDN failed:", error.message);
+    return res.status(500).json({ msg: "Notification processing failed" });
+  }
+});
 
 router.get("/plans", authMiddleware, (req, res) => {
   res.json({
@@ -123,6 +234,17 @@ router.post("/verify-google-play", authMiddleware, async (req, res) => {
       expectedBasePlanId: plan.basePlanId
     });
 
+    const tokenOwner = await User.findOne({
+      "subscription.playPurchaseToken": purchaseToken,
+      _id: { $ne: req.user.id }
+    }).select("_id");
+
+    if (tokenOwner) {
+      return res.status(409).json({
+        msg: "This Google Play purchase is already linked to another Tastewise account."
+      });
+    }
+
     if (verification.acknowledgementState !== "ACKNOWLEDGEMENT_STATE_ACKNOWLEDGED") {
       await acknowledgeGooglePlaySubscription({
         productId: plan.productId,
@@ -133,17 +255,7 @@ router.post("/verify-google-play", authMiddleware, async (req, res) => {
     const user = await User.findById(req.user.id);
     if (!user) return res.status(404).json({ msg: "User not found" });
 
-    user.subscription = {
-      isPremium: true,
-      status: "active",
-      plan: plan.id,
-      provider: "google_play",
-      premiumExpiresAt: verification.expiresAt,
-      playProductId: plan.productId,
-      playBasePlanId: plan.basePlanId,
-      playPurchaseToken: purchaseToken,
-      lastVerifiedAt: new Date()
-    };
+    applyGooglePlayVerification(user, plan, purchaseToken, verification);
 
     await user.save();
     const safeUser = await User.findById(req.user.id).select("-password");
@@ -158,7 +270,16 @@ router.post("/verify-google-play", authMiddleware, async (req, res) => {
       }
     });
   } catch (error) {
-    res.status(500).json({ msg: error.message || "Failed to verify Google Play purchase" });
+    if (error?.code === 11000) {
+      return res.status(409).json({
+        msg: "This Google Play purchase is already linked to another Tastewise account."
+      });
+    }
+
+    const isPurchaseRejected = /not active|does not match/i.test(error.message || "");
+    return res.status(isPurchaseRejected ? 422 : 500).json({
+      msg: error.message || "Failed to verify Google Play purchase"
+    });
   }
 });
 
@@ -183,6 +304,9 @@ router.post("/dev/activate", authMiddleware, async (req, res) => {
       playProductId: plan.productId,
       playBasePlanId: plan.basePlanId,
       playPurchaseToken: null,
+      googlePlayState: null,
+      autoRenewing: false,
+      cancelReason: null,
       lastVerifiedAt: new Date()
     };
 

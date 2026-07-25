@@ -22,7 +22,7 @@ const PREMIUM_PLANS = [
   {
     id: "premium_6_month",
     productId: process.env.PLAY_SUBSCRIPTION_PRODUCT_ID || "tastewise_premium",
-    basePlanId: process.env.PLAY_BASE_PLAN_PREMIUM_HALF_YEARLY || "half_yearly",
+    basePlanId: process.env.PLAY_BASE_PLAN_PREMIUM_HALF_YEARLY || "half-yearly",
     label: "6 Months",
     durationMonths: 6,
     price: "₹449",
@@ -74,7 +74,10 @@ const getSubscriptionSnapshot = (subscription = {}) => {
     provider: isPremium ? subscription.provider || null : null,
     playProductId: isPremium ? subscription.playProductId || null : null,
     playBasePlanId: isPremium ? subscription.playBasePlanId || null : null,
-    premiumExpiresAt: isPremium ? subscription.premiumExpiresAt || null : null,
+    premiumExpiresAt: subscription.premiumExpiresAt || null,
+    autoRenewing: Boolean(subscription.autoRenewing),
+    cancelReason: subscription.cancelReason || null,
+    googlePlayState: subscription.googlePlayState || null,
     lastVerifiedAt: subscription.lastVerifiedAt || null
   };
 };

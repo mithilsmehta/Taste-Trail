@@ -11,6 +11,7 @@ export function AuthProvider({ children }) {
   const [token, setToken] = useState(
     () => localStorage.getItem("token") || ""
   );
+  const [authReady, setAuthReady] = useState(() => !localStorage.getItem("token"));
 
   
   useEffect(() => {
@@ -25,11 +26,43 @@ export function AuthProvider({ children }) {
     }
   }, [token]);
 
+  useEffect(() => {
+    let isMounted = true;
+
+    const loadCurrentUser = async () => {
+      if (!token) {
+        if (isMounted) setAuthReady(true);
+        return;
+      }
+
+      try {
+        const res = await fetch(apiUrl("/api/auth/me"), {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+
+        if (res.ok && isMounted) {
+          const freshUser = await res.json();
+          setUser(freshUser);
+          localStorage.setItem("user", JSON.stringify(freshUser));
+        }
+      } finally {
+        if (isMounted) setAuthReady(true);
+      }
+    };
+
+    loadCurrentUser();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [token]);
+
   const login = (userData, tokenValue) => {
     setUser(userData);
     setToken(tokenValue);
     localStorage.setItem("user", JSON.stringify(userData));
     localStorage.setItem("token", tokenValue);
+    setAuthReady(true);
   };
 
   const logout = () => {
@@ -37,6 +70,7 @@ export function AuthProvider({ children }) {
     setToken("");
     localStorage.removeItem("user");
     localStorage.removeItem("token");
+    setAuthReady(true);
   };
 
   const refreshUser = async () => {
@@ -60,6 +94,7 @@ export function AuthProvider({ children }) {
       value={{
         user,
         token,
+        authReady,
         setUser,
         setToken,  
         login,

@@ -86,8 +86,11 @@
 - Free users see tasteful ad placeholder slots.
 - Premium users will not see ad slots once `subscription.isPremium` is true and not expired.
 - No real ad units are inserted yet, so this is safe while AdSense review is pending.
+- The AdSense ownership meta tag stays public, while the ad script loads only for authenticated free users.
 - Real billing verification is implemented on the backend, but live checkout still needs the Android/TWA Play Billing setup below.
 - Auto-renewal is handled by Google Play. The backend refreshes the stored purchase token on subscription status checks and updates expiry when Play renews the plan.
+- Google Play RTDN is accepted at `/api/subscriptions/google-play-rtdn` when the configured webhook secret is supplied.
+- Purchase tokens cannot be linked to more than one Tastewise account.
 - Jain Masala Dosa should generate directly with a Jain-safe raw banana filling instead of failing because of potato/root-vegetable rules.
 - Jain Paneer Bhurji should generate with a safe paneer masala and no unrelated raw banana substitute.
 
@@ -101,7 +104,7 @@ Inside that product, create these auto-renewing base plans:
 
 - `monthly` - 1 month - ₹99
 - `quarterly` - 3 months - ₹249
-- `half_yearly` - 6 months - ₹449
+- `half-yearly` - 6 months - ₹449
 - `yearly` - 12 months - ₹799
 
 Backend environment variables needed before live purchases:
@@ -111,7 +114,7 @@ Backend environment variables needed before live purchases:
 - `PLAY_SUBSCRIPTION_PRODUCT_ID=tastewise_premium`
 - `PLAY_BASE_PLAN_PREMIUM_MONTHLY=monthly`
 - `PLAY_BASE_PLAN_PREMIUM_QUARTERLY=quarterly`
-- `PLAY_BASE_PLAN_PREMIUM_HALF_YEARLY=half_yearly`
+   - `PLAY_BASE_PLAN_PREMIUM_HALF_YEARLY=half-yearly`
 - `PLAY_BASE_PLAN_PREMIUM_YEARLY=yearly`
 
 ## Android/TWA Billing Setup Needed
