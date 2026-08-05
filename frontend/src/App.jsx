@@ -12,6 +12,7 @@ const Register = lazy(() => import("./pages/Register"));
 const ForgotPassword = lazy(() => import("./pages/ForgotPassword"));
 const ResetPassword = lazy(() => import("./pages/ResetPassword"));
 const Home = lazy(() => import("./pages/Home"));
+const Landing = lazy(() => import("./pages/Landing"));
 const MobileSearch = lazy(() => import("./pages/MobileSearch"));
 const Profile = lazy(() => import("./pages/Profile"));
 const SearchResults = lazy(() => import("./pages/SearchResults"));
@@ -58,8 +59,11 @@ export default function App() {
       <Suspense fallback={<PageLoader />}>
         <Routes>
 
-          {/* Redirect based on saved login */}
-          <Route path="/" element={<Navigate to={user && token ? "/home" : "/login"} replace />} />
+            {/* Public homepage for AdSense reviewers; logged-in users still go to the app */}
+            <Route
+              path="/"
+              element={user && token ? <Navigate to="/home" replace /> : <Landing />}
+            />
 
           {/* Public Routes */}
           <Route path="/login" element={<Login />} />
