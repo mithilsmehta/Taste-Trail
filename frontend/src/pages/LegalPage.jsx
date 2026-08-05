@@ -113,6 +113,13 @@ const pages = {
     intro: "Use this page for support topics, feedback, policy questions, and account-related help.",
     sections: [
       {
+        title: "Email Support",
+        body: [
+          "You can reach out directly via email at support453@gmail.com for any questions, assistance, or feedback.",
+          "We aim to respond to user inquiries within 24 to 48 hours."
+        ]
+      },
+      {
         title: "Contact Topics",
         body: [
           "Account, login, or profile support.",
@@ -128,13 +135,6 @@ const pages = {
           "A short description of the issue.",
           "Screenshots or exact steps if something is not working."
         ]
-      },
-      {
-        title: "Response",
-        body: [
-          "Support details may also be provided through the Google Play Store listing once the Android app is published.",
-          "For now, users can also reach support from their app profile or through the contact information published with the app listing."
-        ]
       }
     ]
   }
@@ -143,6 +143,22 @@ const pages = {
 export default function LegalPage() {
   const location = useLocation();
   const page = pages[location.pathname] || pages["/about"];
+
+  const renderItemText = (text) => {
+    if (text.includes("support453@gmail.com")) {
+      const parts = text.split("support453@gmail.com");
+      return (
+        <>
+          {parts[0]}
+          <a href="mailto:support453@gmail.com" style={{ color: "#FF6A00", fontWeight: 700 }}>
+            support453@gmail.com
+          </a>
+          {parts[1]}
+        </>
+      );
+    }
+    return text;
+  };
 
   return (
     <>
@@ -161,7 +177,7 @@ export default function LegalPage() {
               <h2>{section.title}</h2>
               <ul>
                 {section.body.map((item) => (
-                  <li key={item}>{item}</li>
+                  <li key={item}>{renderItemText(item)}</li>
                 ))}
               </ul>
             </article>
