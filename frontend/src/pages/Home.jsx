@@ -481,13 +481,6 @@ export default function Home() {
 
         <AdSlot placement="home-bottom" label="Sponsored" />
       </main>
-
-      <nav className="home-mobile-nav" aria-label="Home shortcuts">
-        <Link to="/home" className="active"><span>⌂</span>Home</Link>
-        <Link to="/mobile-search"><span>⌕</span>Search</Link>
-        <Link to="/meal-planner"><span>▣</span>Meal Plan</Link>
-        <Link to="/profile"><span>♙</span>Profile</Link>
-      </nav>
     </div>
   );
 }

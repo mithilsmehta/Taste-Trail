@@ -241,3 +241,58 @@ body {
   font-weight: 500 !important;
   letter-spacing: 0;
 }
+
+.app-bottom-nav {
+  display: none;
+}
+
+@media (max-width: 991.98px) {
+  .app-bottom-nav {
+    align-items: center;
+    background: rgba(255, 255, 255, 0.96);
+    border-top: 1px solid var(--tw-border);
+    bottom: 0;
+    box-shadow: 0 -12px 28px rgba(48, 44, 35, 0.08);
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    left: 0;
+    padding: 8px 6px 12px;
+    position: fixed;
+    right: 0;
+    z-index: 1050;
+    backdrop-filter: blur(12px);
+  }
+
+  .app-bottom-nav a {
+    align-items: center;
+    background: transparent;
+    border: 0;
+    color: #8c8984;
+    display: flex;
+    flex-direction: column;
+    font-size: 0.78rem;
+    font-weight: 800;
+    gap: 3px;
+    justify-content: center;
+    text-decoration: none;
+  }
+
+  .app-bottom-nav span {
+    align-items: center;
+    border-radius: 16px;
+    display: flex;
+    font-size: 1.45rem;
+    height: 40px;
+    justify-content: center;
+    width: 40px;
+  }
+
+  .app-bottom-nav .active {
+    color: var(--tw-sage);
+  }
+
+  .app-bottom-nav .active span {
+    background: var(--tw-sage-soft);
+  }
+}
+
