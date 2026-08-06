@@ -98,10 +98,12 @@ exports.login = async (req, res) => {
     const cleanIdentifier = String(identifier || "").trim();
     const cleanEmailIdentifier = cleanIdentifier.toLowerCase();
 
-    const user =
-      (await User.findOne({ email: cleanEmailIdentifier })) ||
-      (await User.findOne({ email: new RegExp(`^${cleanIdentifier.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}$`, "i") })) ||
-      (await User.findOne({ phone: cleanIdentifier }));
+    const user = await User.findOne({
+      $or: [
+        { email: cleanEmailIdentifier },
+        { phone: cleanIdentifier }
+      ]
+    });
 
     if (!user) return res.status(400).json({ msg: "User not found" });
 

@@ -108,7 +108,7 @@ const getOpenRouterApiKey = () => {
 };
 
 const getOpenRouterModel = () => {
-  return process.env.OPENROUTER_MODEL || "meta-llama/llama-3.1-8b-instruct";
+  return process.env.OPENROUTER_MODEL || "meta-llama/llama-3.3-70b-instruct";
 };
 
 const getOpenRouterMaxTokens = () => {
@@ -302,8 +302,40 @@ const getJainFallbackRecipe = (query, servings, options = {}) => {
   const { allowGeneric = false } = options;
   const normalizedQuery = String(query || "").toLowerCase();
   const isPavBhaji = /\bpav\s*bhaji\b/.test(normalizedQuery);
+  const isChineseBhel = /\b(chinese\s*bhel|bhel\s*chinese)\b/.test(normalizedQuery);
   const isHakkaNoodles = /\b(hakka|noodles?|chow\s*mein|chowmein)\b/.test(normalizedQuery);
   const isBiryaniOrPulao = /\b(biryani|pulao|pulav|fried\s*rice|rice)\b/.test(normalizedQuery);
+
+  if (isChineseBhel) {
+    return createJainRecipe({
+      query,
+      servings,
+      ingredients: [
+        "150g fried crispy noodles",
+        "1 cup finely shredded cabbage",
+        "1/2 cup finely sliced capsicum",
+        "1/4 cup finely sliced French beans",
+        "1/4 cup boiled sweet corn",
+        "2 tablespoons schezwan sauce (Jain)",
+        "1 tablespoon tomato ketchup",
+        "1 teaspoon soy sauce",
+        "1 teaspoon chilli sauce",
+        "1 tablespoon oil",
+        "1/2 teaspoon black pepper powder",
+        "1/2 teaspoon chaat masala",
+        "2 tablespoons chopped fresh coriander",
+        "1/4 cup crisp fried noodles for extra garnish"
+      ],
+      steps: [
+        "If using raw noodles, boil them until tender, drain thoroughly, toss lightly with cornflour, and deep-fry in hot oil until golden brown and super crispy, then let cool completely.",
+        "Heat 1 tablespoon oil in a wok or large pan over high heat.",
+        "Add shredded cabbage, capsicum, French beans, and sweet corn, then stir-fry on high flame for 1-2 minutes to keep them crunchy.",
+        "Lower the heat slightly, then stir in schezwan sauce, tomato ketchup, soy sauce, chilli sauce, black pepper powder, and chaat masala.",
+        "Turn off the heat, add the fried crispy noodles, and toss gently until the sauce coats the noodles without making them soggy.",
+        "Transfer immediately to a serving plate, top with extra crispy noodles and fresh coriander, and serve immediately."
+      ]
+    });
+  }
   const isPaneerTikka = /\bpaneer\s*tikka\b/.test(normalizedQuery);
   const isPaneerBhurji = /\bpaneer\s*bhurji\b/.test(normalizedQuery);
   const isPaneerDish = /\bpaneer\b/.test(normalizedQuery);
@@ -1210,6 +1242,7 @@ Accuracy rules:
 - If the query is specific, such as "paneer tikka", "paneer sabji", "pav bhaji", "tiramisu", or "veg biryani", the ingredients and steps must match that dish.
 - For paneer tikka in regular or Jain searches, use paneer cubes, thick curd or hung curd, besan or gram flour, capsicum, firm tomato if allowed, lemon juice, oil or butter for brushing, and standard tikka spices. In Vegan searches, use firm tofu or a vegan paneer alternative with dairy-free marinade instead.
 - For paneer sabji/curry/masala in regular or Jain searches, use paneer as the main ingredient and a normal paneer gravy base allowed by the active search rules. In Vegan searches, use tofu or a vegan paneer alternative and avoid all dairy. Do not use raw banana, plantain, or hing unless the user explicitly requested them.
+- For Chinese Bhel (regular, Jain, or Vegan), the recipe MUST include deep-frying or crisping boiled noodles until golden and crunchy, stir-frying shredded veggies with schezwan sauce and soy sauce, and tossing the crispy noodles immediately before serving so they stay crunchy.
 - Never write impossible spice measurements like "cloves hing". Hing is a pinch or powder only when it truly belongs.
 - Do not overuse any single spice. Include hing/asafoetida only if it genuinely belongs to the requested dish, never just because Jain mode is active.
 Ingredient rules:

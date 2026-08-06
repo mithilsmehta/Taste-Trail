@@ -83,6 +83,18 @@ export default function App() {
   useEffect(() => {
     if (user && token) {
       notificationManager.initializeFromSavedSettings(token);
+      const prefetch = () => {
+        import("./pages/Home");
+        import("./pages/MealPlanner");
+        import("./pages/GroceryList");
+        import("./pages/SavedRecipes");
+        import("./pages/Profile");
+      };
+      if (typeof window !== "undefined" && "requestIdleCallback" in window) {
+        window.requestIdleCallback(prefetch);
+      } else {
+        setTimeout(prefetch, 1000);
+      }
     } else {
       notificationManager.resetInitialization();
     }

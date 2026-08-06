@@ -49,6 +49,9 @@ const userSchema = new mongoose.Schema({
   role: { type: String, default: "user" }
 });
 
+userSchema.index({ email: 1 });
+userSchema.index({ phone: 1 });
+
 userSchema.index(
   { "subscription.playPurchaseToken": 1 },
   {
