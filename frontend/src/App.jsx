@@ -1,4 +1,4 @@
-import { lazy, Suspense, useContext, useEffect } from "react";
+import { lazy, Suspense, useContext, useEffect, useState } from "react";
 import { BrowserRouter, Routes, Route, Navigate, useLocation } from "react-router-dom";
 import { AuthContext } from "./context/AuthContext";
 import ProtectedRoute from "./components/ProtectedRoute";
@@ -42,6 +42,41 @@ function ScrollToTop() {
   return null;
 }
 
+function RootRoute() {
+  const { user, token } = useContext(AuthContext);
+  const [isMobile, setIsMobile] = useState(() => {
+    if (typeof window === "undefined") return false;
+    const userAgent = navigator.userAgent || navigator.vendor || window.opera;
+    const isMobileUA = /android|webos|iphone|ipad|ipod|blackberry|iemobile|opera mini/i.test(userAgent);
+    const isSmallScreen = window.innerWidth <= 768;
+    const isStandalone = window.matchMedia("(display-mode: standalone)").matches || window.navigator.standalone;
+    return isMobileUA || isSmallScreen || isStandalone;
+  });
+
+  useEffect(() => {
+    const handleResize = () => {
+      const userAgent = navigator.userAgent || navigator.vendor || window.opera;
+      const isMobileUA = /android|webos|iphone|ipad|ipod|blackberry|iemobile|opera mini/i.test(userAgent);
+      const isSmallScreen = window.innerWidth <= 768;
+      const isStandalone = window.matchMedia("(display-mode: standalone)").matches || window.navigator.standalone;
+      setIsMobile(isMobileUA || isSmallScreen || isStandalone);
+    };
+
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
+  }, []);
+
+  if (user && token) {
+    return <Navigate to="/home" replace />;
+  }
+
+  if (isMobile) {
+    return <Login />;
+  }
+
+  return <Landing />;
+}
+
 export default function App() {
   const { user, token } = useContext(AuthContext);
 
@@ -59,11 +94,8 @@ export default function App() {
       <Suspense fallback={<PageLoader />}>
         <Routes>
 
-            {/* Public homepage for AdSense reviewers; logged-in users still go to the app */}
-            <Route
-              path="/"
-              element={user && token ? <Navigate to="/home" replace /> : <Landing />}
-            />
+          {/* Root route: Desktop shows Landing, Mobile / App shows Login (if logged out) */}
+          <Route path="/" element={<RootRoute />} />
 
           {/* Public Routes */}
           <Route path="/login" element={<Login />} />
