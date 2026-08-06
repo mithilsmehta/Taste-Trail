@@ -219,7 +219,10 @@ router.get("/all", authMiddleware, async (req, res) => {
       }
     };
 
-    const mealPlans = await MealPlan.find(query).sort({ planDate: 1, dayIndex: 1, mealType: 1 }).lean();
+    const mealPlans = await MealPlan.find(query)
+      .select("planDate mealType recipe.title recipe.ingredients")
+      .sort({ planDate: 1, dayIndex: 1, mealType: 1 })
+      .lean();
     res.json(mealPlans);
   } catch (err) {
     console.error(err);

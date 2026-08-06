@@ -120,10 +120,21 @@ const getStoredCustomItems = () => {
   }
 };
 
+const groceryCacheKey = "tastewiseGroceryCache";
+
+const getStoredMealPlans = () => {
+  try {
+    return JSON.parse(sessionStorage.getItem(groceryCacheKey) || "[]");
+  } catch {
+    return [];
+  }
+};
+
 export default function GroceryList() {
   const navigate = useNavigate();
-  const [mealPlans, setMealPlans] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const cachedPlans = getStoredMealPlans();
+  const [mealPlans, setMealPlans] = useState(cachedPlans);
+  const [loading, setLoading] = useState(() => cachedPlans.length === 0);
   const [filter, setFilter] = useState("all");
   // Provider selection state is disabled with the grocery ordering feature for now.
   // const [selectedProvider, setSelectedProvider] = useState("blinkit");
@@ -167,11 +178,12 @@ export default function GroceryList() {
         : [];
 
       setMealPlans(plans);
+      sessionStorage.setItem(groceryCacheKey, JSON.stringify(plans));
     } catch (err) {
       console.error(err);
-      alert("Failed to load grocery list");
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   };
 
   useEffect(() => {
@@ -568,9 +580,6 @@ export default function GroceryList() {
             <p>{activeItems.length} open • {completedItems.length} completed</p>
           </div>
           <div className="grocery-header-actions">
-            <button type="button" className="grocery-icon-btn" onClick={() => setShowDateList(true)} aria-label="Open date ingredient list">
-              ☰
-            </button>
             <button type="button" className="grocery-icon-btn" onClick={() => setShowReminderSheet(true)} aria-label="Open grocery reminder">
               ⏰
             </button>
