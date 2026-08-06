@@ -14,9 +14,9 @@ const defaultTimes = {
   dinner: "20:00"
 };
 
-const mobileTapRemoveMs = 700;
-const mobileDragReadyMs = 2000;
-const mobileOpenRecipeMs = 3000;
+const mobileTapRemoveMs = 300;
+const mobileDragReadyMs = 600;
+const mobileOpenRecipeMs = 1000;
 const mobileTapMoveTolerance = 10;
 const mobileHoldMoveTolerance = 28;
 const mobileDragMoveTolerance = 16;
