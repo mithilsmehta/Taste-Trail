@@ -1245,6 +1245,10 @@ Accuracy rules:
 - For Chinese Bhel (regular, Jain, or Vegan), the recipe MUST include deep-frying or crisping boiled noodles until golden and crunchy, stir-frying shredded veggies with schezwan sauce and soy sauce, and tossing the crispy noodles immediately before serving so they stay crunchy.
 - Never write impossible spice measurements like "cloves hing". Hing is a pinch or powder only when it truly belongs.
 - Do not overuse any single spice. Include hing/asafoetida only if it genuinely belongs to the requested dish, never just because Jain mode is active.
+Step rules:
+- Provide 5 to 8 chronological, highly detailed, authentic cooking steps for the requested dish.
+- Include exact culinary techniques essential for that dish: for example, tempering spices in hot ghee/oil until crackling, sauteing masalas until oil separates, deep-frying or crisping elements to golden perfection, marinating & resting, roasting, simmering on low flame, or tossing crispy ingredients right before serving.
+- Ensure every step is practical and complete so home cooks get authentic taste and correct textures.
 Ingredient rules:
 - Every ingredient must include an amount, for example "1 cup basmati rice" or "2 tablespoons oil".
 - Keep each ingredient as one complete grocery item.
