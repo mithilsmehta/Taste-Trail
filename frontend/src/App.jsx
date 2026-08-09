@@ -44,34 +44,9 @@ function ScrollToTop() {
 
 function RootRoute() {
   const { user, token } = useContext(AuthContext);
-  const [isMobile, setIsMobile] = useState(() => {
-    if (typeof window === "undefined") return false;
-    const userAgent = navigator.userAgent || navigator.vendor || window.opera;
-    const isMobileUA = /android|webos|iphone|ipad|ipod|blackberry|iemobile|opera mini/i.test(userAgent);
-    const isSmallScreen = window.innerWidth <= 768;
-    const isStandalone = window.matchMedia("(display-mode: standalone)").matches || window.navigator.standalone;
-    return isMobileUA || isSmallScreen || isStandalone;
-  });
-
-  useEffect(() => {
-    const handleResize = () => {
-      const userAgent = navigator.userAgent || navigator.vendor || window.opera;
-      const isMobileUA = /android|webos|iphone|ipad|ipod|blackberry|iemobile|opera mini/i.test(userAgent);
-      const isSmallScreen = window.innerWidth <= 768;
-      const isStandalone = window.matchMedia("(display-mode: standalone)").matches || window.navigator.standalone;
-      setIsMobile(isMobileUA || isSmallScreen || isStandalone);
-    };
-
-    window.addEventListener("resize", handleResize);
-    return () => window.removeEventListener("resize", handleResize);
-  }, []);
 
   if (user && token) {
     return <Navigate to="/home" replace />;
-  }
-
-  if (isMobile) {
-    return <Login />;
   }
 
   return <Landing />;
