@@ -1,0 +1,20 @@
+{
+  "expo": {
+    "name": "TasteWise",
+    "slug": "tastewise",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "light",
+    "android": {
+      "package": "app.tastewise.mobile",
+      "adaptiveIcon": {
+        "backgroundColor": "#FF6A00",
+        "foregroundImage": "./assets/android-icon-foreground.png"
+      }
+    },
+    "web": {
+      "favicon": "./assets/favicon.png"
+    }
+  }
+}
