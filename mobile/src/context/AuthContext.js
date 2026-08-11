@@ -36,7 +36,14 @@ export const AuthProvider = ({ children }) => {
       body: JSON.stringify({ email: emailOrPhone, password })
     });
 
-    const data = await res.json();
+    const text = await res.text();
+    let data;
+    try {
+      data = JSON.parse(text);
+    } catch {
+      throw new Error(text || "Server error. Please try again.");
+    }
+
     if (!res.ok) {
       throw new Error(data.msg || "Login failed");
     }
@@ -55,7 +62,14 @@ export const AuthProvider = ({ children }) => {
       body: JSON.stringify({ name, email, phone, password })
     });
 
-    const data = await res.json();
+    const text = await res.text();
+    let data;
+    try {
+      data = JSON.parse(text);
+    } catch {
+      throw new Error(text || "Server error. Please try again.");
+    }
+
     if (!res.ok) {
       throw new Error(data.msg || "Registration failed");
     }
