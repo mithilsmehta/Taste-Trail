@@ -15,12 +15,26 @@ import { API_BASE_URL } from "../config/api";
 
 const CACHE_KEY = "tastewiseMobileGroceryCache";
 
+const categoryTabs = [
+  { id: "all", label: "All" },
+  { id: "vegetables", label: "Vegetables" },
+  { id: "grains", label: "Grains & Pulses" },
+  { id: "snacks", label: "Kitchen Staples" }
+];
+
+const categoryPatterns = {
+  vegetables: /\b(cabbage|capsicum|bell pepper|broccoli|lettuce|tomato|cucumber|coriander|cilantro|spinach|palak|methi|cauliflower|peas|beans|gourd|lauki|pumpkin|fruit|chilli|chili|leaves|vegetable|carrot|potato|onion|garlic)\b/i,
+  grains: /\b(flour|wheat|rice|basmati|atta|dal|lentil|moong|chana|rajma|beans|pulses|oats|quinoa|millet|jowar|bajra|ragi|semolina|suji|noodles|pasta)\b/i,
+  snacks: /\b(butter|cheese|paneer|pesto|pepper|masala|snack|chips|bread|buns|dry fruits|nuts|almond|cashew|raisins|sauce|chutney)\b/i
+};
+
 export default function GroceryListScreen() {
   const { token } = useContext(AuthContext);
   const [mealPlans, setMealPlans] = useState([]);
   const [checkedItems, setCheckedItems] = useState({});
   const [newItem, setNewItem] = useState("");
   const [customItems, setCustomItems] = useState([]);
+  const [filter, setFilter] = useState("all");
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -58,13 +72,13 @@ export default function GroceryListScreen() {
   };
 
   const toggleCheck = (id) => {
-    setCheckedItems(prev => ({ ...prev, [id]: !prev[id] }));
+    setCheckedItems((prev) => ({ ...prev, [id]: !prev[id] }));
   };
 
   const addCustomItem = () => {
     if (!newItem.trim()) return;
     const item = { id: `custom-${Date.now()}`, name: newItem.trim() };
-    setCustomItems(prev => [item, ...prev]);
+    setCustomItems((prev) => [item, ...prev]);
     setNewItem("");
   };
 
@@ -77,13 +91,33 @@ export default function GroceryListScreen() {
     }))
   );
 
+  const filteredIngredients = allIngredients.filter((item) => {
+    if (filter === "all") return true;
+    return categoryPatterns[filter]?.test(item.name);
+  });
+
   return (
     <View style={styles.container}>
       <View style={styles.header}>
-        <Text style={styles.title}>Grocery List</Text>
+        <Text style={styles.title}>Grocery Checklist</Text>
         <Text style={styles.subtitle}>
-          {allIngredients.length + customItems.length} total items to buy
+          {allIngredients.length + customItems.length} items to buy
         </Text>
+
+        {/* CATEGORY TABS */}
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.tabRow}>
+          {categoryTabs.map((tab) => (
+            <TouchableOpacity
+              key={tab.id}
+              style={[styles.tab, filter === tab.id && styles.tabActive]}
+              onPress={() => setFilter(tab.id)}
+            >
+              <Text style={[styles.tabText, filter === tab.id && styles.tabTextActive]}>
+                {tab.label}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </ScrollView>
       </View>
 
       <View style={styles.addInputRow}>
@@ -117,7 +151,7 @@ export default function GroceryListScreen() {
             </TouchableOpacity>
           ))}
 
-          {allIngredients.map((item) => (
+          {filteredIngredients.map((item) => (
             <TouchableOpacity
               key={item.id}
               style={[styles.itemCard, checkedItems[item.id] && styles.itemCardChecked]}
@@ -128,9 +162,7 @@ export default function GroceryListScreen() {
                 <Text style={[styles.itemName, checkedItems[item.id] && styles.itemCheckedText]}>
                   {item.name}
                 </Text>
-                {Boolean(item.dish) && (
-                  <Text style={styles.dishTag}>For: {item.dish}</Text>
-                )}
+                {Boolean(item.dish) && <Text style={styles.dishTag}>For: {item.dish}</Text>}
               </View>
             </TouchableOpacity>
           ))}
@@ -146,7 +178,6 @@ const styles = StyleSheet.create({
     backgroundColor: "#F9F8F6"
   },
   header: {
-    padding: 20,
     paddingTop: 50,
     backgroundColor: "#FFF",
     borderBottomWidth: 1,
@@ -155,12 +186,39 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 26,
     fontWeight: "800",
-    color: "#2C2A29"
+    color: "#2C2A29",
+    paddingHorizontal: 20
   },
   subtitle: {
     fontSize: 14,
     color: "#666",
-    marginTop: 4
+    marginTop: 2,
+    paddingHorizontal: 20
+  },
+  tabRow: {
+    paddingVertical: 14,
+    paddingHorizontal: 16
+  },
+  tab: {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 20,
+    backgroundColor: "#F4F3EF",
+    marginRight: 8,
+    borderWidth: 1,
+    borderColor: "#E6E4DD"
+  },
+  tabActive: {
+    backgroundColor: "#506950",
+    borderColor: "#506950"
+  },
+  tabText: {
+    fontSize: 13,
+    fontWeight: "600",
+    color: "#444"
+  },
+  tabTextActive: {
+    color: "#FFF"
   },
   addInputRow: {
     flexDirection: "row",
@@ -181,7 +239,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 10,
     borderRadius: 12,
-    justifyContent: "center"
+    justify.content: "center"
   },
   addBtnText: {
     color: "#FFF",
