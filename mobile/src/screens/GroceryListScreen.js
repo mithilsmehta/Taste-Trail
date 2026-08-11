@@ -239,7 +239,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 10,
     borderRadius: 12,
-    justify.content: "center"
+    justifyContent: "center"
   },
   addBtnText: {
     color: "#FFF",
