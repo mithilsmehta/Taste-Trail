@@ -30,10 +30,16 @@ export const AuthProvider = ({ children }) => {
   };
 
   const login = async (emailOrPhone, password) => {
+    const cleanInput = String(emailOrPhone || "").trim();
     const res = await fetch(`${API_BASE_URL}/api/auth/login`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email: emailOrPhone, password })
+      body: JSON.stringify({
+        identifier: cleanInput,
+        email: cleanInput,
+        phone: cleanInput,
+        password
+      })
     });
 
     const text = await res.text();
@@ -55,11 +61,21 @@ export const AuthProvider = ({ children }) => {
     return data;
   };
 
-  const register = async (name, email, phone, password) => {
+  const register = async (fullName, email, phone, password) => {
+    const parts = String(fullName || "").trim().split(/\s+/);
+    const firstName = parts[0] || "User";
+    const lastName = parts.slice(1).join(" ") || "";
+
     const res = await fetch(`${API_BASE_URL}/api/auth/register`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name, email, phone, password })
+      body: JSON.stringify({
+        firstName,
+        lastName,
+        email: String(email || "").trim(),
+        phone: String(phone || "").trim(),
+        password
+      })
     });
 
     const text = await res.text();
@@ -74,11 +90,8 @@ export const AuthProvider = ({ children }) => {
       throw new Error(data.msg || "Registration failed");
     }
 
-    setToken(data.token);
-    setUser(data.user);
-    await AsyncStorage.setItem("token", data.token);
-    await AsyncStorage.setItem("user", JSON.stringify(data.user));
-    return data;
+    // After registration, auto login
+    return await login(email, password);
   };
 
   const logout = async () => {
