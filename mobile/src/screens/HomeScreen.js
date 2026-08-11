@@ -12,6 +12,8 @@ import {
 } from "react-native";
 import { AuthContext } from "../context/AuthContext";
 import { API_BASE_URL } from "../config/api";
+import { colors } from "../theme/colors";
+import HeaderBar from "../components/HeaderBar";
 
 const popularChips = [
   "Paneer Tikka",
@@ -91,89 +93,93 @@ export default function HomeScreen({ navigation }) {
   const firstName = user?.name ? user.name.split(" ")[0] : "Chef";
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.scrollContent}>
-      {/* HEADER GREETING */}
-      <View style={styles.header}>
-        <Text style={styles.greetingTag}>GOOD AFTERNOON</Text>
-        <Text style={styles.mainTitle}>
-          What shall we <Text style={styles.titleHighlight}>cook</Text> today, {firstName}?
-        </Text>
-      </View>
+    <View style={styles.container}>
+      <HeaderBar navigation={navigation} />
 
-      {/* SEARCH BAR */}
-      <View style={styles.searchCard}>
-        <TextInput
-          style={styles.searchInput}
-          placeholder="Search 12,000+ recipes or ingredients..."
-          placeholderTextColor="#888"
-          value={prompt}
-          onChangeText={setPrompt}
-          onSubmitEditing={() => handleGenerateRecipe()}
-        />
-        <TouchableOpacity
-          style={styles.searchButton}
-          onPress={() => handleGenerateRecipe()}
-          disabled={loading}
-        >
-          {loading ? (
-            <ActivityIndicator color="#FFF" size="small" />
-          ) : (
-            <Text style={styles.searchButtonText}>Generate</Text>
-          )}
-        </TouchableOpacity>
-      </View>
+      <ScrollView contentContainerStyle={styles.scrollContent}>
+        {/* HERO TITLE */}
+        <View style={styles.heroSection}>
+          <Text style={styles.greetingLabel}>GOOD AFTERNOON</Text>
+          <Text style={styles.heroTitle}>
+            What shall we <Text style={styles.heroItalic}>cook</Text> today, {firstName}?
+          </Text>
+        </View>
 
-      {/* QUICK SUGGESTIONS CHIPS */}
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.chipRow}>
-        {popularChips.map((chip, idx) => (
+        {/* SEARCH CARD */}
+        <View style={styles.searchCard}>
+          <TextInput
+            style={styles.searchInput}
+            placeholder="Search 12,000+ recipes or ingredients..."
+            placeholderTextColor={colors.muted}
+            value={prompt}
+            onChangeText={setPrompt}
+            onSubmitEditing={() => handleGenerateRecipe()}
+          />
           <TouchableOpacity
-            key={idx}
-            style={styles.chip}
-            onPress={() => {
-              setPrompt(chip);
-              handleGenerateRecipe(chip);
-            }}
+            style={styles.searchButton}
+            onPress={() => handleGenerateRecipe()}
+            disabled={loading}
           >
-            <Text style={styles.chipText}>{chip}</Text>
+            {loading ? (
+              <ActivityIndicator color="#FFF" size="small" />
+            ) : (
+              <Text style={styles.searchButtonText}>Generate</Text>
+            )}
           </TouchableOpacity>
-        ))}
+        </View>
+
+        {/* QUICK SUGGESTIONS CHIPS */}
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.chipRow}>
+          {popularChips.map((chip, idx) => (
+            <TouchableOpacity
+              key={idx}
+              style={styles.chip}
+              onPress={() => {
+                setPrompt(chip);
+                handleGenerateRecipe(chip);
+              }}
+            >
+              <Text style={styles.chipText}>{chip}</Text>
+            </TouchableOpacity>
+          ))}
+        </ScrollView>
+
+        {/* FEATURE CARDS */}
+        <View style={styles.cardContainer}>
+          <TouchableOpacity
+            style={[styles.featureCard, { backgroundColor: colors.cardGreen }]}
+            onPress={() => navigation.navigate("DetectIngredients")}
+          >
+            <Text style={styles.badgeText}>AI POWERED</Text>
+            <Text style={styles.featureTitle}>Detect Ingredients</Text>
+            <Text style={styles.featureDesc}>
+              Take a photo of your fridge ingredients & generate instant recipes!
+            </Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[styles.featureCard, { backgroundColor: colors.cardOrange }]}
+            onPress={() => navigation.navigate("Meal Plan")}
+          >
+            <Text style={styles.badgeText}>SMART PLANNER</Text>
+            <Text style={styles.featureTitle}>Meal Planner</Text>
+            <Text style={styles.featureDesc}>
+              Organize your weekly breakfast, lunch, and dinner schedule.
+            </Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[styles.featureCard, { backgroundColor: colors.cardBlue }]}
+            onPress={() => navigation.navigate("Grocery")}
+          >
+            <Text style={styles.badgeText}>INSTANT LIST</Text>
+            <Text style={styles.featureTitle}>Grocery Checklist</Text>
+            <Text style={styles.featureDesc}>
+              Automated ingredients breakdown by category for grocery shopping.
+            </Text>
+          </TouchableOpacity>
+        </View>
       </ScrollView>
-
-      {/* FEATURE CARDS */}
-      <View style={styles.cardContainer}>
-        <TouchableOpacity
-          style={[styles.featureCard, { backgroundColor: "#506950" }]}
-          onPress={() => navigation.navigate("DetectIngredients")}
-        >
-          <Text style={styles.badgeText}>AI POWERED</Text>
-          <Text style={styles.featureTitle}>Detect Ingredients</Text>
-          <Text style={styles.featureDesc}>
-            Take a photo of your fridge ingredients & generate instant recipes!
-          </Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          style={[styles.featureCard, { backgroundColor: "#D48B38" }]}
-          onPress={() => navigation.navigate("MealPlanner")}
-        >
-          <Text style={styles.badgeText}>SMART PLANNER</Text>
-          <Text style={styles.featureTitle}>Meal Planner</Text>
-          <Text style={styles.featureDesc}>
-            Organize your weekly breakfast, lunch, and dinner schedule.
-          </Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          style={[styles.featureCard, { backgroundColor: "#3C5A76" }]}
-          onPress={() => navigation.navigate("GroceryList")}
-        >
-          <Text style={styles.badgeText}>INSTANT LIST</Text>
-          <Text style={styles.featureTitle}>Grocery Checklist</Text>
-          <Text style={styles.featureDesc}>
-            Automated ingredients breakdown by category for grocery shopping.
-          </Text>
-        </TouchableOpacity>
-      </View>
 
       {/* RECIPE DETAILS MODAL */}
       <Modal visible={modalVisible} animationType="slide" transparent={false}>
@@ -217,49 +223,51 @@ export default function HomeScreen({ navigation }) {
           )}
         </ScrollView>
       </Modal>
-    </ScrollView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#F9F8F6"
+    backgroundColor: colors.bg
   },
   scrollContent: {
     padding: 20,
-    paddingTop: 50
+    paddingBottom: 40
   },
-  header: {
+  heroSection: {
     marginBottom: 20
   },
-  greetingTag: {
+  greetingLabel: {
     fontSize: 12,
     fontWeight: "800",
-    color: "#506950",
+    color: colors.sage,
     letterSpacing: 1.5,
     marginBottom: 6
   },
-  mainTitle: {
+  heroTitle: {
     fontSize: 32,
     fontWeight: "600",
-    color: "#2C2A29",
+    color: colors.ink,
     lineHeight: 38
   },
-  titleHighlight: {
-    color: "#506950",
+  heroItalic: {
+    color: colors.sage,
     fontStyle: "italic"
   },
   searchCard: {
-    backgroundColor: "#FFFFFF",
-    borderRadius: 16,
+    backgroundColor: colors.cardBg,
+    borderRadius: 18,
     padding: 8,
     flexDirection: "row",
     alignItems: "center",
+    borderWidth: 1,
+    borderColor: colors.border,
     shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.04,
+    shadowRadius: 10,
     elevation: 2,
     marginBottom: 16
   },
@@ -267,13 +275,13 @@ const styles = StyleSheet.create({
     flex: 1,
     paddingHorizontal: 12,
     fontSize: 14,
-    color: "#333"
+    color: colors.ink
   },
   searchButton: {
-    backgroundColor: "#FF6A00",
-    paddingHorizontal: 16,
+    backgroundColor: colors.orange,
+    paddingHorizontal: 18,
     paddingVertical: 12,
-    borderRadius: 12
+    borderRadius: 14
   },
   searchButtonText: {
     color: "#FFF",
@@ -284,28 +292,28 @@ const styles = StyleSheet.create({
     marginBottom: 24
   },
   chip: {
-    backgroundColor: "#FFFFFF",
+    backgroundColor: colors.cardBg,
     borderRadius: 20,
     paddingHorizontal: 16,
     paddingVertical: 10,
     marginRight: 10,
     borderWidth: 1,
-    borderColor: "#E6E4DD"
+    borderColor: colors.border
   },
   chipText: {
     fontSize: 13,
     fontWeight: "600",
-    color: "#444"
+    color: colors.ink
   },
   cardContainer: {
     gap: 16
   },
   featureCard: {
-    borderRadius: 20,
+    borderRadius: 22,
     padding: 24
   },
   badgeText: {
-    color: "rgba(255,255,255,0.7)",
+    color: "rgba(255,255,255,0.75)",
     fontSize: 11,
     fontWeight: "800",
     letterSpacing: 1
@@ -337,30 +345,30 @@ const styles = StyleSheet.create({
   closeBtnText: {
     fontSize: 16,
     fontWeight: "700",
-    color: "#FF6A00"
+    color: colors.orange
   },
   modalRecipeTitle: {
     fontSize: 28,
     fontWeight: "800",
-    color: "#2C2A29",
+    color: colors.ink,
     marginTop: 10
   },
   modalRecipeDesc: {
     fontSize: 15,
-    color: "#666",
+    color: colors.subtext,
     marginTop: 8,
     lineHeight: 22
   },
   sectionHeader: {
     fontSize: 20,
     fontWeight: "700",
-    color: "#506950",
+    color: colors.sage,
     marginTop: 24,
     marginBottom: 12
   },
   ingredientItem: {
     fontSize: 15,
-    color: "#333",
+    color: colors.ink,
     paddingVertical: 4
   },
   stepRow: {
@@ -371,7 +379,7 @@ const styles = StyleSheet.create({
     width: 28,
     height: 28,
     borderRadius: 14,
-    backgroundColor: "#FF6A00",
+    backgroundColor: colors.orange,
     color: "#FFF",
     textAlign: "center",
     lineHeight: 28,
@@ -381,11 +389,11 @@ const styles = StyleSheet.create({
   stepText: {
     flex: 1,
     fontSize: 15,
-    color: "#333",
+    color: colors.ink,
     lineHeight: 22
   },
   saveBtn: {
-    backgroundColor: "#506950",
+    backgroundColor: colors.sage,
     borderRadius: 14,
     paddingVertical: 16,
     alignItems: "center",

@@ -10,6 +10,7 @@ import {
 } from "react-native";
 import { AuthContext } from "../context/AuthContext";
 import { API_BASE_URL } from "../config/api";
+import { colors } from "../theme/colors";
 
 export default function SavedRecipesScreen({ navigation }) {
   const { token } = useContext(AuthContext);
@@ -47,7 +48,7 @@ export default function SavedRecipesScreen({ navigation }) {
       </View>
 
       {loading ? (
-        <ActivityIndicator size="large" color="#FF6A00" style={{ marginTop: 40 }} />
+        <ActivityIndicator size="large" color={colors.orange} style={{ marginTop: 40 }} />
       ) : recipes.length === 0 ? (
         <View style={styles.emptyContainer}>
           <Text style={styles.emptyIcon}>❤️</Text>
@@ -111,14 +112,15 @@ export default function SavedRecipesScreen({ navigation }) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#F9F8F6"
+    backgroundColor: colors.bg
   },
   header: {
-    padding: 20,
-    paddingTop: 50,
+    paddingHorizontal: 20,
+    paddingTop: 52,
+    paddingBottom: 16,
     backgroundColor: "#FFF",
     borderBottomWidth: 1,
-    borderColor: "#E6E4DD",
+    borderColor: colors.border,
     flexDirection: "row",
     alignItems: "center"
   },
@@ -128,21 +130,23 @@ const styles = StyleSheet.create({
   backBtnText: {
     fontSize: 18,
     fontWeight: "700",
-    color: "#FF6A00"
+    color: colors.orange
   },
   title: {
     fontSize: 22,
     fontWeight: "800",
-    color: "#2C2A29"
+    color: colors.ink
   },
   scrollContent: {
     padding: 16
   },
   card: {
-    backgroundColor: "#FFF",
-    borderRadius: 16,
+    backgroundColor: colors.cardBg,
+    borderRadius: 18,
     padding: 16,
     marginBottom: 12,
+    borderWidth: 1,
+    borderColor: colors.border,
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.04,
@@ -152,23 +156,23 @@ const styles = StyleSheet.create({
   cardTitle: {
     fontSize: 18,
     fontWeight: "700",
-    color: "#2C2A29"
+    color: colors.ink
   },
   cardDesc: {
     fontSize: 14,
-    color: "#666",
+    color: colors.subtext,
     marginTop: 4,
     lineHeight: 20
   },
   ingredientCount: {
     fontSize: 12,
     fontWeight: "600",
-    color: "#506950",
+    color: colors.sage,
     marginTop: 10
   },
   emptyContainer: {
     flex: 1,
-    justifyContent: "center",
+    justify.content: "center",
     alignItems: "center",
     padding: 30
   },
@@ -179,11 +183,11 @@ const styles = StyleSheet.create({
   emptyTitle: {
     fontSize: 20,
     fontWeight: "700",
-    color: "#333"
+    color: colors.ink
   },
   emptySub: {
     fontSize: 14,
-    color: "#888",
+    color: colors.subtext,
     textAlign: "center",
     marginTop: 6
   },
@@ -202,30 +206,30 @@ const styles = StyleSheet.create({
   closeBtnText: {
     fontSize: 16,
     fontWeight: "700",
-    color: "#FF6A00"
+    color: colors.orange
   },
   modalTitle: {
     fontSize: 28,
     fontWeight: "800",
-    color: "#2C2A29",
+    color: colors.ink,
     marginTop: 10
   },
   modalDesc: {
     fontSize: 15,
-    color: "#666",
+    color: colors.subtext,
     marginTop: 8,
     lineHeight: 22
   },
   sectionTitle: {
     fontSize: 20,
     fontWeight: "700",
-    color: "#506950",
+    color: colors.sage,
     marginTop: 24,
     marginBottom: 12
   },
   ingredientItem: {
     fontSize: 15,
-    color: "#333",
+    color: colors.ink,
     paddingVertical: 4
   },
   stepRow: {
@@ -236,7 +240,7 @@ const styles = StyleSheet.create({
     width: 28,
     height: 28,
     borderRadius: 14,
-    backgroundColor: "#FF6A00",
+    backgroundColor: colors.orange,
     color: "#FFF",
     textAlign: "center",
     lineHeight: 28,
@@ -246,7 +250,7 @@ const styles = StyleSheet.create({
   stepText: {
     flex: 1,
     fontSize: 15,
-    color: "#333",
+    color: colors.ink,
     lineHeight: 22
   }
 });

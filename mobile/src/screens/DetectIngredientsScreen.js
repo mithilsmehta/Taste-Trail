@@ -12,6 +12,7 @@ import {
 } from "react-native";
 import { AuthContext } from "../context/AuthContext";
 import { API_BASE_URL } from "../config/api";
+import { colors } from "../theme/colors";
 
 export default function DetectIngredientsScreen({ navigation }) {
   const { token } = useContext(AuthContext);
@@ -22,7 +23,7 @@ export default function DetectIngredientsScreen({ navigation }) {
 
   const handleDetect = async () => {
     if (!ingredientsText.trim()) {
-      Alert.alert("Input Required", "Enter ingredients you have at home (e.g. Potato, Onion, Cheese)");
+      Alert.alert("Input Required", "Enter ingredients you have at home (e.g. Tomato, Paneer, Capsicum)");
       return;
     }
 
@@ -61,11 +62,11 @@ export default function DetectIngredientsScreen({ navigation }) {
 
       <View style={styles.card}>
         <Text style={styles.cardHeader}>WHAT'S IN YOUR FRIDGE / PANTRY?</Text>
-        <Text style={styles.cardSub}>List the items you have, separated by commas:</Text>
+        <Text style={styles.cardSub}>List items you have, separated by commas:</Text>
         <TextInput
           style={styles.textArea}
           placeholder="e.g. Tomato, Paneer, Capsicum, Schezwan Sauce..."
-          placeholderTextColor="#999"
+          placeholderTextColor={colors.muted}
           value={ingredientsText}
           onChangeText={setIngredientsText}
           multiline
@@ -140,11 +141,11 @@ export default function DetectIngredientsScreen({ navigation }) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#F9F8F6"
+    backgroundColor: colors.bg
   },
   scrollContent: {
     padding: 20,
-    paddingTop: 50
+    paddingTop: 52
   },
   header: {
     flexDirection: "row",
@@ -157,17 +158,19 @@ const styles = StyleSheet.create({
   backBtnText: {
     fontSize: 18,
     fontWeight: "700",
-    color: "#506950"
+    color: colors.sage
   },
   title: {
     fontSize: 24,
     fontWeight: "800",
-    color: "#2C2A29"
+    color: colors.ink
   },
   card: {
-    backgroundColor: "#FFF",
+    backgroundColor: colors.cardBg,
     borderRadius: 20,
     padding: 20,
+    borderWidth: 1,
+    borderColor: colors.border,
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.05,
@@ -177,12 +180,12 @@ const styles = StyleSheet.create({
   cardHeader: {
     fontSize: 12,
     fontWeight: "800",
-    color: "#506950",
+    color: colors.sage,
     letterSpacing: 1
   },
   cardSub: {
     fontSize: 14,
-    color: "#666",
+    color: colors.subtext,
     marginTop: 4,
     marginBottom: 12
   },
@@ -191,14 +194,14 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     padding: 14,
     fontSize: 15,
-    color: "#333",
+    color: colors.ink,
     height: 100,
     textAlignVertical: "top",
     borderWidth: 1,
-    borderColor: "#E6E4DD"
+    borderColor: colors.border
   },
   actionBtn: {
-    backgroundColor: "#506950",
+    backgroundColor: colors.sage,
     borderRadius: 14,
     paddingVertical: 16,
     alignItems: "center",
@@ -218,15 +221,17 @@ const styles = StyleSheet.create({
   resultsHeader: {
     fontSize: 13,
     fontWeight: "800",
-    color: "#888",
+    color: colors.subtext,
     letterSpacing: 1,
     marginBottom: 12
   },
   recipeCard: {
-    backgroundColor: "#FFF",
+    backgroundColor: colors.cardBg,
     borderRadius: 16,
     padding: 16,
     marginBottom: 12,
+    borderWidth: 1,
+    borderColor: colors.border,
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.04,
@@ -236,11 +241,11 @@ const styles = StyleSheet.create({
   recipeTitle: {
     fontSize: 18,
     fontWeight: "700",
-    color: "#2C2A29"
+    color: colors.ink
   },
   recipeDesc: {
     fontSize: 14,
-    color: "#666",
+    color: colors.subtext,
     marginTop: 4,
     lineHeight: 20
   },
@@ -259,30 +264,30 @@ const styles = StyleSheet.create({
   closeBtnText: {
     fontSize: 16,
     fontWeight: "700",
-    color: "#506950"
+    color: colors.sage
   },
   modalTitle: {
     fontSize: 28,
     fontWeight: "800",
-    color: "#2C2A29",
+    color: colors.ink,
     marginTop: 10
   },
   modalDesc: {
     fontSize: 15,
-    color: "#666",
+    color: colors.subtext,
     marginTop: 8,
     lineHeight: 22
   },
   sectionTitle: {
     fontSize: 20,
     fontWeight: "700",
-    color: "#506950",
+    color: colors.sage,
     marginTop: 24,
     marginBottom: 12
   },
   ingredientItem: {
     fontSize: 15,
-    color: "#333",
+    color: colors.ink,
     paddingVertical: 4
   },
   stepRow: {
@@ -293,7 +298,7 @@ const styles = StyleSheet.create({
     width: 28,
     height: 28,
     borderRadius: 14,
-    backgroundColor: "#506950",
+    backgroundColor: colors.sage,
     color: "#FFF",
     textAlign: "center",
     lineHeight: 28,
@@ -303,7 +308,7 @@ const styles = StyleSheet.create({
   stepText: {
     flex: 1,
     fontSize: 15,
-    color: "#333",
+    color: colors.ink,
     lineHeight: 22
   }
 });

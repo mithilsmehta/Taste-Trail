@@ -10,6 +10,8 @@ import {
 } from "react-native";
 import { AuthContext } from "../context/AuthContext";
 import { API_BASE_URL } from "../config/api";
+import { colors } from "../theme/colors";
+import HeaderBar from "../components/HeaderBar";
 
 export default function ProfileScreen({ navigation }) {
   const { user, token, logout, setUser } = useContext(AuthContext);
@@ -43,73 +45,83 @@ export default function ProfileScreen({ navigation }) {
   };
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.scrollContent}>
-      <View style={styles.profileHeader}>
-        <View style={styles.avatar}>
-          <Text style={styles.avatarText}>
-            {user?.name ? user.name.charAt(0).toUpperCase() : "U"}
-          </Text>
-        </View>
-        <Text style={styles.userName}>{user?.name || "TasteWise User"}</Text>
-        <Text style={styles.userEmail}>{user?.email || ""}</Text>
-        {Boolean(user?.phone) && <Text style={styles.userPhone}>{user.phone}</Text>}
-      </View>
+    <View style={styles.container}>
+      <HeaderBar navigation={navigation} showSaved={false} />
 
-      <View style={styles.card}>
-        <Text style={styles.cardHeader}>DIETARY PREFERENCES</Text>
-        <View style={styles.row}>
-          <View>
-            <Text style={styles.rowTitle}>Pure Jain Recipes</Text>
-            <Text style={styles.rowSub}>Exclude onion, garlic, & underground roots</Text>
+      <ScrollView contentContainerStyle={styles.scrollContent}>
+        <View style={styles.profileHeader}>
+          <View style={styles.avatar}>
+            <Text style={styles.avatarText}>
+              {user?.name ? user.name.charAt(0).toUpperCase() : "U"}
+            </Text>
           </View>
-          <Switch value={isJain} onValueChange={toggleJain} trackColor={{ false: "#DDD", true: "#FF6A00" }} />
+          <Text style={styles.userName}>{user?.name || "TasteWise User"}</Text>
+          <Text style={styles.userEmail}>{user?.email || ""}</Text>
+          {Boolean(user?.phone) && <Text style={styles.userPhone}>{user.phone}</Text>}
         </View>
-      </View>
 
-      <View style={styles.card}>
-        <Text style={styles.cardHeader}>MY ACCOUNT</Text>
+        <View style={styles.card}>
+          <Text style={styles.cardHeader}>DIETARY PREFERENCES</Text>
+          <View style={styles.row}>
+            <View style={{ flex: 1, paddingRight: 10 }}>
+              <Text style={styles.rowTitle}>Pure Jain Recipes</Text>
+              <Text style={styles.rowSub}>Exclude onion, garlic, & underground roots</Text>
+            </View>
+            <Switch
+              value={isJain}
+              onValueChange={toggleJain}
+              trackColor={{ false: "#DDD", true: colors.orange }}
+              thumbColor="#FFF"
+            />
+          </View>
+        </View>
 
-        <TouchableOpacity style={styles.optionRow} onPress={() => navigation.navigate("SavedRecipes")}>
-          <Text style={styles.optionText}>❤️ Saved Recipes</Text>
-          <Text style={styles.chevron}>›</Text>
+        <View style={styles.card}>
+          <Text style={styles.cardHeader}>MY ACCOUNT</Text>
+
+          <TouchableOpacity style={styles.optionRow} onPress={() => navigation.navigate("SavedRecipes")}>
+            <Text style={styles.optionText}>❤️ Saved Recipes</Text>
+            <Text style={styles.chevron}>›</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity style={styles.optionRow} onPress={() => navigation.navigate("Meal Plan")}>
+            <Text style={styles.optionText}>📅 Meal Planner</Text>
+            <Text style={styles.chevron}>›</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity style={styles.optionRow} onPress={() => navigation.navigate("Grocery")}>
+            <Text style={styles.optionText}>🛒 Grocery List</Text>
+            <Text style={styles.chevron}>›</Text>
+          </TouchableOpacity>
+        </View>
+
+        <TouchableOpacity style={styles.logoutBtn} onPress={logout}>
+          <Text style={styles.logoutBtnText}>Log Out</Text>
         </TouchableOpacity>
-
-        <TouchableOpacity style={styles.optionRow} onPress={() => navigation.navigate("MealPlanner")}>
-          <Text style={styles.optionText}>📅 Meal Planner</Text>
-          <Text style={styles.chevron}>›</Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity style={styles.optionRow} onPress={() => navigation.navigate("GroceryList")}>
-          <Text style={styles.optionText}>🛒 Grocery List</Text>
-          <Text style={styles.chevron}>›</Text>
-        </TouchableOpacity>
-      </View>
-
-      <TouchableOpacity style={styles.logoutBtn} onPress={logout}>
-        <Text style={styles.logoutBtnText}>Log Out</Text>
-      </TouchableOpacity>
-    </ScrollView>
+      </ScrollView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#F9F8F6"
+    backgroundColor: colors.bg
   },
   scrollContent: {
     padding: 20,
-    paddingTop: 50
+    paddingBottom: 40
   },
   profileHeader: {
     alignItems: "center",
-    marginBottom: 24
+    marginBottom: 24,
+    marginTop: 10
   },
   avatar: {
     width: 80,
     height: 80,
     borderRadius: 40,
-    backgroundColor: "#FF6A00",
+    backgroundColor: colors.orange,
     justifyContent: "center",
     alignItems: "center",
     marginBottom: 12
@@ -122,33 +134,35 @@ const styles = StyleSheet.create({
   userName: {
     fontSize: 24,
     fontWeight: "700",
-    color: "#2C2A29"
+    color: colors.ink
   },
   userEmail: {
     fontSize: 14,
-    color: "#666",
+    color: colors.subtext,
     marginTop: 2
   },
   userPhone: {
     fontSize: 13,
-    color: "#888",
+    color: colors.muted,
     marginTop: 2
   },
   card: {
-    backgroundColor: "#FFF",
-    borderRadius: 16,
-    padding: 16,
+    backgroundColor: colors.cardBg,
+    borderRadius: 18,
+    padding: 18,
     marginBottom: 16,
+    borderWidth: 1,
+    borderColor: colors.border,
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.04,
+    shadowOpacity: 0.03,
     shadowRadius: 6,
     elevation: 2
   },
   cardHeader: {
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: "800",
-    color: "#506950",
+    color: colors.sage,
     letterSpacing: 1,
     marginBottom: 12
   },
@@ -161,11 +175,11 @@ const styles = StyleSheet.create({
   rowTitle: {
     fontSize: 16,
     fontWeight: "600",
-    color: "#333"
+    color: colors.ink
   },
   rowSub: {
     fontSize: 12,
-    color: "#888",
+    color: colors.subtext,
     marginTop: 2
   },
   optionRow: {
@@ -174,29 +188,29 @@ const styles = StyleSheet.create({
     alignItems: "center",
     paddingVertical: 14,
     borderBottomWidth: 1,
-    borderColor: "#F4F3EF"
+    borderColor: colors.border
   },
   optionText: {
     fontSize: 16,
     fontWeight: "600",
-    color: "#333"
+    color: colors.ink
   },
   chevron: {
     fontSize: 20,
-    color: "#CCC"
+    color: colors.muted
   },
   logoutBtn: {
-    backgroundColor: "#FFF",
+    backgroundColor: colors.cardBg,
     borderWidth: 1,
-    borderColor: "#E53935",
-    borderRadius: 14,
+    borderColor: colors.danger,
+    borderRadius: 16,
     paddingVertical: 16,
     alignItems: "center",
     marginTop: 10,
-    marginBottom: 40
+    marginBottom: 30
   },
   logoutBtnText: {
-    color: "#E53935",
+    color: colors.danger,
     fontSize: 16,
     fontWeight: "700"
   }
