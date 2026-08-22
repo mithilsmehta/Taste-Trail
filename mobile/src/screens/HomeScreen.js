@@ -12,6 +12,7 @@ import {
   Dimensions
 } from "react-native";
 import { useIsFocused } from "@react-navigation/native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { AuthContext } from "../context/AuthContext";
 import { API_BASE_URL } from "../config/api";
 import { colors } from "../theme/colors";
@@ -38,14 +39,14 @@ const defaultFeaturedRecipes = [
   },
   {
     _id: "feat-2",
-    title: "Jain Dosa & Sambhar",
-    description: "Authentic South Indian crispy dosa served with freshly simmered aromatic lentil sambhar.",
-    ingredients: ["Rice", "Urad Dal", "Fenugreek Seeds", "Toor Dal", "Drumstick", "Tomato", "Tamarind", "Sambhar Powder", "Mustard Seeds", "Curry Leaves"],
+    title: "Jain Masala Dosa",
+    description: "South Indian engineering at its finest: humble batter becomes Jain Masala Dosa and suddenly breakfast has a fan club.",
+    ingredients: ["Rice", "Urad Dal", "Fenugreek Seeds", "Raw Banana", "Tomato", "Curry Leaves", "Mustard Seeds", "Turmeric Powder", "Coriander Powder", "Coconut Chutney"],
     steps: [
-      "Soak rice and urad dal for 6 hours, blend into batter and ferment overnight.",
-      "Boil toor dal with tomatoes, drumstick, and sambhar spices.",
-      "Temper with mustard seeds and curry leaves.",
-      "Spread batter on hot griddle into crispy dosas and serve with sambhar."
+      "Soak rice, urad dal, and fenugreek seeds for 6 hours, blend into smooth batter and ferment overnight.",
+      "Boil raw banana until tender, then mash with tomatoes, mustard seeds, curry leaves, and spices.",
+      "Spread batter on a hot griddle into crisp golden dosas.",
+      "Fill with raw banana masala, fold, and serve hot with coconut chutney."
     ],
     difficulty: "Easy",
     bgTop: "#E8F5E9",
@@ -65,6 +66,7 @@ const categoryItems = [
 export default function HomeScreen({ navigation }) {
   const { user, token } = useContext(AuthContext);
   const isFocused = useIsFocused();
+  const insets = useSafeAreaInsets();
   const [prompt, setPrompt] = useState("");
   const [loading, setLoading] = useState(false);
   const [generatedRecipe, setGeneratedRecipe] = useState(null);
@@ -112,7 +114,7 @@ export default function HomeScreen({ navigation }) {
   };
 
   const handleGenerateRecipe = async (queryText) => {
-    const searchQuery = queryText || prompt.trim();
+    const searchQuery = String(queryText || prompt || "").trim();
     if (!searchQuery) {
       Alert.alert("Input Needed", "Please enter a dish name or ingredient prompt.");
       return;
@@ -126,7 +128,7 @@ export default function HomeScreen({ navigation }) {
           "Content-Type": "application/json",
           Authorization: `Bearer ${token}`
         },
-        body: JSON.stringify({ prompt: searchQuery })
+        body: JSON.stringify({ query: searchQuery, prompt: searchQuery })
       });
 
       const data = await res.json();
@@ -161,7 +163,7 @@ export default function HomeScreen({ navigation }) {
         throw new Error(data.msg || "Save failed");
       }
 
-      Alert.alert("Saved! ❤️", `"${generatedRecipe.title}" saved to your MongoDB collection.`);
+      Alert.alert("Saved! ❤️", `"${generatedRecipe.title || generatedRecipe.name}" saved to your cookbook.`);
       fetchDashboardData();
     } catch (err) {
       Alert.alert("Save Error", err.message || "Could not save recipe");
@@ -172,10 +174,14 @@ export default function HomeScreen({ navigation }) {
 
   const firstName = user?.name ? user.name.split(" ")[0].toLowerCase() : "mithil";
   const featuredList = savedRecipes.length > 0 ? savedRecipes : defaultFeaturedRecipes;
+  const topPadding = (insets.top || 30) + 12;
 
   return (
     <View style={styles.container}>
-      <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+      <ScrollView
+        contentContainerStyle={[styles.scrollContent, { paddingTop: topPadding }]}
+        showsVerticalScrollIndicator={false}
+      >
         {/* 1. GREETING & HERO TITLE */}
         <View style={styles.heroSection}>
           <Text style={styles.greetingLabel}>GOOD EVENING</Text>
@@ -264,8 +270,8 @@ export default function HomeScreen({ navigation }) {
           style={styles.carouselRow}
         >
           {featuredList.map((item, idx) => {
-            const bgTop = item.bgTop || (idx % 2 === 0 ? "#FDE8D7" : "#E8F5E9");
-            const icon = item.icon || (idx % 2 === 0 ? "🍛" : "🍱");
+            const bgTop = item.bgTop || (idx % 2 === 0 ? "#E8F5E9" : "#FDE8D7");
+            const icon = item.icon || (idx % 2 === 0 ? "🍱" : "🍛");
 
             return (
               <TouchableOpacity
@@ -286,10 +292,10 @@ export default function HomeScreen({ navigation }) {
                 <View style={styles.cardBottomHalf}>
                   <Text style={styles.badgeLabel}>SAVED RECIPE</Text>
                   <Text style={styles.recipeTitle} numberOfLines={1}>
-                    {item.title}
+                    {item.title || item.name}
                   </Text>
                   <Text style={styles.recipeSnippet} numberOfLines={2}>
-                    {item.description || `${item.title} walks in with main-character energy: rich, authentic & delicious.`}
+                    {item.description || `${item.title || item.name} walks in with main-character energy: rich, authentic & delicious.`}
                   </Text>
 
                   <View style={styles.cardFooterRow}>
@@ -385,7 +391,9 @@ export default function HomeScreen({ navigation }) {
                 <Text style={styles.closeBtnText}>✕ Close</Text>
               </TouchableOpacity>
 
-              <Text style={styles.modalRecipeTitle}>{generatedRecipe.title}</Text>
+              <Text style={styles.modalRecipeTitle}>
+                {generatedRecipe.title || generatedRecipe.name}
+              </Text>
               {Boolean(generatedRecipe.description) && (
                 <Text style={styles.modalRecipeDesc}>{generatedRecipe.description}</Text>
               )}
@@ -429,7 +437,6 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     padding: 18,
-    paddingTop: 52,
     paddingBottom: 40
   },
   heroSection: {
