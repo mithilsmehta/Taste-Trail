@@ -1,4 +1,4 @@
-import React, { useState, useContext } from "react";
+import React, { useState, useEffect, useContext } from "react";
 import {
   StyleSheet,
   Text,
@@ -8,29 +8,110 @@ import {
   ScrollView,
   ActivityIndicator,
   Modal,
-  Alert
+  Alert,
+  Dimensions
 } from "react-native";
+import { useIsFocused } from "@react-navigation/native";
 import { AuthContext } from "../context/AuthContext";
 import { API_BASE_URL } from "../config/api";
 import { colors } from "../theme/colors";
-import HeaderBar from "../components/HeaderBar";
 
-const popularChips = [
-  "Paneer Tikka",
-  "Chinese Bhel",
-  "Masala Dosa",
-  "Jain Special",
-  "Healthy Salad",
-  "Quick Pasta"
+const { width } = Dimensions.get("window");
+const CARD_WIDTH = width * 0.72;
+
+const defaultFeaturedRecipes = [
+  {
+    _id: "feat-1",
+    title: "Jain Manchurian Gravy",
+    description: "Jain Manchurian Gravy walks in with main-character energy: smoky, creamy & rich.",
+    ingredients: ["Cabbage", "Cornstarch", "Soy Sauce", "Green Chili", "Bell Pepper", "Capsicum", "Tomato Ketchup", "Sesame Oil", "Ginger Powder", "Salt", "Pepper", "Spring Greens", "Water", "Oil", "Chili Sauce", "Vinegar"],
+    steps: [
+      "Mix finely shredded cabbage with cornstarch, salt, and pepper to make small Manchurian balls.",
+      "Deep fry or air-fry Manchurian balls until golden brown.",
+      "Prepare gravy by heating oil, adding chili, soy sauce, ketchup, and ginger powder.",
+      "Add cornstarch slurry to thicken sauce.",
+      "Toss fried Manchurian balls in gravy and serve hot."
+    ],
+    difficulty: "Moderate",
+    bgTop: "#FDE8D7",
+    icon: "🍛"
+  },
+  {
+    _id: "feat-2",
+    title: "Jain Dosa & Sambhar",
+    description: "Authentic South Indian crispy dosa served with freshly simmered aromatic lentil sambhar.",
+    ingredients: ["Rice", "Urad Dal", "Fenugreek Seeds", "Toor Dal", "Drumstick", "Tomato", "Tamarind", "Sambhar Powder", "Mustard Seeds", "Curry Leaves"],
+    steps: [
+      "Soak rice and urad dal for 6 hours, blend into batter and ferment overnight.",
+      "Boil toor dal with tomatoes, drumstick, and sambhar spices.",
+      "Temper with mustard seeds and curry leaves.",
+      "Spread batter on hot griddle into crispy dosas and serve with sambhar."
+    ],
+    difficulty: "Easy",
+    bgTop: "#E8F5E9",
+    icon: "🍱"
+  }
+];
+
+const categoryItems = [
+  { label: "Indian", icon: "🍛", query: "Indian dish" },
+  { label: "Breakfast", icon: "🥣", query: "Breakfast recipe" },
+  { label: "Italian", icon: "🍝", query: "Italian pasta" },
+  { label: "Dessert", icon: "🍰", query: "Sweet dessert" }
 ];
 
 export default function HomeScreen({ navigation }) {
   const { user, token } = useContext(AuthContext);
+  const isFocused = useIsFocused();
   const [prompt, setPrompt] = useState("");
   const [loading, setLoading] = useState(false);
-  const [recipe, setRecipe] = useState(null);
+  const [generatedRecipe, setGeneratedRecipe] = useState(null);
   const [modalVisible, setModalVisible] = useState(false);
   const [saving, setSaving] = useState(false);
+
+  // Dynamic counts
+  const [savedRecipes, setSavedRecipes] = useState([]);
+  const [mealPlansCount, setMealPlansCount] = useState(0);
+  const [groceryCount, setGroceryCount] = useState(0);
+
+  useEffect(() => {
+    if (isFocused) {
+      fetchDashboardData();
+    }
+  }, [isFocused]);
+
+  const fetchDashboardData = async () => {
+    try {
+      // 1. Fetch Saved Recipes
+      const savedRes = await fetch(`${API_BASE_URL}/api/recipes/my-recipes`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      const savedData = await savedRes.json();
+      if (savedRes.ok && Array.isArray(savedData)) {
+        setSavedRecipes(savedData);
+      }
+
+      // 2. Fetch Meal Plans
+      const mealRes = await fetch(`${API_BASE_URL}/api/meal-plans/all`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      const mealData = await mealRes.json();
+      if (mealRes.ok && Array.isArray(mealData)) {
+        setMealPlansCount(mealData.length);
+      }
+
+      // 3. Calculate Grocery Items
+      if (mealRes.ok && Array.isArray(mealData)) {
+        const totalItems = mealData.reduce(
+          (acc, p) => acc + (p.recipe?.ingredients?.length || 0),
+          0
+        );
+        setGroceryCount(totalItems);
+      }
+    } catch (err) {
+      console.error(err);
+    }
+  };
 
   const handleGenerateRecipe = async (queryText) => {
     const searchQuery = queryText || prompt.trim();
@@ -55,7 +136,7 @@ export default function HomeScreen({ navigation }) {
         throw new Error(data.msg || "Recipe generation failed");
       }
 
-      setRecipe(data.recipe);
+      setGeneratedRecipe(data.recipe);
       setModalVisible(true);
     } catch (err) {
       Alert.alert("Error", err.message || "Failed to generate recipe");
@@ -65,7 +146,7 @@ export default function HomeScreen({ navigation }) {
   };
 
   const handleSaveRecipe = async () => {
-    if (!recipe) return;
+    if (!generatedRecipe) return;
     setSaving(true);
     try {
       const res = await fetch(`${API_BASE_URL}/api/recipes/save`, {
@@ -74,7 +155,7 @@ export default function HomeScreen({ navigation }) {
           "Content-Type": "application/json",
           Authorization: `Bearer ${token}`
         },
-        body: JSON.stringify(recipe)
+        body: JSON.stringify(generatedRecipe)
       });
 
       if (!res.ok) {
@@ -82,7 +163,8 @@ export default function HomeScreen({ navigation }) {
         throw new Error(data.msg || "Save failed");
       }
 
-      Alert.alert("Saved! ❤️", `"${recipe.title}" saved to your recipe collection.`);
+      Alert.alert("Saved! ❤️", `"${generatedRecipe.title}" saved to your cookbook.`);
+      fetchDashboardData();
     } catch (err) {
       Alert.alert("Save Error", err.message || "Could not save recipe");
     } finally {
@@ -90,22 +172,73 @@ export default function HomeScreen({ navigation }) {
     }
   };
 
-  const firstName = user?.name ? user.name.split(" ")[0] : "Chef";
+  const featuredList = savedRecipes.length > 0 ? savedRecipes : defaultFeaturedRecipes;
 
   return (
     <View style={styles.container}>
-      <HeaderBar navigation={navigation} />
-
-      <ScrollView contentContainerStyle={styles.scrollContent}>
-        {/* HERO TITLE */}
-        <View style={styles.heroSection}>
-          <Text style={styles.greetingLabel}>GOOD AFTERNOON</Text>
-          <Text style={styles.heroTitle}>
-            What shall we <Text style={styles.heroItalic}>cook</Text> today, {firstName}?
-          </Text>
+      <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+        {/* HEADER SECTION */}
+        <View style={styles.topHeaderRow}>
+          <Text style={styles.headerTitle}>Browse & Save</Text>
+          <TouchableOpacity onPress={() => navigation.navigate("SavedRecipes")}>
+            <Text style={styles.seeAllText}>See all →</Text>
+          </TouchableOpacity>
         </View>
 
-        {/* SEARCH CARD */}
+        {/* HORIZONTAL CAROUSEL OF RECIPE CARDS */}
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          snapToInterval={CARD_WIDTH + 16}
+          decelerationRate="fast"
+          style={styles.carouselRow}
+        >
+          {featuredList.map((item, idx) => {
+            const bgTop = item.bgTop || (idx % 2 === 0 ? "#FDE8D7" : "#E8F5E9");
+            const icon = item.icon || (idx % 2 === 0 ? "🍛" : "🍱");
+
+            return (
+              <TouchableOpacity
+                key={item._id || idx}
+                style={styles.carouselCard}
+                onPress={() => {
+                  setGeneratedRecipe(item);
+                  setModalVisible(true);
+                }}
+              >
+                <View style={[styles.cardTopHalf, { backgroundColor: bgTop }]}>
+                  <Text style={styles.cardEmoji}>{icon}</Text>
+                  <View style={styles.heartCircle}>
+                    <Text style={{ fontSize: 13 }}>❤️</Text>
+                  </View>
+                </View>
+
+                <View style={styles.cardBottomHalf}>
+                  <Text style={styles.badgeLabel}>SAVED RECIPE</Text>
+                  <Text style={styles.recipeTitle} numberOfLines={1}>
+                    {item.title}
+                  </Text>
+                  <Text style={styles.recipeSnippet} numberOfLines={2}>
+                    {item.description || `${item.title} walks in with main-character energy: rich, authentic & delicious.`}
+                  </Text>
+
+                  <View style={styles.cardFooterRow}>
+                    <Text style={styles.ingredientCount}>
+                      {item.ingredients?.length || 10} ingredients
+                    </Text>
+                    <View style={styles.diffPill}>
+                      <Text style={styles.diffPillText}>
+                        {item.difficulty || "Moderate"}
+                      </Text>
+                    </View>
+                  </View>
+                </View>
+              </TouchableOpacity>
+            );
+          })}
+        </ScrollView>
+
+        {/* SEARCH & PROMPT GENERATOR */}
         <View style={styles.searchCard}>
           <TextInput
             style={styles.searchInput}
@@ -128,55 +261,72 @@ export default function HomeScreen({ navigation }) {
           </TouchableOpacity>
         </View>
 
-        {/* QUICK SUGGESTIONS CHIPS */}
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.chipRow}>
-          {popularChips.map((chip, idx) => (
-            <TouchableOpacity
-              key={idx}
-              style={styles.chip}
-              onPress={() => {
-                setPrompt(chip);
-                handleGenerateRecipe(chip);
-              }}
-            >
-              <Text style={styles.chipText}>{chip}</Text>
-            </TouchableOpacity>
-          ))}
-        </ScrollView>
-
-        {/* FEATURE CARDS */}
-        <View style={styles.cardContainer}>
+        {/* TWO SIDE-BY-SIDE ACTION CARDS */}
+        <View style={styles.sideBySideRow}>
+          {/* MEAL PLANNER CARD */}
           <TouchableOpacity
-            style={[styles.featureCard, { backgroundColor: colors.cardGreen }]}
-            onPress={() => navigation.navigate("DetectIngredients")}
-          >
-            <Text style={styles.badgeText}>AI POWERED</Text>
-            <Text style={styles.featureTitle}>Detect Ingredients</Text>
-            <Text style={styles.featureDesc}>
-              Take a photo of your fridge ingredients & generate instant recipes!
-            </Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={[styles.featureCard, { backgroundColor: colors.cardOrange }]}
+            style={styles.actionCard}
             onPress={() => navigation.navigate("Meal Plan")}
           >
-            <Text style={styles.badgeText}>SMART PLANNER</Text>
-            <Text style={styles.featureTitle}>Meal Planner</Text>
-            <Text style={styles.featureDesc}>
-              Organize your weekly breakfast, lunch, and dinner schedule.
-            </Text>
+            <View style={styles.actionCardHeader}>
+              <View style={[styles.iconSquare, { backgroundColor: "#FDE8D7" }]}>
+                <Text style={{ fontSize: 16 }}>📅</Text>
+              </View>
+              <View style={{ flex: 1, marginLeft: 10 }}>
+                <Text style={styles.actionBadge}>PLAN AHEAD</Text>
+                <Text style={styles.actionTitle}>Meal Planner</Text>
+                <Text style={styles.actionSub}>{mealPlansCount} meals this week</Text>
+              </View>
+              <Text style={styles.arrowText}>›</Text>
+            </View>
           </TouchableOpacity>
 
+          {/* GROCERY LIST CARD */}
           <TouchableOpacity
-            style={[styles.featureCard, { backgroundColor: colors.cardBlue }]}
+            style={styles.actionCard}
             onPress={() => navigation.navigate("Grocery")}
           >
-            <Text style={styles.badgeText}>INSTANT LIST</Text>
-            <Text style={styles.featureTitle}>Grocery Checklist</Text>
-            <Text style={styles.featureDesc}>
-              Automated ingredients breakdown by category for grocery shopping.
-            </Text>
+            <View style={styles.actionCardHeader}>
+              <View style={[styles.iconSquare, { backgroundColor: "#E8F5E9" }]}>
+                <Text style={{ fontSize: 16 }}>🛒</Text>
+              </View>
+              <View style={{ flex: 1, marginLeft: 10 }}>
+                <Text style={styles.actionBadge}>SHOPPING</Text>
+                <Text style={styles.actionTitle}>Grocery List</Text>
+                <Text style={styles.actionSub}>{groceryCount} items</Text>
+              </View>
+              <Text style={styles.arrowText}>›</Text>
+            </View>
+          </TouchableOpacity>
+        </View>
+
+        {/* 2X2 CATEGORY GRID */}
+        <View style={styles.categoryGrid}>
+          {categoryItems.map((cat, idx) => (
+            <TouchableOpacity
+              key={idx}
+              style={styles.categoryPillCard}
+              onPress={() => {
+                setPrompt(cat.label);
+                handleGenerateRecipe(cat.query);
+              }}
+            >
+              <Text style={styles.catEmoji}>{cat.icon}</Text>
+              <Text style={styles.catLabel}>{cat.label}</Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+
+        {/* SAVED RECIPES SUMMARY CARD */}
+        <View style={styles.summaryCard}>
+          <Text style={styles.summaryBadge}>SAVED RECIPES</Text>
+          <Text style={styles.summaryTitle}>{savedRecipes.length} saved favorites</Text>
+
+          <TouchableOpacity
+            style={styles.cookbookBtn}
+            onPress={() => navigation.navigate("SavedRecipes")}
+          >
+            <Text style={styles.cookbookBtnText}>Open cookbook</Text>
           </TouchableOpacity>
         </View>
       </ScrollView>
@@ -184,26 +334,26 @@ export default function HomeScreen({ navigation }) {
       {/* RECIPE DETAILS MODAL */}
       <Modal visible={modalVisible} animationType="slide" transparent={false}>
         <ScrollView style={styles.modalContainer} contentContainerStyle={styles.modalContent}>
-          {recipe && (
+          {generatedRecipe && (
             <>
               <TouchableOpacity style={styles.closeBtn} onPress={() => setModalVisible(false)}>
                 <Text style={styles.closeBtnText}>✕ Close</Text>
               </TouchableOpacity>
 
-              <Text style={styles.modalRecipeTitle}>{recipe.title}</Text>
-              {Boolean(recipe.description) && (
-                <Text style={styles.modalRecipeDesc}>{recipe.description}</Text>
+              <Text style={styles.modalRecipeTitle}>{generatedRecipe.title}</Text>
+              {Boolean(generatedRecipe.description) && (
+                <Text style={styles.modalRecipeDesc}>{generatedRecipe.description}</Text>
               )}
 
               <Text style={styles.sectionHeader}>Ingredients</Text>
-              {recipe.ingredients?.map((ing, i) => (
+              {generatedRecipe.ingredients?.map((ing, i) => (
                 <Text key={i} style={styles.ingredientItem}>
                   • {ing}
                 </Text>
               ))}
 
               <Text style={styles.sectionHeader}>Step-by-Step Instructions</Text>
-              {recipe.steps?.map((step, sIdx) => (
+              {generatedRecipe.steps?.map((step, sIdx) => (
                 <View key={sIdx} style={styles.stepRow}>
                   <Text style={styles.stepNumber}>{sIdx + 1}</Text>
                   <Text style={styles.stepText}>{step}</Text>
@@ -233,43 +383,127 @@ const styles = StyleSheet.create({
     backgroundColor: colors.bg
   },
   scrollContent: {
-    padding: 20,
+    padding: 18,
+    paddingTop: 52,
     paddingBottom: 40
   },
-  heroSection: {
+  topHeaderRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 16
+  },
+  headerTitle: {
+    fontSize: 28,
+    fontWeight: "700",
+    color: colors.ink,
+    fontFamily: "Georgia"
+  },
+  seeAllText: {
+    fontSize: 14,
+    fontWeight: "700",
+    color: colors.sage
+  },
+  carouselRow: {
     marginBottom: 20
   },
-  greetingLabel: {
-    fontSize: 12,
-    fontWeight: "800",
-    color: colors.sage,
-    letterSpacing: 1.5,
-    marginBottom: 6
-  },
-  heroTitle: {
-    fontSize: 32,
-    fontWeight: "600",
-    color: colors.ink,
-    lineHeight: 38
-  },
-  heroItalic: {
-    color: colors.sage,
-    fontStyle: "italic"
-  },
-  searchCard: {
+  carouselCard: {
+    width: CARD_WIDTH,
     backgroundColor: colors.cardBg,
-    borderRadius: 18,
-    padding: 8,
-    flexDirection: "row",
-    alignItems: "center",
+    borderRadius: 22,
+    marginRight: 16,
     borderWidth: 1,
     borderColor: colors.border,
+    overflow: "hidden",
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.04,
     shadowRadius: 10,
-    elevation: 2,
-    marginBottom: 16
+    elevation: 2
+  },
+  cardTopHalf: {
+    height: 120,
+    justifyContent: "center",
+    alignItems: "center",
+    position: "relative"
+  },
+  cardEmoji: {
+    fontSize: 50
+  },
+  heartCircle: {
+    position: "absolute",
+    top: 12,
+    right: 12,
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    backgroundColor: "#FFF",
+    justifyContent: "center",
+    alignItems: "center",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 4,
+    elevation: 2
+  },
+  cardBottomHalf: {
+    padding: 16
+  },
+  badgeLabel: {
+    fontSize: 10,
+    fontWeight: "800",
+    color: colors.sage,
+    letterSpacing: 1,
+    marginBottom: 4
+  },
+  recipeTitle: {
+    fontSize: 20,
+    fontWeight: "700",
+    color: colors.ink,
+    fontFamily: "Georgia",
+    marginBottom: 6
+  },
+  recipeSnippet: {
+    fontSize: 13,
+    color: colors.subtext,
+    lineHeight: 18,
+    marginBottom: 14
+  },
+  cardFooterRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center"
+  },
+  ingredientCount: {
+    fontSize: 13,
+    fontWeight: "600",
+    color: colors.subtext
+  },
+  diffPill: {
+    backgroundColor: "#FDE8D7",
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 12
+  },
+  diffPillText: {
+    fontSize: 11,
+    fontWeight: "700",
+    color: "#D96B43"
+  },
+  searchCard: {
+    backgroundColor: colors.cardBg,
+    borderRadius: 18,
+    padding: 6,
+    flexDirection: "row",
+    alignItems: "center",
+    borderWidth: 1,
+    borderColor: colors.border,
+    marginBottom: 20,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.03,
+    shadowRadius: 6,
+    elevation: 1
   },
   searchInput: {
     flex: 1,
@@ -279,8 +513,8 @@ const styles = StyleSheet.create({
   },
   searchButton: {
     backgroundColor: colors.orange,
-    paddingHorizontal: 18,
-    paddingVertical: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
     borderRadius: 14
   },
   searchButtonText: {
@@ -288,47 +522,127 @@ const styles = StyleSheet.create({
     fontWeight: "700",
     fontSize: 14
   },
-  chipRow: {
-    marginBottom: 24
+  sideBySideRow: {
+    flexDirection: "row",
+    gap: 12,
+    marginBottom: 16
   },
-  chip: {
+  actionCard: {
+    flex: 1,
     backgroundColor: colors.cardBg,
-    borderRadius: 20,
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    marginRight: 10,
+    borderRadius: 18,
+    padding: 14,
     borderWidth: 1,
-    borderColor: colors.border
+    borderColor: colors.border,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.03,
+    shadowRadius: 6,
+    elevation: 1
   },
-  chipText: {
-    fontSize: 13,
-    fontWeight: "600",
+  actionCardHeader: {
+    flexDirection: "row",
+    alignItems: "center"
+  },
+  iconSquare: {
+    width: 42,
+    height: 42,
+    borderRadius: 12,
+    justifyContent: "center",
+    alignItems: "center"
+  },
+  actionBadge: {
+    fontSize: 9,
+    fontWeight: "800",
+    color: colors.sage,
+    letterSpacing: 0.8
+  },
+  actionTitle: {
+    fontSize: 16,
+    fontWeight: "700",
+    color: colors.ink,
+    fontFamily: "Georgia",
+    marginTop: 2
+  },
+  actionSub: {
+    fontSize: 11,
+    color: colors.subtext,
+    marginTop: 2
+  },
+  arrowText: {
+    fontSize: 18,
+    color: colors.muted,
+    marginLeft: 4
+  },
+  categoryGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 12,
+    marginBottom: 20
+  },
+  categoryPillCard: {
+    width: (width - 48) / 2,
+    backgroundColor: colors.cardBg,
+    borderRadius: 16,
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    flexDirection: "row",
+    alignItems: "center",
+    borderWidth: 1,
+    borderColor: colors.border,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.02,
+    shadowRadius: 4,
+    elevation: 1
+  },
+  catEmoji: {
+    fontSize: 18,
+    marginRight: 10
+  },
+  catLabel: {
+    fontSize: 15,
+    fontWeight: "700",
     color: colors.ink
   },
-  cardContainer: {
-    gap: 16
+  summaryCard: {
+    backgroundColor: colors.cardBg,
+    borderRadius: 20,
+    padding: 20,
+    borderWidth: 1,
+    borderColor: colors.border,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.04,
+    shadowRadius: 8,
+    elevation: 2,
+    marginBottom: 20
   },
-  featureCard: {
-    borderRadius: 22,
-    padding: 24
-  },
-  badgeText: {
-    color: "rgba(255,255,255,0.75)",
-    fontSize: 11,
+  summaryBadge: {
+    fontSize: 10,
     fontWeight: "800",
+    color: colors.sage,
     letterSpacing: 1
   },
-  featureTitle: {
-    color: "#FFF",
-    fontSize: 24,
+  summaryTitle: {
+    fontSize: 22,
     fontWeight: "700",
-    marginTop: 6
+    color: colors.ink,
+    fontFamily: "Georgia",
+    marginTop: 6,
+    marginBottom: 16
   },
-  featureDesc: {
-    color: "rgba(255,255,255,0.9)",
+  cookbookBtn: {
+    backgroundColor: colors.ink,
+    borderRadius: 24,
+    paddingVertical: 14,
+    paddingHorizontal: 24,
+    alignSelf: "flex-start"
+  },
+  cookbookBtnText: {
+    color: "#FFF",
     fontSize: 14,
-    marginTop: 8,
-    lineHeight: 20
+    fontWeight: "700"
   },
   modalContainer: {
     flex: 1,
@@ -351,7 +665,8 @@ const styles = StyleSheet.create({
     fontSize: 28,
     fontWeight: "800",
     color: colors.ink,
-    marginTop: 10
+    marginTop: 10,
+    fontFamily: "Georgia"
   },
   modalRecipeDesc: {
     fontSize: 15,
