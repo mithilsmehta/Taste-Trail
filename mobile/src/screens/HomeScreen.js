@@ -53,6 +53,8 @@ const defaultFeaturedRecipes = [
   }
 ];
 
+const popularChips = ["Paneer Tikka", "Masala Dosa", "Veg Biryani", "Chinese Bhel", "Jain Special"];
+
 const categoryItems = [
   { label: "Indian", icon: "🍛", query: "Indian dish" },
   { label: "Breakfast", icon: "🥣", query: "Breakfast recipe" },
@@ -69,7 +71,7 @@ export default function HomeScreen({ navigation }) {
   const [modalVisible, setModalVisible] = useState(false);
   const [saving, setSaving] = useState(false);
 
-  // Dynamic counts
+  // Dynamic MongoDB Counts
   const [savedRecipes, setSavedRecipes] = useState([]);
   const [mealPlansCount, setMealPlansCount] = useState(0);
   const [groceryCount, setGroceryCount] = useState(0);
@@ -82,7 +84,7 @@ export default function HomeScreen({ navigation }) {
 
   const fetchDashboardData = async () => {
     try {
-      // 1. Fetch Saved Recipes
+      // 1. Saved Recipes from MongoDB
       const savedRes = await fetch(`${API_BASE_URL}/api/recipes/my-recipes`, {
         headers: { Authorization: `Bearer ${token}` }
       });
@@ -91,22 +93,18 @@ export default function HomeScreen({ navigation }) {
         setSavedRecipes(savedData);
       }
 
-      // 2. Fetch Meal Plans
+      // 2. Meal Plans from MongoDB
       const mealRes = await fetch(`${API_BASE_URL}/api/meal-plans/all`, {
         headers: { Authorization: `Bearer ${token}` }
       });
       const mealData = await mealRes.json();
       if (mealRes.ok && Array.isArray(mealData)) {
         setMealPlansCount(mealData.length);
-      }
-
-      // 3. Calculate Grocery Items
-      if (mealRes.ok && Array.isArray(mealData)) {
-        const totalItems = mealData.reduce(
+        const totalGrocery = mealData.reduce(
           (acc, p) => acc + (p.recipe?.ingredients?.length || 0),
           0
         );
-        setGroceryCount(totalItems);
+        setGroceryCount(totalGrocery);
       }
     } catch (err) {
       console.error(err);
@@ -163,7 +161,7 @@ export default function HomeScreen({ navigation }) {
         throw new Error(data.msg || "Save failed");
       }
 
-      Alert.alert("Saved! ❤️", `"${generatedRecipe.title}" saved to your cookbook.`);
+      Alert.alert("Saved! ❤️", `"${generatedRecipe.title}" saved to your MongoDB collection.`);
       fetchDashboardData();
     } catch (err) {
       Alert.alert("Save Error", err.message || "Could not save recipe");
@@ -172,12 +170,85 @@ export default function HomeScreen({ navigation }) {
     }
   };
 
+  const firstName = user?.name ? user.name.split(" ")[0].toLowerCase() : "mithil";
   const featuredList = savedRecipes.length > 0 ? savedRecipes : defaultFeaturedRecipes;
 
   return (
     <View style={styles.container}>
       <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
-        {/* HEADER SECTION */}
+        {/* 1. GREETING & HERO TITLE */}
+        <View style={styles.heroSection}>
+          <Text style={styles.greetingLabel}>GOOD EVENING</Text>
+          <Text style={styles.heroTitle}>
+            What shall we <Text style={styles.heroItalic}>cook</Text>
+            {"\n"}today, {firstName}?
+          </Text>
+        </View>
+
+        {/* 2. SEARCH BAR WITH GREEN SEARCH ICON BUTTON */}
+        <View style={styles.searchCard}>
+          <Text style={styles.searchLeftIcon}>🔍</Text>
+          <TextInput
+            style={styles.searchInput}
+            placeholder="Search 12,000+ recipes..."
+            placeholderTextColor={colors.muted}
+            value={prompt}
+            onChangeText={setPrompt}
+            onSubmitEditing={() => handleGenerateRecipe()}
+          />
+          <TouchableOpacity
+            style={styles.searchIconButton}
+            onPress={() => handleGenerateRecipe()}
+            disabled={loading}
+          >
+            {loading ? (
+              <ActivityIndicator color={colors.sage} size="small" />
+            ) : (
+              <Text style={{ fontSize: 16 }}>🔍</Text>
+            )}
+          </TouchableOpacity>
+        </View>
+
+        {/* 3. SUGGESTION CHIPS ROW */}
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.chipRow}>
+          {popularChips.map((chip, idx) => (
+            <TouchableOpacity
+              key={idx}
+              style={styles.chip}
+              onPress={() => {
+                setPrompt(chip);
+                handleGenerateRecipe(chip);
+              }}
+            >
+              <Text style={styles.chipText}>{chip}</Text>
+            </TouchableOpacity>
+          ))}
+        </ScrollView>
+
+        {/* 4. BIG GREEN FRIDGE CARD ("Generate a recipe from your fridge") */}
+        <View style={styles.fridgeCard}>
+          <View style={styles.aiBadge}>
+            <View style={styles.aiDot} />
+            <Text style={styles.aiBadgeText}>AI POWERED</Text>
+          </View>
+
+          <Text style={styles.fridgeTitle}>
+            Generate a recipe{"\n"}from your <Text style={styles.fridgeItalic}>fridge</Text>
+          </Text>
+
+          <Text style={styles.fridgeSub}>
+            Snap a photo of your ingredients and we'll create a recipe just for you.
+          </Text>
+
+          <TouchableOpacity
+            style={styles.takePhotoButton}
+            onPress={() => navigation.navigate("DetectIngredients")}
+          >
+            <Text style={styles.takePhotoText}>📷 Take Photo</Text>
+          </TouchableOpacity>
+        </View>
+
+        {/* 5. BROWSE & SAVE CAROUSEL */}
         <View style={styles.topHeaderRow}>
           <Text style={styles.headerTitle}>Browse & Save</Text>
           <TouchableOpacity onPress={() => navigation.navigate("SavedRecipes")}>
@@ -185,7 +256,6 @@ export default function HomeScreen({ navigation }) {
           </TouchableOpacity>
         </View>
 
-        {/* HORIZONTAL CAROUSEL OF RECIPE CARDS */}
         <ScrollView
           horizontal
           showsHorizontalScrollIndicator={false}
@@ -238,32 +308,8 @@ export default function HomeScreen({ navigation }) {
           })}
         </ScrollView>
 
-        {/* SEARCH & PROMPT GENERATOR */}
-        <View style={styles.searchCard}>
-          <TextInput
-            style={styles.searchInput}
-            placeholder="Search 12,000+ recipes or ingredients..."
-            placeholderTextColor={colors.muted}
-            value={prompt}
-            onChangeText={setPrompt}
-            onSubmitEditing={() => handleGenerateRecipe()}
-          />
-          <TouchableOpacity
-            style={styles.searchButton}
-            onPress={() => handleGenerateRecipe()}
-            disabled={loading}
-          >
-            {loading ? (
-              <ActivityIndicator color="#FFF" size="small" />
-            ) : (
-              <Text style={styles.searchButtonText}>Generate</Text>
-            )}
-          </TouchableOpacity>
-        </View>
-
-        {/* TWO SIDE-BY-SIDE ACTION CARDS */}
+        {/* 6. SIDE-BY-SIDE ACTION CARDS */}
         <View style={styles.sideBySideRow}>
-          {/* MEAL PLANNER CARD */}
           <TouchableOpacity
             style={styles.actionCard}
             onPress={() => navigation.navigate("Meal Plan")}
@@ -281,7 +327,6 @@ export default function HomeScreen({ navigation }) {
             </View>
           </TouchableOpacity>
 
-          {/* GROCERY LIST CARD */}
           <TouchableOpacity
             style={styles.actionCard}
             onPress={() => navigation.navigate("Grocery")}
@@ -300,7 +345,7 @@ export default function HomeScreen({ navigation }) {
           </TouchableOpacity>
         </View>
 
-        {/* 2X2 CATEGORY GRID */}
+        {/* 7. 2X2 CATEGORY GRID */}
         <View style={styles.categoryGrid}>
           {categoryItems.map((cat, idx) => (
             <TouchableOpacity
@@ -317,7 +362,7 @@ export default function HomeScreen({ navigation }) {
           ))}
         </View>
 
-        {/* SAVED RECIPES SUMMARY CARD */}
+        {/* 8. SAVED RECIPES SUMMARY CARD */}
         <View style={styles.summaryCard}>
           <Text style={styles.summaryBadge}>SAVED RECIPES</Text>
           <Text style={styles.summaryTitle}>{savedRecipes.length} saved favorites</Text>
@@ -387,6 +432,136 @@ const styles = StyleSheet.create({
     paddingTop: 52,
     paddingBottom: 40
   },
+  heroSection: {
+    marginBottom: 20
+  },
+  greetingLabel: {
+    fontSize: 12,
+    fontWeight: "800",
+    color: colors.sage,
+    letterSpacing: 1.5,
+    marginBottom: 6
+  },
+  heroTitle: {
+    fontSize: 32,
+    fontWeight: "600",
+    color: colors.ink,
+    lineHeight: 38
+  },
+  heroItalic: {
+    color: colors.sage,
+    fontStyle: "italic"
+  },
+  searchCard: {
+    backgroundColor: colors.cardBg,
+    borderRadius: 24,
+    paddingHorizontal: 16,
+    paddingVertical: 6,
+    flexDirection: "row",
+    alignItems: "center",
+    borderWidth: 1,
+    borderColor: colors.border,
+    marginBottom: 16,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.03,
+    shadowRadius: 6,
+    elevation: 1
+  },
+  searchLeftIcon: {
+    fontSize: 14,
+    marginRight: 8,
+    opacity: 0.5
+  },
+  searchInput: {
+    flex: 1,
+    fontSize: 15,
+    color: colors.ink,
+    paddingVertical: 10
+  },
+  searchIconButton: {
+    backgroundColor: "#EBF0EB",
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    justifyContent: "center",
+    alignItems: "center"
+  },
+  chipRow: {
+    marginBottom: 20
+  },
+  chip: {
+    backgroundColor: colors.cardBg,
+    borderRadius: 20,
+    paddingHorizontal: 18,
+    paddingVertical: 10,
+    marginRight: 10,
+    borderWidth: 1,
+    borderColor: colors.border
+  },
+  chipText: {
+    fontSize: 14,
+    fontWeight: "700",
+    color: colors.sage
+  },
+  fridgeCard: {
+    backgroundColor: "#4E704F",
+    borderRadius: 28,
+    padding: 24,
+    marginBottom: 28
+  },
+  aiBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "rgba(255, 255, 255, 0.25)",
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 16,
+    alignSelf: "flex-start",
+    marginBottom: 16
+  },
+  aiDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: "#8BE396",
+    marginRight: 6
+  },
+  aiBadgeText: {
+    fontSize: 11,
+    fontWeight: "800",
+    color: "#FFF",
+    letterSpacing: 1
+  },
+  fridgeTitle: {
+    fontSize: 30,
+    fontWeight: "600",
+    color: "#FFF",
+    lineHeight: 36,
+    marginBottom: 10
+  },
+  fridgeItalic: {
+    fontStyle: "italic",
+    fontWeight: "400"
+  },
+  fridgeSub: {
+    fontSize: 14,
+    color: "rgba(255, 255, 255, 0.88)",
+    lineHeight: 20,
+    marginBottom: 20
+  },
+  takePhotoButton: {
+    backgroundColor: "#FFF",
+    borderRadius: 20,
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    alignSelf: "flex-start"
+  },
+  takePhotoText: {
+    color: colors.sage,
+    fontWeight: "800",
+    fontSize: 14
+  },
   topHeaderRow: {
     flexDirection: "row",
     justifyContent: "space-between",
@@ -396,8 +571,7 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontSize: 28,
     fontWeight: "700",
-    color: colors.ink,
-    fontFamily: "Georgia"
+    color: colors.ink
   },
   seeAllText: {
     fontSize: 14,
@@ -405,7 +579,7 @@ const styles = StyleSheet.create({
     color: colors.sage
   },
   carouselRow: {
-    marginBottom: 20
+    marginBottom: 24
   },
   carouselCard: {
     width: CARD_WIDTH,
@@ -460,7 +634,6 @@ const styles = StyleSheet.create({
     fontSize: 20,
     fontWeight: "700",
     color: colors.ink,
-    fontFamily: "Georgia",
     marginBottom: 6
   },
   recipeSnippet: {
@@ -490,38 +663,6 @@ const styles = StyleSheet.create({
     fontWeight: "700",
     color: "#D96B43"
   },
-  searchCard: {
-    backgroundColor: colors.cardBg,
-    borderRadius: 18,
-    padding: 6,
-    flexDirection: "row",
-    alignItems: "center",
-    borderWidth: 1,
-    borderColor: colors.border,
-    marginBottom: 20,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.03,
-    shadowRadius: 6,
-    elevation: 1
-  },
-  searchInput: {
-    flex: 1,
-    paddingHorizontal: 12,
-    fontSize: 14,
-    color: colors.ink
-  },
-  searchButton: {
-    backgroundColor: colors.orange,
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    borderRadius: 14
-  },
-  searchButtonText: {
-    color: "#FFF",
-    fontWeight: "700",
-    fontSize: 14
-  },
   sideBySideRow: {
     flexDirection: "row",
     gap: 12,
@@ -548,7 +689,7 @@ const styles = StyleSheet.create({
     width: 42,
     height: 42,
     borderRadius: 12,
-    justifyContent: "center",
+    justify.content: "center",
     alignItems: "center"
   },
   actionBadge: {
@@ -561,7 +702,6 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: "700",
     color: colors.ink,
-    fontFamily: "Georgia",
     marginTop: 2
   },
   actionSub: {
@@ -628,7 +768,6 @@ const styles = StyleSheet.create({
     fontSize: 22,
     fontWeight: "700",
     color: colors.ink,
-    fontFamily: "Georgia",
     marginTop: 6,
     marginBottom: 16
   },
@@ -665,8 +804,7 @@ const styles = StyleSheet.create({
     fontSize: 28,
     fontWeight: "800",
     color: colors.ink,
-    marginTop: 10,
-    fontFamily: "Georgia"
+    marginTop: 10
   },
   modalRecipeDesc: {
     fontSize: 15,
