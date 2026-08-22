@@ -689,7 +689,7 @@ const styles = StyleSheet.create({
     width: 42,
     height: 42,
     borderRadius: 12,
-    justify.content: "center",
+    justifyContent: "center",
     alignItems: "center"
   },
   actionBadge: {
