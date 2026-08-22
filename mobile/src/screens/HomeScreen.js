@@ -7,6 +7,7 @@ import {
   TouchableOpacity,
   ScrollView,
   ActivityIndicator,
+  RefreshControl,
   Modal,
   Alert,
   Dimensions
@@ -77,6 +78,13 @@ export default function HomeScreen({ navigation }) {
   const [savedRecipes, setSavedRecipes] = useState([]);
   const [mealPlansCount, setMealPlansCount] = useState(0);
   const [groceryCount, setGroceryCount] = useState(0);
+  const [refreshing, setRefreshing] = useState(false);
+
+  const onRefresh = async () => {
+    setRefreshing(true);
+    await fetchDashboardData();
+    setRefreshing(false);
+  };
 
   useEffect(() => {
     if (isFocused) {
@@ -181,6 +189,9 @@ export default function HomeScreen({ navigation }) {
       <ScrollView
         contentContainerStyle={[styles.scrollContent, { paddingTop: topPadding }]}
         showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[colors.sage]} />
+        }
       >
         {/* 1. GREETING & HERO TITLE */}
         <View style={styles.heroSection}>

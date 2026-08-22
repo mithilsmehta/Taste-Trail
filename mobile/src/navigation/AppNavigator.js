@@ -8,12 +8,15 @@ import { AuthContext } from "../context/AuthContext";
 
 import LoginScreen from "../screens/LoginScreen";
 import RegisterScreen from "../screens/RegisterScreen";
+import ForgotPasswordScreen from "../screens/ForgotPasswordScreen";
 import HomeScreen from "../screens/HomeScreen";
 import MealPlannerScreen from "../screens/MealPlannerScreen";
 import GroceryListScreen from "../screens/GroceryListScreen";
 import ProfileScreen from "../screens/ProfileScreen";
 import SavedRecipesScreen from "../screens/SavedRecipesScreen";
 import DetectIngredientsScreen from "../screens/DetectIngredientsScreen";
+import PremiumScreen from "../screens/PremiumScreen";
+import SearchScreen from "../screens/SearchScreen";
 
 const Stack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
@@ -93,11 +96,14 @@ export default function AppNavigator() {
             <Stack.Screen name="MainTabs" component={MainTabNavigator} />
             <Stack.Screen name="SavedRecipes" component={SavedRecipesScreen} />
             <Stack.Screen name="DetectIngredients" component={DetectIngredientsScreen} />
+            <Stack.Screen name="Premium" component={PremiumScreen} />
+            <Stack.Screen name="Search" component={SearchScreen} />
           </>
         ) : (
           <>
             <Stack.Screen name="Login" component={LoginScreen} />
             <Stack.Screen name="Register" component={RegisterScreen} />
+            <Stack.Screen name="ForgotPassword" component={ForgotPasswordScreen} />
           </>
         )}
       </Stack.Navigator>
