@@ -21,40 +21,6 @@ import { colors } from "../theme/colors";
 const { width } = Dimensions.get("window");
 const CARD_WIDTH = width * 0.72;
 
-const defaultFeaturedRecipes = [
-  {
-    _id: "feat-1",
-    title: "Jain Manchurian Gravy",
-    description: "Jain Manchurian Gravy walks in with main-character energy: smoky, creamy & rich.",
-    ingredients: ["Cabbage", "Cornstarch", "Soy Sauce", "Green Chili", "Bell Pepper", "Capsicum", "Tomato Ketchup", "Sesame Oil", "Ginger Powder", "Salt", "Pepper", "Spring Greens", "Water", "Oil", "Chili Sauce", "Vinegar"],
-    steps: [
-      "Mix finely shredded cabbage with cornstarch, salt, and pepper to make small Manchurian balls.",
-      "Deep fry or air-fry Manchurian balls until golden brown.",
-      "Prepare gravy by heating oil, adding chili, soy sauce, ketchup, and ginger powder.",
-      "Add cornstarch slurry to thicken sauce.",
-      "Toss fried Manchurian balls in gravy and serve hot."
-    ],
-    difficulty: "Moderate",
-    bgTop: "#FDE8D7",
-    icon: "🍛"
-  },
-  {
-    _id: "feat-2",
-    title: "Jain Masala Dosa",
-    description: "South Indian engineering at its finest: humble batter becomes Jain Masala Dosa and suddenly breakfast has a fan club.",
-    ingredients: ["Rice", "Urad Dal", "Fenugreek Seeds", "Raw Banana", "Tomato", "Curry Leaves", "Mustard Seeds", "Turmeric Powder", "Coriander Powder", "Coconut Chutney"],
-    steps: [
-      "Soak rice, urad dal, and fenugreek seeds for 6 hours, blend into smooth batter and ferment overnight.",
-      "Boil raw banana until tender, then mash with tomatoes, mustard seeds, curry leaves, and spices.",
-      "Spread batter on a hot griddle into crisp golden dosas.",
-      "Fill with raw banana masala, fold, and serve hot with coconut chutney."
-    ],
-    difficulty: "Easy",
-    bgTop: "#E8F5E9",
-    icon: "🍱"
-  }
-];
-
 const popularChips = ["Paneer Tikka", "Masala Dosa", "Veg Biryani", "Chinese Bhel", "Jain Special"];
 
 const categoryItems = [
@@ -73,18 +39,13 @@ export default function HomeScreen({ navigation }) {
   const [generatedRecipe, setGeneratedRecipe] = useState(null);
   const [modalVisible, setModalVisible] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
 
-  // Dynamic MongoDB Counts
+  // Dynamic MongoDB States
   const [savedRecipes, setSavedRecipes] = useState([]);
   const [mealPlansCount, setMealPlansCount] = useState(0);
   const [groceryCount, setGroceryCount] = useState(0);
-  const [refreshing, setRefreshing] = useState(false);
-
-  const onRefresh = async () => {
-    setRefreshing(true);
-    await fetchDashboardData();
-    setRefreshing(false);
-  };
+  const [loadingDashboard, setLoadingDashboard] = useState(true);
 
   useEffect(() => {
     if (isFocused) {
@@ -93,17 +54,20 @@ export default function HomeScreen({ navigation }) {
   }, [isFocused]);
 
   const fetchDashboardData = async () => {
+    setLoadingDashboard(true);
     try {
-      // 1. Saved Recipes from MongoDB
+      // 1. Fetch Live Saved Recipes from MongoDB
       const savedRes = await fetch(`${API_BASE_URL}/api/recipes/my-recipes`, {
         headers: { Authorization: `Bearer ${token}` }
       });
       const savedData = await savedRes.json();
       if (savedRes.ok && Array.isArray(savedData)) {
         setSavedRecipes(savedData);
+      } else {
+        setSavedRecipes([]);
       }
 
-      // 2. Meal Plans from MongoDB
+      // 2. Fetch Live Meal Plans & Calculate Grocery Items from MongoDB
       const mealRes = await fetch(`${API_BASE_URL}/api/meal-plans/all`, {
         headers: { Authorization: `Bearer ${token}` }
       });
@@ -115,10 +79,21 @@ export default function HomeScreen({ navigation }) {
           0
         );
         setGroceryCount(totalGrocery);
+      } else {
+        setMealPlansCount(0);
+        setGroceryCount(0);
       }
     } catch (err) {
-      console.error(err);
+      console.error("Dashboard data fetch error:", err);
+    } finally {
+      setLoadingDashboard(false);
     }
+  };
+
+  const onRefresh = async () => {
+    setRefreshing(true);
+    await fetchDashboardData();
+    setRefreshing(false);
   };
 
   const handleGenerateRecipe = async (queryText) => {
@@ -171,7 +146,7 @@ export default function HomeScreen({ navigation }) {
         throw new Error(data.msg || "Save failed");
       }
 
-      Alert.alert("Saved! ❤️", `"${generatedRecipe.title || generatedRecipe.name}" saved to your cookbook.`);
+      Alert.alert("Saved! ❤️", `"${generatedRecipe.title || generatedRecipe.name}" saved to your MongoDB collection.`);
       fetchDashboardData();
     } catch (err) {
       Alert.alert("Save Error", err.message || "Could not save recipe");
@@ -181,7 +156,6 @@ export default function HomeScreen({ navigation }) {
   };
 
   const firstName = user?.name ? user.name.split(" ")[0].toLowerCase() : "mithil";
-  const featuredList = savedRecipes.length > 0 ? savedRecipes : defaultFeaturedRecipes;
   const topPadding = (insets.top || 30) + 12;
 
   return (
@@ -265,7 +239,7 @@ export default function HomeScreen({ navigation }) {
           </TouchableOpacity>
         </View>
 
-        {/* 5. BROWSE & SAVE CAROUSEL */}
+        {/* 5. BROWSE & SAVE CAROUSEL (EXCLUSIVELY MONGODB DATA) */}
         <View style={styles.topHeaderRow}>
           <Text style={styles.headerTitle}>Browse & Save</Text>
           <TouchableOpacity onPress={() => navigation.navigate("SavedRecipes")}>
@@ -273,57 +247,68 @@ export default function HomeScreen({ navigation }) {
           </TouchableOpacity>
         </View>
 
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          snapToInterval={CARD_WIDTH + 16}
-          decelerationRate="fast"
-          style={styles.carouselRow}
-        >
-          {featuredList.map((item, idx) => {
-            const bgTop = item.bgTop || (idx % 2 === 0 ? "#E8F5E9" : "#FDE8D7");
-            const icon = item.icon || (idx % 2 === 0 ? "🍱" : "🍛");
+        {loadingDashboard ? (
+          <ActivityIndicator color={colors.sage} style={{ marginVertical: 20 }} />
+        ) : savedRecipes.length > 0 ? (
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            snapToInterval={CARD_WIDTH + 16}
+            decelerationRate="fast"
+            style={styles.carouselRow}
+          >
+            {savedRecipes.map((item, idx) => {
+              const bgTop = idx % 2 === 0 ? "#E8F5E9" : "#FDE8D7";
+              const icon = idx % 2 === 0 ? "🍱" : "🍛";
 
-            return (
-              <TouchableOpacity
-                key={item._id || idx}
-                style={styles.carouselCard}
-                onPress={() => {
-                  setGeneratedRecipe(item);
-                  setModalVisible(true);
-                }}
-              >
-                <View style={[styles.cardTopHalf, { backgroundColor: bgTop }]}>
-                  <Text style={styles.cardEmoji}>{icon}</Text>
-                  <View style={styles.heartCircle}>
-                    <Text style={{ fontSize: 13 }}>❤️</Text>
-                  </View>
-                </View>
-
-                <View style={styles.cardBottomHalf}>
-                  <Text style={styles.badgeLabel}>SAVED RECIPE</Text>
-                  <Text style={styles.recipeTitle} numberOfLines={1}>
-                    {item.title || item.name}
-                  </Text>
-                  <Text style={styles.recipeSnippet} numberOfLines={2}>
-                    {item.description || `${item.title || item.name} walks in with main-character energy: rich, authentic & delicious.`}
-                  </Text>
-
-                  <View style={styles.cardFooterRow}>
-                    <Text style={styles.ingredientCount}>
-                      {item.ingredients?.length || 10} ingredients
-                    </Text>
-                    <View style={styles.diffPill}>
-                      <Text style={styles.diffPillText}>
-                        {item.difficulty || "Moderate"}
-                      </Text>
+              return (
+                <TouchableOpacity
+                  key={item._id || idx}
+                  style={styles.carouselCard}
+                  onPress={() => {
+                    setGeneratedRecipe(item);
+                    setModalVisible(true);
+                  }}
+                >
+                  <View style={[styles.cardTopHalf, { backgroundColor: bgTop }]}>
+                    <Text style={styles.cardEmoji}>{icon}</Text>
+                    <View style={styles.heartCircle}>
+                      <Text style={{ fontSize: 13 }}>❤️</Text>
                     </View>
                   </View>
-                </View>
-              </TouchableOpacity>
-            );
-          })}
-        </ScrollView>
+
+                  <View style={styles.cardBottomHalf}>
+                    <Text style={styles.badgeLabel}>SAVED RECIPE</Text>
+                    <Text style={styles.recipeTitle} numberOfLines={1}>
+                      {item.title || item.name}
+                    </Text>
+                    <Text style={styles.recipeSnippet} numberOfLines={2}>
+                      {item.description || `${item.title || item.name} walks in with main-character energy.`}
+                    </Text>
+
+                    <View style={styles.cardFooterRow}>
+                      <Text style={styles.ingredientCount}>
+                        {item.ingredients?.length || 0} ingredients
+                      </Text>
+                      <View style={styles.diffPill}>
+                        <Text style={styles.diffPillText}>
+                          {item.difficulty || "Moderate"}
+                        </Text>
+                      </View>
+                    </View>
+                  </View>
+                </TouchableOpacity>
+              );
+            })}
+          </ScrollView>
+        ) : (
+          <View style={styles.noRecipesBanner}>
+            <Text style={styles.noRecipesTitle}>No saved recipes yet in your database</Text>
+            <Text style={styles.noRecipesSub}>
+              Search recipes above or use "Detect Ingredients" to save your favorites directly to MongoDB!
+            </Text>
+          </View>
+        )}
 
         {/* 6. SIDE-BY-SIDE ACTION CARDS */}
         <View style={styles.sideBySideRow}>
@@ -393,7 +378,7 @@ export default function HomeScreen({ navigation }) {
         </View>
       </ScrollView>
 
-      {/* RECIPE DETAILS MODAL */}
+      {/* DETAILED RECIPE VIEW MODAL (MATCHING WEB PLATFORM DESIGN) */}
       <Modal visible={modalVisible} animationType="slide" transparent={false}>
         <ScrollView style={styles.modalContainer} contentContainerStyle={styles.modalContent}>
           {generatedRecipe && (
@@ -405,17 +390,46 @@ export default function HomeScreen({ navigation }) {
               <Text style={styles.modalRecipeTitle}>
                 {generatedRecipe.title || generatedRecipe.name}
               </Text>
+
               {Boolean(generatedRecipe.description) && (
                 <Text style={styles.modalRecipeDesc}>{generatedRecipe.description}</Text>
               )}
 
-              <Text style={styles.sectionHeader}>Ingredients</Text>
+              {/* NUTRITION BREAKDOWN GRID */}
+              {generatedRecipe.nutrition && (
+                <View style={styles.nutritionBox}>
+                  <Text style={styles.nutritionTitle}>NUTRITION FACTS</Text>
+                  <View style={styles.nutritionGrid}>
+                    <View style={styles.nutritionCard}>
+                      <Text style={styles.nutritionValue}>{generatedRecipe.nutrition.calories || 0}</Text>
+                      <Text style={styles.nutritionLabel}>Calories</Text>
+                    </View>
+                    <View style={styles.nutritionCard}>
+                      <Text style={styles.nutritionValue}>{generatedRecipe.nutrition.protein || 0}g</Text>
+                      <Text style={styles.nutritionLabel}>Protein</Text>
+                    </View>
+                    <View style={styles.nutritionCard}>
+                      <Text style={styles.nutritionValue}>{generatedRecipe.nutrition.carbs || 0}g</Text>
+                      <Text style={styles.nutritionLabel}>Carbs</Text>
+                    </View>
+                    <View style={styles.nutritionCard}>
+                      <Text style={styles.nutritionValue}>{generatedRecipe.nutrition.fat || 0}g</Text>
+                      <Text style={styles.nutritionLabel}>Fat</Text>
+                    </View>
+                  </View>
+                </View>
+              )}
+
+              {/* INGREDIENTS SECTION */}
+              <Text style={styles.sectionHeader}>Ingredients ({generatedRecipe.ingredients?.length || 0})</Text>
               {generatedRecipe.ingredients?.map((ing, i) => (
-                <Text key={i} style={styles.ingredientItem}>
-                  • {ing}
-                </Text>
+                <View key={i} style={styles.ingredientRow}>
+                  <View style={styles.ingredientDot} />
+                  <Text style={styles.ingredientItem}>{ing}</Text>
+                </View>
               ))}
 
+              {/* STEP-BY-STEP INSTRUCTIONS SECTION */}
               <Text style={styles.sectionHeader}>Step-by-Step Instructions</Text>
               {generatedRecipe.steps?.map((step, sIdx) => (
                 <View key={sIdx} style={styles.stepRow}>
@@ -424,15 +438,28 @@ export default function HomeScreen({ navigation }) {
                 </View>
               ))}
 
-              <TouchableOpacity
-                style={styles.saveBtn}
-                onPress={handleSaveRecipe}
-                disabled={saving}
-              >
-                <Text style={styles.saveBtnText}>
-                  {saving ? "Saving..." : "❤️ Save Recipe"}
-                </Text>
-              </TouchableOpacity>
+              {/* ACTION BUTTONS */}
+              <View style={styles.modalActionRow}>
+                <TouchableOpacity
+                  style={styles.saveBtn}
+                  onPress={handleSaveRecipe}
+                  disabled={saving}
+                >
+                  <Text style={styles.saveBtnText}>
+                    {saving ? "Saving..." : "❤️ Save to Cookbook"}
+                  </Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={styles.planBtn}
+                  onPress={() => {
+                    setModalVisible(false);
+                    navigation.navigate("SavedRecipes");
+                  }}
+                >
+                  <Text style={styles.planBtnText}>📅 Add to Meal Plan</Text>
+                </TouchableOpacity>
+              </View>
             </>
           )}
         </ScrollView>
@@ -681,6 +708,26 @@ const styles = StyleSheet.create({
     fontWeight: "700",
     color: "#D96B43"
   },
+  noRecipesBanner: {
+    backgroundColor: colors.cardBg,
+    borderRadius: 20,
+    padding: 20,
+    marginBottom: 24,
+    borderWidth: 1,
+    borderColor: colors.border,
+    alignItems: "center"
+  },
+  noRecipesTitle: {
+    fontSize: 16,
+    fontWeight: "700",
+    color: colors.ink
+  },
+  noRecipesSub: {
+    fontSize: 13,
+    color: colors.subtext,
+    textAlign: "center",
+    marginTop: 4
+  },
   sideBySideRow: {
     flexDirection: "row",
     gap: 12,
@@ -830,6 +877,43 @@ const styles = StyleSheet.create({
     marginTop: 8,
     lineHeight: 22
   },
+  nutritionBox: {
+    backgroundColor: colors.sageSoft,
+    borderRadius: 16,
+    padding: 16,
+    marginTop: 20,
+    borderWidth: 1,
+    borderColor: "rgba(80, 105, 80, 0.2)"
+  },
+  nutritionTitle: {
+    fontSize: 11,
+    fontWeight: "800",
+    color: colors.sage,
+    letterSpacing: 1,
+    marginBottom: 10
+  },
+  nutritionGrid: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    gap: 8
+  },
+  nutritionCard: {
+    flex: 1,
+    backgroundColor: "#FFF",
+    borderRadius: 12,
+    paddingVertical: 10,
+    alignItems: "center"
+  },
+  nutritionValue: {
+    fontSize: 16,
+    fontWeight: "800",
+    color: colors.ink
+  },
+  nutritionLabel: {
+    fontSize: 11,
+    color: colors.subtext,
+    marginTop: 2
+  },
   sectionHeader: {
     fontSize: 20,
     fontWeight: "700",
@@ -837,10 +921,21 @@ const styles = StyleSheet.create({
     marginTop: 24,
     marginBottom: 12
   },
+  ingredientRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingVertical: 6
+  },
+  ingredientDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: colors.sage,
+    marginRight: 10
+  },
   ingredientItem: {
     fontSize: 15,
-    color: colors.ink,
-    paddingVertical: 4
+    color: colors.ink
   },
   stepRow: {
     flexDirection: "row",
@@ -863,16 +958,32 @@ const styles = StyleSheet.create({
     color: colors.ink,
     lineHeight: 22
   },
+  modalActionRow: {
+    gap: 12,
+    marginTop: 30,
+    marginBottom: 40
+  },
   saveBtn: {
     backgroundColor: colors.sage,
     borderRadius: 14,
     paddingVertical: 16,
-    alignItems: "center",
-    marginTop: 30,
-    marginBottom: 40
+    alignItems: "center"
   },
   saveBtnText: {
     color: "#FFF",
+    fontSize: 16,
+    fontWeight: "700"
+  },
+  planBtn: {
+    backgroundColor: colors.orangeSoft,
+    borderWidth: 1,
+    borderColor: colors.orange,
+    borderRadius: 14,
+    paddingVertical: 16,
+    alignItems: "center"
+  },
+  planBtnText: {
+    color: colors.orange,
     fontSize: 16,
     fontWeight: "700"
   }

@@ -6,7 +6,8 @@ import {
   ScrollView,
   TouchableOpacity,
   ActivityIndicator,
-  Modal
+  Modal,
+  Alert
 } from "react-native";
 import { AuthContext } from "../context/AuthContext";
 import { API_BASE_URL } from "../config/api";
@@ -30,12 +31,42 @@ export default function SavedRecipesScreen({ navigation }) {
       const data = await res.json();
       if (res.ok && Array.isArray(data)) {
         setRecipes(data);
+      } else {
+        setRecipes([]);
       }
     } catch (err) {
-      console.error(err);
+      console.error("Saved recipes fetch error:", err);
     } finally {
       setLoading(false);
     }
+  };
+
+  const deleteRecipe = async (id) => {
+    Alert.alert("Delete Recipe", "Are you sure you want to remove this recipe from your cookbook?", [
+      { text: "Cancel", style: "cancel" },
+      {
+        text: "Delete",
+        style: "destructive",
+        onPress: async () => {
+          try {
+            const res = await fetch(`${API_BASE_URL}/api/recipes/${id}`, {
+              method: "DELETE",
+              headers: { Authorization: `Bearer ${token}` }
+            });
+
+            if (res.ok) {
+              setRecipes((prev) => prev.filter((r) => r._id !== id));
+              if (selectedRecipe?._id === id) setSelectedRecipe(null);
+            } else {
+              const data = await res.json();
+              Alert.alert("Delete Failed", data.msg || "Could not delete recipe");
+            }
+          } catch (err) {
+            Alert.alert("Error", err.message || "Could not delete recipe");
+          }
+        }
+      }
+    ]);
   };
 
   return (
@@ -52,30 +83,44 @@ export default function SavedRecipesScreen({ navigation }) {
       ) : recipes.length === 0 ? (
         <View style={styles.emptyContainer}>
           <Text style={styles.emptyIcon}>❤️</Text>
-          <Text style={styles.emptyTitle}>No saved recipes yet</Text>
-          <Text style={styles.emptySub}>Generate or search recipes to save your favorites here.</Text>
+          <Text style={styles.emptyTitle}>No saved recipes in your database</Text>
+          <Text style={styles.emptySub}>
+            Search recipes on Home or use "Detect Ingredients" to save your favorites directly to MongoDB!
+          </Text>
         </View>
       ) : (
-        <ScrollView contentContainerStyle={styles.scrollContent}>
+        <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
           {recipes.map((item, idx) => (
-            <TouchableOpacity
-              key={item._id || idx}
-              style={styles.card}
-              onPress={() => setSelectedRecipe(item)}
-            >
-              <Text style={styles.cardTitle}>{item.title}</Text>
+            <View key={item._id || idx} style={styles.card}>
+              <Text style={styles.cardTitle}>{item.title || item.name}</Text>
               {Boolean(item.description) && (
                 <Text style={styles.cardDesc} numberOfLines={2}>{item.description}</Text>
               )}
               <Text style={styles.ingredientCount}>
                 {item.ingredients?.length || 0} ingredients • {item.steps?.length || 0} steps
               </Text>
-            </TouchableOpacity>
+
+              <View style={styles.cardActionRow}>
+                <TouchableOpacity
+                  style={styles.viewBtn}
+                  onPress={() => setSelectedRecipe(item)}
+                >
+                  <Text style={styles.viewBtnText}>👁️ View Recipe</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={styles.deleteBtn}
+                  onPress={() => deleteRecipe(item._id)}
+                >
+                  <Text style={styles.deleteBtnText}>🗑️ Delete</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
           ))}
         </ScrollView>
       )}
 
-      {/* FULL RECIPE MODAL */}
+      {/* DETAILED RECIPE VIEW MODAL */}
       <Modal visible={Boolean(selectedRecipe)} animationType="slide" transparent={false}>
         <ScrollView style={styles.modalContainer} contentContainerStyle={styles.modalContent}>
           {selectedRecipe && (
@@ -84,14 +129,42 @@ export default function SavedRecipesScreen({ navigation }) {
                 <Text style={styles.closeBtnText}>✕ Close</Text>
               </TouchableOpacity>
 
-              <Text style={styles.modalTitle}>{selectedRecipe.title}</Text>
+              <Text style={styles.modalTitle}>{selectedRecipe.title || selectedRecipe.name}</Text>
               {Boolean(selectedRecipe.description) && (
                 <Text style={styles.modalDesc}>{selectedRecipe.description}</Text>
               )}
 
-              <Text style={styles.sectionTitle}>Ingredients</Text>
+              {/* NUTRITION BREAKDOWN GRID */}
+              {selectedRecipe.nutrition && (
+                <View style={styles.nutritionBox}>
+                  <Text style={styles.nutritionTitle}>NUTRITION FACTS</Text>
+                  <View style={styles.nutritionGrid}>
+                    <View style={styles.nutritionCard}>
+                      <Text style={styles.nutritionValue}>{selectedRecipe.nutrition.calories || 0}</Text>
+                      <Text style={styles.nutritionLabel}>Calories</Text>
+                    </View>
+                    <View style={styles.nutritionCard}>
+                      <Text style={styles.nutritionValue}>{selectedRecipe.nutrition.protein || 0}g</Text>
+                      <Text style={styles.nutritionLabel}>Protein</Text>
+                    </View>
+                    <View style={styles.nutritionCard}>
+                      <Text style={styles.nutritionValue}>{selectedRecipe.nutrition.carbs || 0}g</Text>
+                      <Text style={styles.nutritionLabel}>Carbs</Text>
+                    </View>
+                    <View style={styles.nutritionCard}>
+                      <Text style={styles.nutritionValue}>{selectedRecipe.nutrition.fat || 0}g</Text>
+                      <Text style={styles.nutritionLabel}>Fat</Text>
+                    </View>
+                  </View>
+                </View>
+              )}
+
+              <Text style={styles.sectionTitle}>Ingredients ({selectedRecipe.ingredients?.length || 0})</Text>
               {selectedRecipe.ingredients?.map((ing, i) => (
-                <Text key={i} style={styles.ingredientItem}>• {ing}</Text>
+                <View key={i} style={styles.ingredientRow}>
+                  <View style={styles.ingredientDot} />
+                  <Text style={styles.ingredientItem}>{ing}</Text>
+                </View>
               ))}
 
               <Text style={styles.sectionTitle}>Cooking Instructions</Text>
@@ -101,6 +174,25 @@ export default function SavedRecipesScreen({ navigation }) {
                   <Text style={styles.stepText}>{step}</Text>
                 </View>
               ))}
+
+              <View style={styles.modalActionRow}>
+                <TouchableOpacity
+                  style={styles.planBtn}
+                  onPress={() => {
+                    setSelectedRecipe(null);
+                    navigation.navigate("MainTabs", { screen: "Meal Plan" });
+                  }}
+                >
+                  <Text style={styles.planBtnText}>📅 Add to Meal Plan</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={styles.modalDeleteBtn}
+                  onPress={() => deleteRecipe(selectedRecipe._id)}
+                >
+                  <Text style={styles.modalDeleteBtnText}>🗑️ Delete Recipe</Text>
+                </TouchableOpacity>
+              </View>
             </>
           )}
         </ScrollView>
@@ -168,7 +260,36 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: "600",
     color: colors.sage,
-    marginTop: 10
+    marginTop: 8
+  },
+  cardActionRow: {
+    flexDirection: "row",
+    gap: 8,
+    marginTop: 14
+  },
+  viewBtn: {
+    flex: 1,
+    backgroundColor: colors.orange,
+    paddingVertical: 10,
+    borderRadius: 12,
+    alignItems: "center"
+  },
+  viewBtnText: {
+    color: "#FFF",
+    fontWeight: "700",
+    fontSize: 13
+  },
+  deleteBtn: {
+    backgroundColor: "#FCE4E4",
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderRadius: 12,
+    alignItems: "center"
+  },
+  deleteBtnText: {
+    color: colors.danger,
+    fontWeight: "700",
+    fontSize: 13
   },
   emptyContainer: {
     flex: 1,
@@ -220,6 +341,43 @@ const styles = StyleSheet.create({
     marginTop: 8,
     lineHeight: 22
   },
+  nutritionBox: {
+    backgroundColor: colors.sageSoft,
+    borderRadius: 16,
+    padding: 16,
+    marginTop: 20,
+    borderWidth: 1,
+    borderColor: "rgba(80, 105, 80, 0.2)"
+  },
+  nutritionTitle: {
+    fontSize: 11,
+    fontWeight: "800",
+    color: colors.sage,
+    letterSpacing: 1,
+    marginBottom: 10
+  },
+  nutritionGrid: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    gap: 8
+  },
+  nutritionCard: {
+    flex: 1,
+    backgroundColor: "#FFF",
+    borderRadius: 12,
+    paddingVertical: 10,
+    alignItems: "center"
+  },
+  nutritionValue: {
+    fontSize: 16,
+    fontWeight: "800",
+    color: colors.ink
+  },
+  nutritionLabel: {
+    fontSize: 11,
+    color: colors.subtext,
+    marginTop: 2
+  },
   sectionTitle: {
     fontSize: 20,
     fontWeight: "700",
@@ -227,10 +385,21 @@ const styles = StyleSheet.create({
     marginTop: 24,
     marginBottom: 12
   },
+  ingredientRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingVertical: 6
+  },
+  ingredientDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: colors.sage,
+    marginRight: 10
+  },
   ingredientItem: {
     fontSize: 15,
-    color: colors.ink,
-    paddingVertical: 4
+    color: colors.ink
   },
   stepRow: {
     flexDirection: "row",
@@ -252,5 +421,32 @@ const styles = StyleSheet.create({
     fontSize: 15,
     color: colors.ink,
     lineHeight: 22
+  },
+  modalActionRow: {
+    gap: 12,
+    marginTop: 30,
+    marginBottom: 40
+  },
+  planBtn: {
+    backgroundColor: colors.sage,
+    borderRadius: 14,
+    paddingVertical: 16,
+    alignItems: "center"
+  },
+  planBtnText: {
+    color: "#FFF",
+    fontSize: 16,
+    fontWeight: "700"
+  },
+  modalDeleteBtn: {
+    backgroundColor: "#FCE4E4",
+    borderRadius: 14,
+    paddingVertical: 14,
+    alignItems: "center"
+  },
+  modalDeleteBtnText: {
+    color: colors.danger,
+    fontSize: 15,
+    fontWeight: "700"
   }
 });
